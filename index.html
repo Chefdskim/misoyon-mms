@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>미소연 통합 메뉴 관리 시스템</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @media print { .no-print { display: none !important; } .print-only { display: block !important; } }
+        body { -webkit-tap-highlight-color: transparent; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        const MisoYonApp = () => {
+            const [isAdmin, setIsAdmin] = useState(false); // 보안: 관리자 모드 여부
+            const [menuMaster, setMenuMaster] = useState([]); // 엑셀 데이터
+            const [mealPlan, setMealPlan] = useState([]); // 현재 식단
+            const [searchQuery, setSearchQuery] = useState("");
+
+            // 1. 엑셀 업로드 (기능 연동)
+            const handleUpload = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    const bstr = evt.target.result;
+                    const wb = XLSX.read(bstr, { type: 'binary' });
+                    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                    const sanitized = data.map((row, i) => ({
+                        id: i,
+                        name: row['메뉴명'] || '이름없음',
+                        kcal: parseInt(row['칼로리']) || 0,
+                        protein: parseInt(row['단백질']) || 0,
+                        category: row['카테고리'] || '일반'
+                    }));
+                    setMenuMaster(sanitized);
+                    alert(`${sanitized.length}개의 데이터가 로드되었습니다.`);
+                };
+                reader.readAsBinaryString(file);
+            };
+
+            // 2. 영양가 자동 분석 (기능 C)
+            const nutrition = useMemo(() => {
+                return mealPlan.reduce((acc, cur) => ({
+                    kcal: acc.kcal + cur.kcal,
+                    protein: acc.protein + cur.protein
+                }), { kcal: 0, protein: 0 });
+            }, [mealPlan]);
+
+            // 3. 인쇄 기능 (기능 A)
+            const handlePrint = () => window.print();
+
+            return (
+                <div className="min-h-screen bg-gray-50 pb-20">
+                    {/* 상단 네비게이션 */}
+                    <nav className={`p-4 text-white flex justify-between items-center no-print ${isAdmin ? 'bg-red-700' : 'bg-blue-800'}`}>
+                        <h1 className="font-black tracking-tighter">MISOYON MMS v1.0</h1>
+                        <button onClick={() => setIsAdmin(!isAdmin)} className="text-[10px] border px-2 py-1 rounded">
+                            {isAdmin ? "관리자 로그아웃" : "관리자 로그인"}
+                        </button>
+                    </nav>
+
+                    <div className="max-w-4xl mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* 왼쪽: 메뉴 검색 (모바일에서는 상단) */}
+                        <div className="lg:col-span-4 space-y-4 no-print">
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+                                <h3 className="font-bold text-xs text-gray-400 mb-3">EXCEL DATA IMPORT</h3>
+                                <input type="file" onChange={handleUpload} className="text-xs w-full" />
+                            </div>
+                            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+                                <input 
+                                    placeholder="메뉴/초성 검색..." 
+                                    className="w-full p-3 bg-gray-50 rounded-xl mb-4 outline-none border focus:border-blue-500"
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                                <div className="max-h-64 overflow-y-auto space-y-2">
+                                    {menuMaster.filter(m => m.name.includes(searchQuery)).map(m => (
+                                        <div key={m.id} onClick={() => setMealPlan([...mealPlan, m])} className="p-3 border rounded-xl hover:bg-blue-50 cursor-pointer flex justify-between items-center text-sm">
+                                            <span className="font-bold">{m.name}</span>
+                                            <span className="text-blue-500 font-black">+</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 오른쪽: 식단표 및 영양 분석 */}
+                        <div className="lg:col-span-8 print:col-span-12">
+                            <div className="bg-white p-6 lg:p-10 rounded-3xl shadow-sm border border-gray-100 print:border-none">
+                                <div className="flex justify-between items-end mb-6">
+                                    <h2 className="text-2xl font-black">오늘의 식단</h2>
+                                    <div className="text-right">
+                                        <p className="text-[10px] text-gray-400 uppercase">Total Nutrition</p>
+                                        <p className="text-lg font-bold text-blue-600">{nutrition.kcal}kcal / {nutrition.protein}g</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-3 min-h-[200px] border-t pt-6">
+                                    {mealPlan.map((m, idx) => (
+                                        <div key={idx} className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl">
+                                            <span className="font-bold text-gray-700">{m.name}</span>
+                                            {isAdmin && <button onClick={() => setMealPlan(mealPlan.filter((_, i) => i !== idx))} className="text-red-300 no-print">삭제</button>}
+                                        </div>
+                                    ))}
+                                </div>
+                                <button onClick={handlePrint} className="w-full mt-8 py-4 bg-gray-900 text-white rounded-2xl font-bold no-print shadow-lg active:scale-95 transition">
+                                    식단표 PDF 저장 / 인쇄하기
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 하단 탭바 (모바일 최적화) */}
+                    <footer className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 flex justify-around no-print lg:hidden">
+                        <button className="text-blue-600 font-bold text-xs">🏠 홈</button>
+                        <button className="text-gray-400 font-bold text-xs">🍳 레시피</button>
+                        <button className="text-gray-400 font-bold text-xs">📁 관리</button>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MisoYonApp />);
+    </script>
+</body>
+</html>
