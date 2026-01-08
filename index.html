@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>미소연 MMS v3.7 - 복사 붙여넣기 모드</title>
+    <title>미소연 MMS v3.8</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
-        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background-color: #cbd5e1; gap: 1px; border-radius: 12px; overflow: hidden; }
-        .calendar-day { min-height: 110px; background: white; padding: 8px; cursor: pointer; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background-color: #e2e8f0; gap: 1px; border-radius: 12px; overflow: hidden; }
+        .calendar-day { min-height: 100px; background: white; padding: 6px; cursor: pointer; }
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
-        .menu-text { font-size: 10px; font-weight: 800; padding: 2px 4px; border-radius: 4px; margin-top: 2px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dot-menu { font-size: 10px; padding: 1px 3px; border-radius: 4px; margin-top: 1px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+        @media print { .no-print { display: none; } body { background: white; } }
     </style>
 </head>
 <body>
@@ -26,29 +27,30 @@
             const [menus, setMenus] = useState([]);
             const [selectedDate, setSelectedDate] = useState(null);
             const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
-            const [inputText, setInputText] = useState("");
+            const [rawInput, setRawInput] = useState("");
 
-            const handleProcessText = () => {
-                const lines = inputText.split('\n');
-                const formatted = lines.map(line => {
-                    const parts = line.split(/,|\t/); // 쉼표나 탭으로 분리
-                    if (parts.length < 4) return null;
-
-                    const d = parts[0].match(/\d+/g);
+            // 데이터를 파싱하는 핵심 로직 (CSV 및 복사 데이터 대응)
+            const handleData = () => {
+                const rows = rawInput.split('\n');
+                const formatted = rows.map(line => {
+                    const col = line.split(/,|\t/); // 쉼표나 탭으로 구분
+                    if (col.length < 4) return null;
+                    
+                    const d = col[0].match(/\d+/g);
                     if (!d || d.length < 3) return null;
-                    const cleanDate = `${d[0]}-${String(d[1]).padStart(2, '0')}-${String(d[2]).padStart(2, '0')}`;
+                    const dateStr = `${d[0]}-${String(d[1]).padStart(2, '0')}-${String(d[2]).padStart(2, '0')}`;
 
                     return {
-                        date: cleanDate,
-                        morning: parts[1]?.replace(/"/g, '').trim(),
-                        lunch: parts[2]?.replace(/"/g, '').trim(),
-                        dinner: parts[3]?.replace(/"/g, '').trim(),
-                        staff: parts[5]?.replace(/"/g, '').trim() || "현황 없음"
+                        date: dateStr,
+                        morning: col[1]?.replace(/"/g, '').trim(),
+                        lunch: col[2]?.replace(/"/g, '').trim(),
+                        dinner: col[3]?.replace(/"/g, '').trim(),
+                        staff: col[5]?.replace(/"/g, '').trim() || "정보 없음"
                     };
                 }).filter(Boolean);
 
                 setMenus(formatted);
-                if(formatted.length > 0) alert(formatted.length + "일치 데이터를 적용했습니다.");
+                if(formatted.length > 0) alert(`${formatted.length}일치 데이터를 적용했습니다.`);
             };
 
             const calendarDays = useMemo(() => {
@@ -67,59 +69,87 @@
             }, [currentMonth, menus]);
 
             return (
-                <div className="p-4 max-w-6xl mx-auto">
-                    <header className="bg-white p-6 rounded-3xl shadow-sm border mb-6">
-                        <h1 className="text-xl font-black text-blue-600 mb-4">MISOYON MMS v3.7 (안정화 버전)</h1>
-                        <div className="flex flex-col gap-2">
-                            <textarea 
-                                className="w-full p-3 border rounded-xl text-sm" 
-                                rows="3" 
-                                placeholder="엑셀 내용을 복사해서 여기에 붙여넣으세요 (날짜, 아침, 점심, 저녁 순서)"
-                                value={inputText}
-                                onChange={(e) => setInputText(e.target.value)}
-                            />
-                            <button onClick={handleProcessText} className="bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">식단 적용하기</button>
-                        </div>
+                <div className="max-w-6xl mx-auto p-4 pb-20">
+                    <header className="no-print mb-6 bg-white p-6 rounded-3xl border shadow-sm">
+                        <h1 className="text-2xl font-black text-blue-600 mb-4">MISOYON 식단 관리 시스템</h1>
+                        <textarea 
+                            className="w-full p-4 border rounded-2xl text-sm mb-2 focus:ring-2 focus:ring-blue-500 outline-none" 
+                            rows="3" 
+                            placeholder="엑셀이나 메모장 내용을 복사해서 여기에 붙여넣으세요."
+                            value={rawInput}
+                            onChange={(e) => setRawInput(e.target.value)}
+                        />
+                        <button onClick={handleData} className="w-full bg-blue-600 text-white py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all">식단 데이터 적용</button>
                     </header>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 bg-white p-4 rounded-2xl border">
-                            <div className="flex justify-between mb-4 px-2">
-                                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))}>◀</button>
-                                <h2 className="font-bold">{currentMonth.getFullYear()}년 {currentMonth.getMonth()+1}월</h2>
-                                <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))}>▶</button>
-                            </div>
-                            <div className="calendar-grid">
-                                {['일','월','화','수','목','금','토'].map(d => <div key={d} className="bg-slate-50 py-2 text-center text-[10px] font-bold text-slate-400">{d}</div>)}
-                                {calendarDays.map((d, i) => (
-                                    <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={() => d?.data && setSelectedDate(d.data)}>
-                                        {d && (
-                                            <>
-                                                <span className={`text-xs font-bold ${d.data ? 'text-blue-600' : 'text-slate-300'}`}>{d.day}</span>
-                                                {d.data && (
-                                                    <div>
-                                                        <span className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</span>
-                                                        <span className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</span>
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                ))}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* 왼쪽: 달력 */}
+                        <div className="lg:col-span-7 no-print">
+                            <div className="bg-white p-6 rounded-3xl border shadow-sm">
+                                <div className="flex justify-between items-center mb-6">
+                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))} className="text-xl">◀</button>
+                                    <h2 className="text-2xl font-black">{currentMonth.getFullYear()}년 {currentMonth.getMonth()+1}월</h2>
+                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))} className="text-xl">▶</button>
+                                </div>
+                                <div className="calendar-grid">
+                                    {['일','월','화','수','목','금','토'].map(d => <div key={d} className="bg-slate-50 py-3 text-center text-xs font-bold text-slate-400">{d}</div>)}
+                                    {calendarDays.map((d, i) => (
+                                        <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={() => d?.data && setSelectedDate(d.data)}>
+                                            {d && (
+                                                <>
+                                                    <span className={`text-xs font-bold ${d.data ? 'text-blue-600' : 'text-slate-300'}`}>{d.day}</span>
+                                                    {d.data && (
+                                                        <div className="mt-1">
+                                                            <span className="dot-menu bg-orange-50 text-orange-600">조: {d.data.morning.split(',')[0]}</span>
+                                                            <span className="dot-menu bg-blue-50 text-blue-600">중: {d.data.lunch.split(',')[0]}</span>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                        <div className="bg-white p-6 rounded-2xl border shadow-lg">
+
+                        {/* 오른쪽: 상세 정보 (인쇄 영역) */}
+                        <div className="lg:col-span-5">
                             {selectedDate ? (
-                                <div>
-                                    <h3 className="font-black text-blue-600 mb-4">{selectedDate.date}</h3>
-                                    <div className="bg-slate-900 text-white p-4 rounded-xl mb-4 text-sm">{selectedDate.staff}</div>
-                                    <div className="space-y-3">
-                                        <div className="p-3 bg-orange-50 rounded-lg"><p className="text-[10px] font-bold text-orange-400">아침</p><p className="font-bold">{selectedDate.morning}</p></div>
-                                        <div className="p-3 bg-blue-50 rounded-lg"><p className="text-[10px] font-bold text-blue-400">점심</p><p className="font-bold">{selectedDate.lunch}</p></div>
-                                        <div className="p-3 bg-purple-50 rounded-lg"><p className="text-[10px] font-bold text-purple-400">저녁</p><p className="font-bold">{selectedDate.dinner}</p></div>
+                                <div className="bg-white p-8 rounded-3xl border-2 border-blue-100 shadow-xl relative overflow-hidden">
+                                    <div className="mb-8 border-b pb-6">
+                                        <h3 className="text-blue-600 font-black text-lg mb-1">{selectedDate.date}</h3>
+                                        <h2 className="text-3xl font-black text-slate-900">오늘의 식단 안내</h2>
                                     </div>
+                                    
+                                    <div className="space-y-6">
+                                        <div className="p-5 bg-slate-50 rounded-2xl">
+                                            <p className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-widest">Personnel / 근무 현황</p>
+                                            <p className="text-lg font-bold text-slate-700 leading-relaxed">{selectedDate.staff}</p>
+                                        </div>
+
+                                        <div className="grid gap-4">
+                                            <div className="p-6 bg-orange-50 rounded-2xl border border-orange-100">
+                                                <span className="text-orange-600 font-black text-sm block mb-1">MORNING 아침</span>
+                                                <p className="text-xl font-black text-orange-900">{selectedDate.morning}</p>
+                                            </div>
+                                            <div className="p-6 bg-blue-50 rounded-2xl border border-blue-100">
+                                                <span className="text-blue-600 font-black text-sm block mb-1">LUNCH 점심</span>
+                                                <p className="text-xl font-black text-blue-900">{selectedDate.lunch}</p>
+                                            </div>
+                                            <div className="p-6 bg-purple-50 rounded-2xl border border-purple-100">
+                                                <span className="text-purple-600 font-black text-sm block mb-1">DINNER 저녁</span>
+                                                <p className="text-xl font-black text-purple-900">{selectedDate.dinner}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={() => window.print()} className="no-print w-full mt-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-black transition-all">이 화면 인쇄하기</button>
                                 </div>
-                            ) : <div className="text-center py-20 text-slate-300 font-bold">날짜를 선택하세요</div>}
+                            ) : (
+                                <div className="h-full flex items-center justify-center bg-slate-50 border-2 border-dashed rounded-3xl p-20 text-center">
+                                    <p className="text-slate-400 font-bold leading-relaxed">달력의 날짜를 선택하면<br/>이곳에 상세 식단이 표시됩니다.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
