@@ -3,147 +3,201 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>미소연 레시피 & 식단 관리 v1.4</title>
+    <title>미소연 레시피 관리 시스템 v1.5</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&display=swap');
+        body { font-family: 'Noto Sans KR', sans-serif; }
+        @media print { .no-print { display: none !important; } }
+    </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-50 text-slate-900">
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useMemo } = React;
+        const { useState, useEffect, useMemo } = React;
 
         const MisoYonApp = () => {
-            const [viewMode, setViewMode] = useState('daily'); // daily, weekly, monthly
-            const [menuData, setMenuData] = useState([]); // 전체 메뉴/레시피 데이터
-            const [selectedRecipe, setSelectedRecipe] = useState(null); // 상세보기용
+            const [viewMode, setViewMode] = useState('일간');
+            const [menus, setMenus] = useState(() => {
+                const saved = localStorage.getItem('misoMenus');
+                return saved ? JSON.parse(saved) : [];
+            });
             const [searchTerm, setSearchTerm] = useState("");
+            const [selectedMenu, setSelectedMenu] = useState(null);
+            const [isEditing, setIsEditing] = useState(false);
 
-            // 엑셀 데이터 파싱 (셰프님 파일 구조 대응)
-            const handleFile = (e) => {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                    const wb = XLSX.read(evt.target.result, { type: 'binary' });
-                    const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                    // 레시피 형식으로 가공 (데이터에 레시피 내용이 포함되어 있다고 가정)
-                    const processed = raw.map((item, idx) => ({
-                        id: idx,
-                        date: item['일자'] || '날짜미상',
-                        type: item['구분'] || '일반',
-                        name: item['메뉴명'] || item['메뉴'] || '이름없음',
-                        recipe: item['레시피'] || item['조리법'] || '등록된 레시피 내용이 없습니다.',
-                        nutrition: item['영양성분'] || '기록 없음',
-                        week: item['주차'] || '1주차'
-                    }));
-                    setMenuData(processed);
+            // 데이터 변경 시 자동 저장
+            useEffect(() => {
+                localStorage.setItem('misoMenus', JSON.stringify(menus));
+            }, [menus]);
+
+            // 메뉴 추가/수정 함수
+            const saveMenu = (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const newMenu = {
+                    id: selectedMenu?.id || Date.now(),
+                    date: formData.get('date'),
+                    name: formData.get('name'),
+                    recipe: formData.get('recipe'),
+                    nutrition: formData.get('nutrition'),
+                    category: formData.get('category')
                 };
-                reader.readAsBinaryString(file);
+
+                if (selectedMenu) {
+                    setMenus(menus.map(m => m.id === selectedMenu.id ? newMenu : m));
+                } else {
+                    setMenus([...menus, newMenu]);
+                }
+                setIsEditing(false);
+                setSelectedMenu(newMenu);
+            };
+
+            const deleteMenu = (id) => {
+                if(confirm("정말 삭제하시겠습니까?")) {
+                    setMenus(menus.filter(m => m.id !== id));
+                    setSelectedMenu(null);
+                }
             };
 
             const filteredList = useMemo(() => {
-                return menuData.filter(m => m.name.includes(searchTerm) || m.date.includes(searchTerm));
-            }, [menuData, searchTerm]);
+                return menus.filter(m => m.name.includes(searchTerm) || m.date.includes(searchTerm));
+            }, [menus, searchTerm]);
 
             return (
                 <div className="min-h-screen flex flex-col">
-                    {/* 상단바: 검색 및 모드 전환 */}
-                    <header className="bg-slate-900 text-white p-4 sticky top-0 z-20 no-print">
-                        <div className="max-w-7xl mx-auto flex flex-wrap gap-4 justify-between items-center">
-                            <div className="flex items-center gap-4">
-                                <h1 className="text-xl font-black tracking-tighter text-blue-400">MISOYON v1.4</h1>
-                                <div className="flex bg-slate-800 rounded-lg p-1">
-                                    {['daily', 'weekly', 'monthly'].map(mode => (
+                    {/* 상단 헤더 */}
+                    <header className="bg-white border-b sticky top-0 z-20 no-print shadow-sm">
+                        <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
+                            <div className="flex items-center gap-8">
+                                <h1 className="text-2xl font-black text-blue-600 tracking-tighter">미소연 MMS v1.5</h1>
+                                <nav className="flex bg-gray-100 rounded-xl p-1">
+                                    {['일간', '주간', '월간'].map(mode => (
                                         <button 
                                             key={mode}
                                             onClick={() => setViewMode(mode)}
-                                            className={`px-4 py-1.5 rounded-md text-xs font-bold transition ${viewMode === mode ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
+                                            className={`px-6 py-2 rounded-lg text-sm font-bold transition ${viewMode === mode ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500'}`}
                                         >
-                                            {mode.toUpperCase()}
+                                            {mode}
                                         </button>
                                     ))}
-                                </div>
+                                </nav>
                             </div>
-                            
-                            <div className="flex-grow max-w-md relative">
+                            <div className="flex gap-3">
                                 <input 
                                     type="text" 
-                                    placeholder="날짜 또는 메뉴명 스마트 검색..." 
-                                    className="w-full bg-slate-800 border-none rounded-xl px-4 py-2 text-sm focus:ring-2 ring-blue-500"
+                                    placeholder="날짜 또는 메뉴 검색..." 
+                                    className="border rounded-xl px-4 py-2 text-sm w-64 outline-none focus:ring-2 ring-blue-500/20"
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
+                                <button 
+                                    onClick={() => {setSelectedMenu(null); setIsEditing(true);}}
+                                    className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-blue-700 transition"
+                                >
+                                    + 새 메뉴 등록
+                                </button>
                             </div>
-
-                            <label className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer transition">
-                                파일 업데이트
-                                <input type="file" onChange={handleFile} className="hidden" />
-                            </label>
                         </div>
                     </header>
 
-                    <div className="max-w-7xl mx-auto w-full p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        {/* 왼쪽: 메뉴 목록 (일간/주간/월간 리스트) */}
-                        <main className="lg:col-span-8">
-                            <div className="bg-white rounded-3xl shadow-sm border p-6 min-h-[70vh]">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-2xl font-black text-slate-800 capitalize">{viewMode} Menu List</h2>
-                                    <button onClick={() => window.print()} className="text-sm font-bold text-blue-600 underline">현재 화면 출력/저장</button>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="max-w-7xl mx-auto w-full p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* 왼쪽 목록 */}
+                        <aside className="lg:col-span-5 no-print">
+                            <div className="bg-white rounded-3xl border shadow-sm p-6 overflow-hidden">
+                                <h2 className="text-lg font-bold mb-4 flex justify-between items-center">
+                                    <span>식단 목록 ({viewMode})</span>
+                                    <span className="text-xs text-gray-400 font-normal">총 {filteredList.length}건</span>
+                                </h2>
+                                <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
                                     {filteredList.map(m => (
                                         <div 
                                             key={m.id} 
-                                            onClick={() => setSelectedRecipe(m)}
-                                            className="p-5 border rounded-2xl hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition group"
+                                            onClick={() => {setSelectedMenu(m); setIsEditing(false);}}
+                                            className={`p-5 rounded-2xl border transition-all cursor-pointer ${selectedMenu?.id === m.id ? 'border-blue-500 bg-blue-50' : 'hover:border-gray-300 bg-white'}`}
                                         >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className="text-[10px] font-bold bg-slate-100 px-2 py-1 rounded text-slate-500">{m.date} | {m.type}</span>
+                                            <div className="flex justify-between text-[11px] font-bold text-gray-400 mb-1">
+                                                <span>{m.date}</span>
+                                                <span>{m.category}</span>
                                             </div>
-                                            <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-600">{m.name}</h3>
-                                            <p className="text-xs text-slate-400 mt-2 line-clamp-1">{m.recipe}</p>
+                                            <h3 className="font-bold text-slate-800">{m.name}</h3>
                                         </div>
                                     ))}
                                 </div>
                             </div>
-                        </main>
+                        </aside>
 
-                        {/* 오른쪽: 레시피 상세보기 패널 */}
-                        <aside className="lg:col-span-4 no-print">
-                            <div className="bg-white rounded-3xl shadow-xl border border-blue-100 p-8 sticky top-24 min-h-[500px]">
-                                {selectedRecipe ? (
-                                    <div className="animate-in fade-in duration-300">
-                                        <h2 className="text-2xl font-black text-slate-900 mb-2">{selectedRecipe.name}</h2>
-                                        <div className="flex gap-2 mb-6">
-                                            <span className="text-xs font-bold bg-blue-100 text-blue-600 px-3 py-1 rounded-full">영양성분 포함</span>
+                        {/* 오른쪽 상세 및 수정 창 */}
+                        <main className="lg:col-span-7">
+                            <div className="bg-white rounded-3xl border shadow-lg p-8 min-h-[75vh]">
+                                {isEditing ? (
+                                    <form onSubmit={saveMenu} className="space-y-6">
+                                        <h2 className="text-xl font-black mb-4">{selectedMenu ? "메뉴 수정하기" : "새 메뉴 등록하기"}</h2>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-400 mb-1">날짜</label>
+                                                <input name="date" type="date" required defaultValue={selectedMenu?.date} className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500/20" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-gray-400 mb-1">구분 (조식/중식/석식 등)</label>
+                                                <input name="category" placeholder="예: 중식" defaultValue={selectedMenu?.category} className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500/20" />
+                                            </div>
                                         </div>
-                                        
-                                        <div className="space-y-6">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-400 mb-1">메뉴명</label>
+                                            <input name="name" placeholder="메뉴 이름을 입력하세요" required defaultValue={selectedMenu?.name} className="w-full border rounded-xl p-3 text-lg font-bold outline-none focus:ring-2 ring-blue-500/20" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-400 mb-1">상세 레시피</label>
+                                            <textarea name="recipe" rows="8" placeholder="조리 순서 및 식재료를 입력하세요" defaultValue={selectedMenu?.recipe} className="w-full border rounded-xl p-4 text-sm leading-relaxed outline-none focus:ring-2 ring-blue-500/20"></textarea>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-400 mb-1">영양성분 및 비고</label>
+                                            <input name="nutrition" placeholder="예: 750kcal / 단백질 30g" defaultValue={selectedMenu?.nutrition} className="w-full border rounded-xl p-3 text-sm outline-none focus:ring-2 ring-blue-500/20" />
+                                        </div>
+                                        <div className="flex gap-3 pt-4">
+                                            <button type="submit" className="flex-grow bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-blue-600 transition">저장하기</button>
+                                            <button type="button" onClick={() => setIsEditing(false)} className="px-8 bg-gray-100 rounded-2xl font-bold">취소</button>
+                                        </div>
+                                    </form>
+                                ) : selectedMenu ? (
+                                    <div className="animate-in fade-in duration-500">
+                                        <div className="flex justify-between items-start mb-8 pb-6 border-b">
+                                            <div>
+                                                <span className="text-sm font-bold text-blue-600">{selectedMenu.date} | {selectedMenu.category}</span>
+                                                <h2 className="text-4xl font-black text-slate-900 mt-2">{selectedMenu.name}</h2>
+                                            </div>
+                                            <div className="flex gap-2 no-print">
+                                                <button onClick={() => setIsEditing(true)} className="px-4 py-2 border rounded-xl text-sm font-bold hover:bg-gray-50">수정</button>
+                                                <button onClick={() => deleteMenu(selectedMenu.id)} className="px-4 py-2 border rounded-xl text-sm font-bold text-red-500 hover:bg-red-50">삭제</button>
+                                                <button onClick={() => window.print()} className="px-4 py-2 bg-slate-100 rounded-xl text-sm font-bold hover:bg-slate-200">인쇄/PDF</button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-8">
                                             <section>
-                                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 border-b pb-1">Cooking Recipe</h4>
-                                                <div className="text-slate-700 leading-relaxed whitespace-pre-wrap text-sm bg-slate-50 p-4 rounded-2xl">
-                                                    {selectedRecipe.recipe}
+                                                <h3 className="text-xs font-black text-gray-300 uppercase tracking-widest mb-4">Cooking Recipe</h3>
+                                                <div className="bg-gray-50 p-6 rounded-3xl text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                                    {selectedMenu.recipe}
                                                 </div>
                                             </section>
-
                                             <section>
-                                                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 border-b pb-1">Nutrition Info</h4>
-                                                <div className="text-sm font-bold text-blue-600 bg-blue-50 p-4 rounded-2xl">
-                                                    {selectedRecipe.nutrition}
+                                                <h3 className="text-xs font-black text-gray-300 uppercase tracking-widest mb-4">Nutrition & Notes</h3>
+                                                <div className="bg-blue-50 p-6 rounded-3xl text-blue-900 font-bold">
+                                                    {selectedMenu.nutrition}
                                                 </div>
                                             </section>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-300 text-center py-20">
-                                        <div className="text-4xl mb-4">📖</div>
-                                        <p className="font-bold">메뉴를 선택하면<br/>상세 레시피가 나타납니다.</p>
+                                    <div className="h-full flex flex-col items-center justify-center text-center py-20 text-gray-300">
+                                        <div className="text-6xl mb-6">👨‍🍳</div>
+                                        <p className="text-xl font-bold">왼쪽 목록에서 메뉴를 선택하거나<br/>새 레시피를 등록해 주세요.</p>
                                     </div>
                                 )}
                             </div>
-                        </aside>
+                        </main>
                     </div>
                 </div>
             );
