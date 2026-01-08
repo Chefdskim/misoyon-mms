@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>미소연 MMS v1.9 - 초정밀 엑셀 미러링</title>
+    <title>미소연 MMS v2.0 - 스마트 식단 뷰어</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -11,24 +11,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
-        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f1f5f9; }
-        
-        /* 엑셀 테이블 정밀 재현 */
-        .excel-container { background: #ffffff; border: 1px solid #cbd5e1; overflow: auto; max-height: 80vh; }
-        .excel-table { border-collapse: collapse; min-width: 100%; table-layout: fixed; }
-        .excel-table th, .excel-table td { 
-            border: 1px solid #cbd5e1; 
-            padding: 12px; 
-            font-size: 13px; 
-            line-height: 1.6;
-            vertical-align: top; 
-            word-break: break-all;
-            white-space: pre-wrap; /* 엑셀의 줄바꿈을 그대로 표시 */
-        }
-        .excel-table tr:nth-child(even) { background-color: #f8fafc; }
-        .cell-content { min-height: 20px; transition: all 0.2s; }
-        .clickable-cell:hover { background-color: #e2e8f0 !important; cursor: pointer; color: #2563eb; }
-        
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8fafc; }
+        .menu-card { transition: all 0.3s ease; border-left: 6px solid #3b82f6; }
+        .menu-card:hover { transform: translateY(-5px); shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .category-badge { font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 99px; }
         @media print { .no-print { display: none !important; } }
     </style>
 </head>
@@ -38,8 +24,8 @@
         const { useState } = React;
 
         const MisoYonApp = () => {
-            const [excelData, setExcelData] = useState([]);
-            const [selectedRecipe, setSelectedRecipe] = useState(null);
+            const [days, setDays] = useState([]);
+            const [selectedMenu, setSelectedMenu] = useState(null);
 
             const handleFileUpload = (e) => {
                 const file = e.target.files[0];
@@ -47,100 +33,91 @@
                 reader.onload = (evt) => {
                     const bstr = evt.target.result;
                     const wb = XLSX.read(bstr, { type: 'binary' });
-                    const wsname = wb.SheetNames[0];
-                    const ws = wb.Sheets[wsname];
-                    // 원본 서식을 최대한 유지하며 배열로 변환
-                    const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-                    setExcelData(data);
+                    const ws = wb.Sheets[wb.SheetNames[0]];
+                    const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                    
+                    // 셰프님의 엑셀 구조(가로 날짜)를 세로 카드형으로 재구성
+                    const extractedDays = [];
+                    const dates = data[0]; // 첫 줄이 날짜
+
+                    for (let j = 1; j < dates.length; j++) {
+                        if (!dates[j] || dates[j] === "") continue;
+                        
+                        extractedDays.push({
+                            date: dates[j],
+                            morning: data.find(row => String(row[0]).includes("아침"))?.[j] || "",
+                            lunch: data.find(row => String(row[0]).includes("점심"))?.[j] || "",
+                            dinner: data.find(row => String(row[0]).includes("저녁"))?.[j] || ""
+                        });
+                    }
+                    setDays(extractedDays);
                 };
                 reader.readAsBinaryString(file);
             };
 
             return (
-                <div className="flex flex-col min-h-screen">
-                    {/* 상단 헤더 */}
-                    <header className="bg-slate-900 text-white p-5 flex justify-between items-center shadow-lg no-print">
-                        <div className="flex items-center gap-4">
-                            <h1 className="text-2xl font-black tracking-tighter text-blue-400">미소연 MMS v1.9</h1>
-                            <span className="text-slate-400 text-xs font-bold border border-slate-700 px-2 py-1 rounded">초정밀 엑셀 모드</span>
+                <div className="min-h-screen pb-20">
+                    <header className="bg-white border-b px-6 py-6 sticky top-0 z-50 no-print flex justify-between items-center shadow-sm">
+                        <div>
+                            <h1 className="text-2xl font-black text-slate-800 tracking-tight">MISOYON <span className="text-blue-600">MMS v2.0</span></h1>
+                            <p className="text-xs text-slate-400 font-bold mt-1">셰프님 전용 스마트 식단 관리</p>
                         </div>
-                        <div className="flex gap-3">
-                            <label className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-xl font-bold cursor-pointer transition flex items-center gap-2">
-                                <span>📁 엑셀 등록</span>
-                                <input type="file" onChange={handleFileUpload} className="hidden" accept=".xlsx,.xls,.csv" />
-                            </label>
-                            <button onClick={() => window.print()} className="bg-slate-700 hover:bg-slate-600 px-6 py-2 rounded-xl font-bold transition">인쇄 / PDF</button>
-                        </div>
+                        <label className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl font-bold cursor-pointer transition shadow-lg shadow-blue-100">
+                            📁 식단표(엑셀) 올리기
+                            <input type="file" onChange={handleFileUpload} className="hidden" accept=".xlsx,.xls,.csv" />
+                        </label>
                     </header>
 
-                    <div className="p-6 grid grid-cols-12 gap-6 flex-grow">
-                        {/* 왼쪽: 엑셀 미러링 테이블 */}
-                        <div className="col-span-12 lg:col-span-9">
-                            <div className="excel-container rounded-2xl shadow-inner">
-                                {excelData.length > 0 ? (
-                                    <table className="excel-table">
-                                        <tbody>
-                                            {excelData.map((row, i) => (
-                                                <tr key={i}>
-                                                    {row.map((cell, j) => (
-                                                        <td 
-                                                            key={j} 
-                                                            className={cell ? "clickable-cell cell-content" : "cell-content"}
-                                                            onClick={() => cell && setSelectedRecipe(cell)}
-                                                        >
-                                                            {cell}
-                                                        </td>
-                                                    ))}
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                ) : (
-                                    <div className="py-60 text-center flex flex-col items-center justify-center bg-white">
-                                        <div className="text-6xl mb-6 opacity-20">📊</div>
-                                        <p className="text-xl font-bold text-slate-400 italic">"엑셀 파일 등록하기" 버튼을 눌러주세요.</p>
-                                        <p className="text-sm text-slate-300 mt-2">셰프님의 엑셀 화면이 여기에 그대로 나타납니다.</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 오른쪽: 상세 레시피 정보창 */}
-                        <div className="col-span-12 lg:col-span-3 no-print">
-                            <div className="bg-white rounded-[2rem] shadow-2xl border-t-[12px] border-blue-500 p-8 sticky top-6 min-h-[500px] flex flex-col">
-                                {selectedRecipe ? (
-                                    <div className="animate-in slide-in-from-bottom-4 duration-300">
-                                        <div className="mb-8">
-                                            <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full">상세 내용</span>
-                                            <h2 className="text-2xl font-black text-slate-900 mt-4 leading-tight border-b pb-4">레시피 상세보기</h2>
+                    <div className="max-w-7xl mx-auto p-6">
+                        {days.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {days.map((day, idx) => (
+                                    <div key={idx} className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 menu-card">
+                                        <div className="flex justify-between items-center mb-6 border-b pb-4">
+                                            <span className="text-lg font-black text-slate-700">{day.date}</span>
+                                            <span className="text-xs font-bold text-blue-500 bg-blue-50 px-3 py-1 rounded-full">정상운영</span>
                                         </div>
                                         
-                                        <div className="bg-slate-50 p-6 rounded-3xl text-slate-800 leading-relaxed whitespace-pre-wrap text-lg font-medium shadow-inner border border-slate-100">
-                                            {selectedRecipe}
+                                        <div className="space-y-6">
+                                            <div onClick={() => setSelectedMenu({title: '아침 메뉴', content: day.morning})} className="cursor-pointer group">
+                                                <span className="category-badge bg-orange-100 text-orange-600 mb-1 inline-block">아침</span>
+                                                <p className="text-sm font-bold text-slate-600 group-hover:text-blue-600 transition whitespace-pre-wrap">{day.morning || "일정 없음"}</p>
+                                            </div>
+                                            <div onClick={() => setSelectedMenu({title: '점심 메뉴', content: day.lunch})} className="cursor-pointer group">
+                                                <span className="category-badge bg-green-100 text-green-600 mb-1 inline-block">점심</span>
+                                                <p className="text-sm font-bold text-slate-600 group-hover:text-blue-600 transition whitespace-pre-wrap">{day.lunch || "일정 없음"}</p>
+                                            </div>
+                                            <div onClick={() => setSelectedMenu({title: '저녁 메뉴', content: day.dinner})} className="cursor-pointer group">
+                                                <span className="category-badge bg-purple-100 text-purple-600 mb-1 inline-block">저녁</span>
+                                                <p className="text-sm font-bold text-slate-600 group-hover:text-blue-600 transition whitespace-pre-wrap">{day.dinner || "일정 없음"}</p>
+                                            </div>
                                         </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="py-40 text-center bg-white rounded-[3rem] border border-dashed border-slate-300">
+                                <p className="text-6xl mb-6">👨‍🍳</p>
+                                <p className="text-xl font-bold text-slate-400 italic">엑셀 파일을 올려주시면<br/>보기 편한 카드 형태로 변환해 드립니다.</p>
+                            </div>
+                        )}
+                    </div>
 
-                                        <div className="mt-10 p-5 bg-yellow-50 rounded-2xl border border-yellow-100">
-                                            <p className="text-xs text-yellow-700 leading-5">
-                                                <strong className="block mb-1">💡 셰프님을 위한 안내</strong>
-                                                엑셀 셀 안에 적힌 메뉴명, 조리법, 영양성분이 위 창에 모두 표시됩니다. 인쇄 시에는 왼쪽의 식단표가 강조됩니다.
-                                            </p>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-center text-slate-300 py-20 flex-grow">
-                                        <div className="text-5xl mb-6">🔍</div>
-                                        <p className="font-bold text-lg">왼쪽 식단표에서<br/>칸을 클릭해 보세요.</p>
-                                        <p className="text-xs mt-2 text-slate-400 font-normal underline decoration-dotted">클릭한 내용이 크게 보입니다.</p>
-                                    </div>
-                                )}
+                    {/* 레시피 상세 팝업 */}
+                    {selectedMenu && (
+                        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 no-print" onClick={() => setSelectedMenu(null)}>
+                            <div className="bg-white rounded-[2.5rem] max-w-2xl w-full p-10 shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-8">
+                                    <h2 className="text-3xl font-black text-slate-900">{selectedMenu.title}</h2>
+                                    <button onClick={() => setSelectedMenu(null)} className="text-slate-300 hover:text-slate-600 text-2xl font-bold">✕</button>
+                                </div>
+                                <div className="bg-slate-50 p-8 rounded-3xl text-xl leading-relaxed text-slate-700 whitespace-pre-wrap font-medium border border-slate-100 shadow-inner max-h-[60vh] overflow-y-auto">
+                                    {selectedMenu.content || "등록된 내용이 없습니다."}
+                                </div>
+                                <button onClick={() => window.print()} className="w-full mt-8 py-5 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-blue-600 transition">이 메뉴 인쇄하기</button>
                             </div>
                         </div>
-                    </div>
-                    
-                    {/* 인쇄 시 하단 정보 표시 */}
-                    <footer className="print-only hidden p-10 text-center text-slate-400 text-sm italic">
-                        미소연 MMS 스마트 식단 관리 시스템으로 생성된 문서입니다.
-                    </footer>
+                    )}
                 </div>
             );
         };
