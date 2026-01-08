@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>미소연 통합 메뉴 관리 v1.2</title>
+    <title>미소연 통합 메뉴 관리 v1.3</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -11,140 +11,188 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.8/mammoth.browser.min.js"></script>
+    <style>
+        @media print { .no-print { display: none !important; } }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+    </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useMemo } = React;
+        const { useState, useEffect } = React;
 
         const MisoYonApp = () => {
-            const [menuMaster, setMenuMaster] = useState([]);
-            const [mealPlan, setMealPlan] = useState([]);
+            const [menuMaster, setMenuMaster] = useState([]); // 업로드된 전체 메뉴 저장소
+            const [mealPlan, setMealPlan] = useState([]); // 현재 구성 중인 식단
+            const [searchQuery, setSearchQuery] = useState("");
             const [loading, setLoading] = useState(false);
 
-            // 통합 파일 판독 엔진
+            // 통합 파일 판독 엔진 (v1.2 기능 유지 및 강화)
             const handleFileUpload = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
                 setLoading(true);
-
                 const fileName = file.name.toLowerCase();
                 
                 try {
                     if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || fileName.endsWith('.csv')) {
-                        // 1. 엑셀/CSV 처리
                         const reader = new FileReader();
                         reader.onload = (evt) => {
                             const wb = XLSX.read(evt.target.result, { type: 'binary' });
                             const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                            processRawData(data);
+                            processData(data);
                         };
                         reader.readAsBinaryString(file);
-                    } 
-                    else if (fileName.endsWith('.docx')) {
-                        // 2. 워드 처리
+                    } else if (fileName.endsWith('.docx')) {
                         const reader = new FileReader();
                         reader.onload = async (evt) => {
                             const result = await mammoth.extractRawText({ arrayBuffer: evt.target.result });
-                            processTextData(result.value);
+                            processText(result.value);
                         };
                         reader.readAsArrayBuffer(file);
-                    } 
-                    else if (fileName.endsWith('.pdf')) {
-                        // 3. PDF 처리
+                    } else if (fileName.endsWith('.pdf')) {
                         const reader = new FileReader();
                         reader.onload = async (evt) => {
                             const typedarray = new Uint8Array(evt.target.result);
+                            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
                             const pdf = await pdfjsLib.getDocument(typedarray).promise;
                             let fullText = "";
                             for (let i = 1; i <= pdf.numPages; i++) {
                                 const page = await pdf.getPage(i);
                                 const content = await page.getTextContent();
-                                fullText += content.items.map(item => item.str).join(" ");
+                                fullText += content.items.map(item => item.str).join("\n");
                             }
-                            processTextData(fullText);
+                            processText(fullText);
                         };
                         reader.readAsArrayBuffer(file);
                     }
                 } catch (err) {
-                    alert("파일을 읽는 중 오류가 발생했습니다.");
+                    alert("파일 분석 중 오류가 발생했습니다.");
                 } finally {
                     setLoading(false);
                 }
             };
 
-            // 데이터를 시스템 형식으로 변환 (셰프님 파일 맞춤형)
-            const processRawData = (data) => {
+            const processData = (data) => {
                 const sanitized = data.map((row, i) => ({
-                    id: i,
-                    name: row['메뉴명'] || row['메뉴'] || Object.values(row).find(v => typeof v === 'string' && v.length > 1) || "이름없음",
+                    id: `xl-${i}-${Date.now()}`,
+                    name: row['메뉴명'] || row['메뉴'] || Object.values(row)[0] || "이름없음",
                     kcal: parseInt(row['칼로리']) || 0,
-                    protein: parseInt(row['단백질']) || 0
+                    protein: parseInt(row['단백질']) || 0,
+                    category: row['구분'] || row['카테고리'] || "일반"
                 }));
-                setMenuMaster(sanitized);
+                setMenuMaster(prev => [...prev, ...sanitized]);
             };
 
-            const processTextData = (text) => {
-                // 텍스트에서 메뉴로 추정되는 단어들을 추출하는 로직 (간단 구현)
-                const lines = text.split(/[,\n]/).filter(l => l.trim().length > 1);
+            const processText = (text) => {
+                const lines = text.split('\n').filter(l => l.trim().length > 1);
                 const sanitized = lines.map((line, i) => ({
-                    id: `text-${i}`,
+                    id: `txt-${i}-${Date.now()}`,
                     name: line.trim(),
                     kcal: 0,
-                    protein: 0
+                    protein: 0,
+                    category: "분석데이터"
                 }));
-                setMenuMaster(sanitized);
+                setMenuMaster(prev => [...prev, ...sanitized]);
             };
 
+            const filteredMenu = menuMaster.filter(m => m.name.includes(searchQuery));
+            const totalKcal = mealPlan.reduce((sum, item) => sum + item.kcal, 0);
+
             return (
-                <div className="min-h-screen bg-slate-50 p-4 lg:p-10 font-sans">
-                    <header className="max-w-5xl mx-auto mb-10 flex justify-between items-center">
-                        <h1 className="text-3xl font-black text-slate-800 tracking-tight">MISOYON <span className="text-blue-600">MMS v1.2</span></h1>
-                        <div className="bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-200">
-                            <label className="text-xs font-bold text-slate-400 block mb-1 uppercase">Smart Import (XL, PDF, DOC)</label>
-                            <input type="file" onChange={handleFileUpload} className="text-xs" accept=".xlsx, .xls, .csv, .pdf, .docx" />
+                <div className="min-h-screen">
+                    {/* 상단 헤더 */}
+                    <header className="bg-white border-b sticky top-0 z-10 no-print">
+                        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                            <h1 className="text-xl font-bold text-blue-600">MISOYON <span className="text-slate-400 font-medium">MMS v1.3</span></h1>
+                            <div className="flex items-center gap-4">
+                                <label className="bg-blue-50 text-blue-600 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer hover:bg-blue-100 transition">
+                                    파일 불러오기 (XL, PDF, DOC)
+                                    <input type="file" onChange={handleFileUpload} className="hidden" accept=".xlsx,.xls,.csv,.pdf,.docx" />
+                                </label>
+                            </div>
                         </div>
                     </header>
 
-                    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        <aside className="lg:col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                            <h2 className="font-bold text-slate-800 mb-4">로드된 메뉴 목록 {loading && " (분석 중...)"}</h2>
-                            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
-                                {menuMaster.map(m => (
-                                    <div key={m.id} onClick={() => setMealPlan([...mealPlan, m])} className="p-4 bg-slate-50 rounded-2xl border border-transparent hover:border-blue-400 cursor-pointer transition-all active:scale-95">
-                                        <p className="font-bold text-slate-700">{m.name}</p>
-                                        <p className="text-[10px] text-slate-400">{m.kcal}kcal / 단백질 {m.protein}g</p>
-                                    </div>
-                                ))}
+                    <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* 1. 메뉴 저장소 (왼쪽) */}
+                        <section className="lg:col-span-5 no-print">
+                            <div className="bg-white rounded-2xl shadow-sm border p-6 sticky top-24">
+                                <div className="mb-6">
+                                    <h2 className="text-lg font-bold mb-2">메뉴 저장소</h2>
+                                    <input 
+                                        type="text" 
+                                        placeholder="메뉴명을 입력하여 검색..." 
+                                        className="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 ring-blue-500/20 transition"
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2 max-h-[calc(100vh-350px)] overflow-y-auto custom-scrollbar pr-2">
+                                    {filteredMenu.length === 0 ? (
+                                        <p className="text-center py-10 text-slate-400 text-sm">파일을 업로드하면<br/>여기에 메뉴 목록이 나타납니다.</p>
+                                    ) : (
+                                        filteredMenu.map(m => (
+                                            <div key={m.id} onClick={() => setMealPlan([...mealPlan, m])} className="group p-4 bg-white border rounded-xl hover:border-blue-500 hover:shadow-md cursor-pointer transition-all flex justify-between items-center">
+                                                <div>
+                                                    <span className="text-xs font-bold text-blue-500 uppercase tracking-widest">{m.category}</span>
+                                                    <p className="font-bold text-slate-800">{m.name}</p>
+                                                    <p className="text-xs text-slate-400">{m.kcal}kcal / {m.protein}g</p>
+                                                </div>
+                                                <span className="opacity-0 group-hover:opacity-100 text-blue-500 text-xl font-bold">+</span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
-                        </aside>
+                        </section>
 
-                        <main className="lg:col-span-8 bg-white p-8 rounded-3xl shadow-xl border border-blue-50 relative overflow-hidden">
-                            <div className="flex justify-between items-end mb-8 border-b pb-6">
-                                <div>
-                                    <h2 className="text-2xl font-black text-slate-800">오늘의 식단표</h2>
-                                    <p className="text-slate-400 text-sm italic">선택된 메뉴가 자동으로 합산됩니다.</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-4xl font-black text-blue-600 tracking-tighter">
-                                        {mealPlan.reduce((a,b)=>a+b.kcal, 0)} <span className="text-sm font-normal text-slate-400">kcal</span>
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            <div className="space-y-3 min-h-[300px]">
-                                {mealPlan.map((m, i) => (
-                                    <div key={i} className="flex justify-between items-center p-5 bg-blue-50 rounded-2xl border border-blue-100 animate-in slide-in-from-right-4 duration-300">
-                                        <span className="text-lg font-bold text-blue-900">{m.name}</span>
-                                        <button onClick={() => setMealPlan(mealPlan.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-600 font-bold">삭제</button>
+                        {/* 2. 식단 구성 대시보드 (오른쪽) */}
+                        <section className="lg:col-span-7">
+                            <div className="bg-white rounded-3xl shadow-xl border-t-4 border-blue-600 p-8 min-h-[600px] flex flex-col">
+                                <div className="flex justify-between items-start mb-8 border-b pb-6">
+                                    <div>
+                                        <h2 className="text-3xl font-black text-slate-900 mb-1">오늘의 식단</h2>
+                                        <p className="text-slate-400">구성된 메뉴는 하단 출력 버튼을 통해 PDF로 저장 가능합니다.</p>
                                     </div>
-                                ))}
+                                    <div className="text-right">
+                                        <p className="text-sm font-bold text-slate-400 uppercase">Total Nutrition</p>
+                                        <p className="text-4xl font-black text-blue-600 tracking-tighter">{totalKcal} <span className="text-lg">kcal</span></p>
+                                    </div>
+                                </div>
+
+                                <div className="flex-grow space-y-4">
+                                    {mealPlan.length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-300 py-20 border-2 border-dashed border-slate-100 rounded-3xl">
+                                            <p className="text-lg font-medium">선택된 메뉴가 없습니다.</p>
+                                            <p className="text-sm">왼쪽 저장소에서 메뉴를 클릭하여 추가하세요.</p>
+                                        </div>
+                                    ) : (
+                                        mealPlan.map((m, i) => (
+                                            <div key={i} className="flex justify-between items-center p-5 bg-slate-50 rounded-2xl group border border-transparent hover:border-slate-200 transition">
+                                                <div>
+                                                    <p className="text-lg font-bold text-slate-800">{m.name}</p>
+                                                    <p className="text-sm text-slate-500">{m.kcal}kcal / {m.protein}g</p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => setMealPlan(mealPlan.filter((_, idx) => idx !== i))}
+                                                    className="no-print text-slate-300 hover:text-red-500 transition font-bold"
+                                                >
+                                                    삭제
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                <button 
+                                    onClick={() => window.print()} 
+                                    className="no-print w-full mt-10 py-5 bg-slate-900 text-white rounded-2xl font-black text-xl hover:bg-blue-700 transition shadow-lg active:scale-[0.98]"
+                                >
+                                    식단표 PDF 저장 / 인쇄하기
+                                </button>
                             </div>
-                            
-                            <button onClick={() => window.print()} className="w-full mt-10 py-5 bg-slate-900 text-white rounded-2xl font-black text-lg hover:bg-blue-600 transition-colors shadow-lg">
-                                식단 보고서 출력하기 (PDF)
-                            </button>
-                        </main>
+                        </section>
                     </div>
                 </div>
             );
