@@ -3,199 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>미소연 통합 레시피 관리 v1.6</title>
+    <title>미소연 MMS v1.8 - 엑셀 미러링 시스템</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&display=swap');
-        body { font-family: 'Noto Sans KR', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
+        body { font-family: 'Pretendard', sans-serif; }
+        .excel-table td { border: 1px solid #e2e8f0; padding: 8px; font-size: 13px; min-width: 120px; vertical-align: top; }
+        .excel-table th { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px; font-weight: 700; }
+        .clickable-cell:hover { background-color: #eff6ff; cursor: pointer; color: #2563eb; }
         @media print { .no-print { display: none !important; } }
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect } = React;
 
         const MisoYonApp = () => {
-            const [viewMode, setViewMode] = useState('전체');
-            const [menus, setMenus] = useState(() => {
-                const saved = localStorage.getItem('misoMenusV16');
-                return saved ? JSON.parse(saved) : [];
-            });
-            const [searchTerm, setSearchTerm] = useState("");
-            const [selectedMenu, setSelectedMenu] = useState(null);
-            const [isEditing, setIsEditing] = useState(false);
+            const [excelData, setExcelData] = useState([]); // 엑셀 화면 표시용
+            const [selectedContent, setSelectedContent] = useState(null); // 클릭한 셀 내용
 
-            useEffect(() => {
-                localStorage.setItem('misoMenusV16', JSON.stringify(menus));
-            }, [menus]);
-
-            // 파일 읽기 기능
-            const handleFileImport = (e) => {
+            // 엑셀 파일 읽기 (구조 그대로 유지)
+            const handleExcelUpload = (e) => {
                 const file = e.target.files[0];
-                if (!file) return;
                 const reader = new FileReader();
                 reader.onload = (evt) => {
                     const wb = XLSX.read(evt.target.result, { type: 'binary' });
-                    const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                    const imported = raw.map((item, idx) => ({
-                        id: Date.now() + idx,
-                        date: item['일자'] || new Date().toISOString().split('T')[0],
-                        category: item['구분'] || '일반',
-                        name: item['메뉴명'] || item['메뉴'] || '이름없음',
-                        recipe: item['레시피'] || item['조리법'] || '',
-                        nutrition: item['영양성분'] || ''
-                    }));
-                    setMenus([...menus, ...imported]);
-                    alert(`${imported.length}개의 메뉴를 불러왔습니다!`);
+                    const ws = wb.Sheets[wb.SheetNames[0]];
+                    const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                    setExcelData(data);
                 };
                 reader.readAsBinaryString(file);
             };
 
-            const saveMenu = (e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target);
-                const menuData = {
-                    id: selectedMenu?.id || Date.now(),
-                    date: formData.get('date'),
-                    category: formData.get('category'),
-                    name: formData.get('name'),
-                    recipe: formData.get('recipe'),
-                    nutrition: formData.get('nutrition')
-                };
-                if (selectedMenu) {
-                    setMenus(menus.map(m => m.id === selectedMenu.id ? menuData : m));
-                } else {
-                    setMenus([menuData, ...menus]);
-                }
-                setIsEditing(false);
-                setSelectedMenu(menuData);
-            };
-
-            const filteredList = useMemo(() => {
-                return menus.filter(m => m.name.includes(searchTerm) || m.date.includes(searchTerm));
-            }, [menus, searchTerm]);
-
             return (
                 <div className="min-h-screen flex flex-col">
-                    <header className="bg-white border-b sticky top-0 z-20 no-print">
-                        <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-                            <h1 className="text-2xl font-black text-blue-600">미소연 MMS <span className="text-slate-300 font-light text-lg ml-2">v1.6</span></h1>
-                            <div className="flex gap-3">
-                                <input 
-                                    type="text" 
-                                    placeholder="날짜 또는 메뉴명 검색..." 
-                                    className="border rounded-xl px-4 py-2 text-sm w-64 outline-none focus:ring-2 ring-blue-500/20"
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                                <label className="bg-slate-100 text-slate-600 px-5 py-2 rounded-xl text-sm font-bold cursor-pointer hover:bg-slate-200 transition">
-                                    파일 불러오기 (XL/CSV)
-                                    <input type="file" onChange={handleFileImport} className="hidden" accept=".xlsx,.xls,.csv" />
-                                </label>
-                                <button 
-                                    onClick={() => {setSelectedMenu(null); setIsEditing(true);}}
-                                    className="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200"
-                                >
-                                    + 직접 등록
-                                </button>
-                            </div>
+                    <header className="bg-white border-b px-6 py-4 flex items-center justify-between sticky top-0 z-50 no-print">
+                        <h1 className="text-2xl font-black text-blue-600">미소연 MMS <span className="text-slate-300 font-light">v1.8</span></h1>
+                        <div className="flex gap-3">
+                            <label className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-bold cursor-pointer hover:bg-blue-700 transition shadow-lg shadow-blue-100">
+                                엑셀 파일 등록하기
+                                <input type="file" onChange={handleExcelUpload} className="hidden" accept=".xlsx,.xls,.csv" />
+                            </label>
+                            <button onClick={() => window.print()} className="bg-slate-900 text-white px-6 py-2 rounded-xl text-sm font-bold no-print">화면 인쇄/PDF</button>
                         </div>
                     </header>
 
-                    <div className="max-w-7xl mx-auto w-full p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        <aside className="lg:col-span-4 no-print">
-                            <div className="bg-white rounded-3xl border p-6 min-h-[70vh] flex flex-col">
-                                <h2 className="font-bold text-slate-800 mb-4 flex items-center justify-between">
-                                    목록 <span className="text-xs font-normal text-slate-400">{filteredList.length}개 발견</span>
-                                </h2>
-                                <div className="space-y-3 overflow-y-auto custom-scrollbar flex-grow pr-1">
-                                    {filteredList.map(m => (
-                                        <div 
-                                            key={m.id} 
-                                            onClick={() => {setSelectedMenu(m); setIsEditing(false);}}
-                                            className={`p-4 rounded-2xl border transition-all cursor-pointer ${selectedMenu?.id === m.id ? 'border-blue-500 bg-blue-50' : 'bg-white hover:border-slate-300'}`}
-                                        >
-                                            <span className="text-[10px] font-bold text-blue-400 block mb-1">{m.date} | {m.category}</span>
-                                            <h3 className="font-bold text-slate-800">{m.name}</h3>
-                                        </div>
-                                    ))}
-                                </div>
+                    <div className="p-6 grid grid-cols-12 gap-6 flex-grow">
+                        {/* 왼쪽: 엑셀 미러링 화면 */}
+                        <div className="col-span-12 lg:col-span-8 bg-white rounded-2xl shadow-sm border overflow-auto max-h-[80vh] custom-scrollbar">
+                            <div className="p-4 border-b bg-slate-50 sticky top-0">
+                                <h2 className="font-bold text-slate-700">등록된 엑셀 식단표 화면</h2>
                             </div>
-                        </aside>
+                            {excelData.length > 0 ? (
+                                <table className="excel-table w-full border-collapse">
+                                    <tbody>
+                                        {excelData.map((row, i) => (
+                                            <tr key={i}>
+                                                {row.map((cell, j) => (
+                                                    <td 
+                                                        key={j} 
+                                                        className={cell ? "clickable-cell" : ""}
+                                                        onClick={() => cell && setSelectedContent(cell)}
+                                                    >
+                                                        <pre className="whitespace-pre-wrap font-sans">{cell}</pre>
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <div className="py-40 text-center text-slate-300">
+                                    <p className="text-5xl mb-4">📊</p>
+                                    <p className="text-lg">상단의 [엑셀 파일 등록하기] 버튼을 눌러주세요.</p>
+                                </div>
+                            )}
+                        </div>
 
-                        <main className="lg:col-span-8">
-                            <div className="bg-white rounded-3xl border shadow-xl p-8 min-h-[75vh]">
-                                {isEditing ? (
-                                    <form onSubmit={saveMenu} className="space-y-6">
-                                        <div className="flex justify-between items-center border-b pb-4">
-                                            <h2 className="text-xl font-bold">{selectedMenu ? "정보 수정" : "신규 등록"}</h2>
-                                            <button type="button" onClick={() => setIsEditing(false)} className="text-slate-400 font-bold px-2">X 취소</button>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-xs font-bold text-slate-400 mb-1 block">날짜</label>
-                                                <input name="date" type="date" required defaultValue={selectedMenu?.date} className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500/20" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs font-bold text-slate-400 mb-1 block">구분 (조식/중식 등)</label>
-                                                <input name="category" defaultValue={selectedMenu?.category} className="w-full border rounded-xl p-3 outline-none focus:ring-2 ring-blue-500/20" placeholder="예: 중식" />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-400 mb-1 block">메뉴명</label>
-                                            <input name="name" required defaultValue={selectedMenu?.name} className="w-full border rounded-xl p-4 text-xl font-black outline-none focus:ring-2 ring-blue-500/20" placeholder="메뉴 이름을 입력하세요" />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-400 mb-1 block">상세 레시피</label>
-                                            <textarea name="recipe" rows="8" defaultValue={selectedMenu?.recipe} className="w-full border rounded-xl p-4 text-sm leading-relaxed outline-none focus:ring-2 ring-blue-500/20" placeholder="조리법과 재료를 자유롭게 작성하세요"></textarea>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-400 mb-1 block">영양성분 및 비고</label>
-                                            <input name="nutrition" defaultValue={selectedMenu?.nutrition} className="w-full border rounded-xl p-3 text-sm outline-none focus:ring-2 ring-blue-500/20" placeholder="예: 800kcal / 고단백" />
-                                        </div>
-                                        <button type="submit" className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg hover:bg-blue-600 transition shadow-lg">저장하기</button>
-                                    </form>
-                                ) : selectedMenu ? (
+                        {/* 오른쪽: 상세 레시피/내용 뷰어 */}
+                        <div className="col-span-12 lg:col-span-4 no-print">
+                            <div className="bg-white rounded-2xl shadow-xl border-t-4 border-blue-600 p-8 sticky top-24 min-h-[400px]">
+                                {selectedContent ? (
                                     <div className="animate-in fade-in duration-300">
-                                        <div className="flex justify-between items-start mb-10 pb-6 border-b">
-                                            <div>
-                                                <span className="text-sm font-bold text-blue-600 uppercase tracking-tighter">{selectedMenu.date} — {selectedMenu.category}</span>
-                                                <h2 className="text-4xl font-black text-slate-900 mt-2">{selectedMenu.name}</h2>
-                                            </div>
-                                            <div className="flex gap-2 no-print">
-                                                <button onClick={() => setIsEditing(true)} className="px-5 py-2 border rounded-xl font-bold hover:bg-slate-50 transition">수정</button>
-                                                <button onClick={() => window.print()} className="px-5 py-2 bg-slate-900 text-white rounded-xl font-bold hover:bg-blue-600 transition shadow-md">인쇄/PDF</button>
-                                            </div>
+                                        <h3 className="text-xs font-black text-blue-400 uppercase tracking-widest mb-2">선택된 메뉴 정보</h3>
+                                        <h2 className="text-2xl font-black text-slate-900 mb-6 pb-4 border-b">상세 보기</h2>
+                                        
+                                        <div className="bg-slate-50 p-6 rounded-2xl text-slate-800 leading-relaxed whitespace-pre-wrap text-lg shadow-inner">
+                                            {selectedContent}
                                         </div>
-                                        <div className="grid gap-10">
-                                            <section>
-                                                <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-4">Cooking Recipe</h3>
-                                                <div className="bg-slate-50 p-8 rounded-3xl text-slate-700 leading-relaxed whitespace-pre-wrap text-lg min-h-[200px]">
-                                                    {selectedMenu.recipe || "등록된 레시피가 없습니다."}
-                                                </div>
-                                            </section>
-                                            <section>
-                                                <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-4">Nutrition Info</h3>
-                                                <div className="bg-blue-50 p-6 rounded-2xl text-blue-900 font-bold border border-blue-100">
-                                                    {selectedMenu.nutrition || "기록된 정보 없음"}
-                                                </div>
-                                            </section>
+
+                                        <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100">
+                                            <p className="text-sm text-blue-800 font-bold italic">💡 팁: 레시피나 영양성분 기록이 엑셀 셀 안에 있다면 위 화면에 바로 나타납니다.</p>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-200 py-32">
-                                        <div className="text-7xl mb-6">📂</div>
-                                        <p className="text-xl font-bold text-slate-400">파일을 불러오거나<br/>새 메뉴를 등록해 보세요.</p>
+                                    <div className="h-full flex flex-col items-center justify-center text-center text-slate-300 py-20">
+                                        <p className="text-4xl mb-4">📖</p>
+                                        <p className="font-bold">왼쪽 엑셀 화면에서<br/>확인하고 싶은 칸을 클릭하세요.</p>
                                     </div>
                                 )}
                             </div>
-                        </main>
+                        </div>
                     </div>
                 </div>
             );
@@ -206,4 +119,3 @@
     </script>
 </body>
 </html>
-
