@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MISOYON MMS v6.0 - 실시간 연동</title>
+    <title>MISOYON MMS v6.5 - 연월 선택형</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,11 +13,13 @@
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
         body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border-radius: 12px; overflow: hidden; }
-        .calendar-day { min-height: 90px; background: white; padding: 6px; cursor: pointer; }
+        .calendar-day { min-height: 90px; background: white; padding: 6px; cursor: pointer; transition: 0.2s; }
+        .calendar-day:hover { background: #f8fafc; }
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-dot { font-size: 10px; font-weight: 800; padding: 2px 4px; border-radius: 4px; margin-top: 2px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .detail-view { max-height: 85vh; overflow-y: auto; }
-        @media print { .no-print { display: none !important; } }
+        .detail-view { max-height: 90vh; overflow-y: auto; }
+        select { cursor: pointer; border: none; background: transparent; font-weight: 900; outline: none; appearance: none; text-align: center; }
+        @media print { .no-print { display: none !important; } .detail-view { max-height: none; overflow: visible; } }
     </style>
 </head>
 <body>
@@ -31,6 +33,7 @@
             const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
             const [sheetUrl, setSheetUrl] = useState(localStorage.getItem('miso_url') || "");
 
+            // 구글 시트 데이터 가져오기 (연도 상관없이 모든 날짜 수집)
             const fetchSheetData = (url) => {
                 if(!url) return;
                 Papa.parse(url, {
@@ -48,7 +51,8 @@
                             if (label.includes("날짜")) {
                                 headers = values.map(v => {
                                     const d = v.match(/\d+/g);
-                                    return d && d.length >= 2 ? `2026-${d[d.length-2].padStart(2, '0')}-${d[d.length-1].padStart(2, '0')}` : null;
+                                    if(d && d.length >= 3) return `${d[0]}-${d[1].padStart(2, '0')}-${d[2].padStart(2, '0')}`;
+                                    return null;
                                 });
                                 headers.forEach(d => { if(d) tempMenus.push({ date: d, staff: "", morning: "", lunch: "", dinner: "" }); });
                             } else if (headers.length > 0) {
@@ -87,41 +91,55 @@
                 return days;
             }, [currentMonth, menus]);
 
+            // 연도/월 변경 핸들러
+            const handleYearChange = (e) => setCurrentMonth(new Date(parseInt(e.target.value), currentMonth.getMonth(), 1));
+            const handleMonthChange = (e) => setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.target.value), 1));
+
             return (
-                <div className="max-w-7xl mx-auto p-4 lg:p-10">
+                <div className="max-w-7xl mx-auto p-4 lg:p-8">
                     <header className="bg-white p-6 rounded-3xl shadow-sm border mb-6 no-print">
-                        <h1 className="text-2xl font-black text-blue-600 mb-4">MISOYON 실시간 연동</h1>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col md:flex-row gap-4 items-center">
+                            <h1 className="text-xl font-black text-blue-600 shrink-0">MISOYON v6.5</h1>
                             <input 
                                 type="text" 
-                                className="flex-1 p-3 border rounded-xl text-sm outline-none focus:border-blue-500"
-                                placeholder="구글 시트 CSV 주소를 입력하세요."
+                                className="flex-1 p-3 border rounded-2xl text-xs outline-none focus:border-blue-500 bg-slate-50"
+                                placeholder="구글 시트 CSV 주소"
                                 value={sheetUrl}
                                 onChange={(e) => setSheetUrl(e.target.value)}
                             />
-                            <button onClick={() => fetchSheetData(sheetUrl)} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold">연동하기</button>
+                            <button onClick={() => fetchSheetData(sheetUrl)} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold text-sm shadow-lg hover:bg-blue-700 transition-all">실시간 연동</button>
                         </div>
                     </header>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                         <div className="lg:col-span-7 no-print">
-                            <div className="bg-white p-8 rounded-[3rem] border">
-                                <div className="flex justify-between items-center mb-6">
-                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))} className="text-xl">◀</button>
-                                    <h2 className="text-2xl font-black">{currentMonth.getFullYear()}년 {currentMonth.getMonth()+1}월</h2>
-                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))} className="text-xl">▶</button>
+                            <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm">
+                                <div className="flex justify-between items-center mb-8 px-2">
+                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))} className="p-2 hover:bg-slate-100 rounded-full transition-colors">◀</button>
+                                    
+                                    <div className="flex items-center gap-1 text-2xl font-black text-slate-800 bg-slate-50 px-6 py-2 rounded-2xl border-2 border-slate-100">
+                                        <select value={currentMonth.getFullYear()} onChange={handleYearChange} className="text-blue-600 hover:text-blue-700">
+                                            {Array.from({length: 31}, (_, i) => 2020 + i).map(y => <option key={y} value={y}>{y}년</option>)}
+                                        </select>
+                                        <select value={currentMonth.getMonth()} onChange={handleMonthChange} className="text-slate-800">
+                                            {Array.from({length: 12}, (_, i) => i).map(m => <option key={m} value={m}>{m + 1}월</option>)}
+                                        </select>
+                                    </div>
+
+                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))} className="p-2 hover:bg-slate-100 rounded-full transition-colors">▶</button>
                                 </div>
+
                                 <div className="calendar-grid">
-                                    {['일','월','화','수','목','금','토'].map(d => <div key={d} className="bg-slate-50 py-4 text-center text-xs font-bold text-slate-400">{d}</div>)}
+                                    {['일','월','화','수','목','금','토'].map(d => <div key={d} className="bg-slate-50 py-4 text-center text-[11px] font-bold text-slate-400">{d}</div>)}
                                     {calendarDays.map((d, i) => (
                                         <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={() => d?.data && setSelectedDate(d.data)}>
                                             {d && (
                                                 <>
-                                                    <span className={`text-sm font-black ${d.data ? 'text-blue-600' : 'text-slate-300'}`}>{d.day}</span>
+                                                    <span className={`text-[13px] font-black ${d.data ? 'text-blue-600' : 'text-slate-300'}`}>{d.day}</span>
                                                     {d.data && (
-                                                        <div className="mt-2">
-                                                            <span className="menu-dot bg-orange-50 text-orange-600">조:{d.data.morning.slice(0,5)}</span>
-                                                            <span className="menu-dot bg-blue-50 text-blue-600">중:{d.data.lunch.slice(0,5)}</span>
+                                                        <div className="mt-1">
+                                                            <span className="menu-dot bg-orange-50 text-orange-600">조:{d.data.morning.slice(0,6)}</span>
+                                                            <span className="menu-dot bg-blue-50 text-blue-600">중:{d.data.lunch.slice(0,6)}</span>
                                                         </div>
                                                     )}
                                                 </>
@@ -134,32 +152,34 @@
 
                         <div className="lg:col-span-5 detail-view">
                             {selectedDate ? (
-                                <div className="bg-white p-10 rounded-[3.5rem] border-2 shadow-2xl">
-                                    <div className="mb-8 border-b pb-6">
-                                        <p className="text-blue-600 font-black mb-1">{selectedDate.date}</p>
-                                        <h2 className="text-4xl font-black text-slate-900">식단 리포트</h2>
+                                <div className="bg-white p-10 rounded-[3.5rem] border shadow-2xl relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-full h-2 bg-blue-600"></div>
+                                    <div className="mb-8 border-b border-slate-100 pb-6">
+                                        <p className="text-blue-600 font-black tracking-tighter mb-1">{selectedDate.date}</p>
+                                        <h2 className="text-4xl font-black text-slate-900 tracking-tight italic">DAILY REPORT</h2>
                                     </div>
                                     <div className="space-y-6">
-                                        <div className="p-6 bg-slate-900 text-white rounded-[2rem]">
-                                            <p className="text-[10px] text-slate-400 mb-2 font-bold uppercase tracking-widest">Personnel 근무 현황</p>
-                                            <p className="text-lg font-bold whitespace-pre-wrap">{selectedDate.staff || "정보 없음"}</p>
+                                        <div className="p-6 bg-slate-900 text-white rounded-[2rem] shadow-lg">
+                                            <p className="text-[10px] text-slate-400 mb-2 font-black uppercase tracking-[0.2em]">Staff On Duty</p>
+                                            <p className="text-lg font-bold whitespace-pre-wrap leading-relaxed">{selectedDate.staff || "등록된 정보 없음"}</p>
                                         </div>
                                         {[
                                             {t:'MORNING 아침', c:selectedDate.morning, bg:'bg-orange-50', txt:'text-orange-900', lbl:'text-orange-400'},
                                             {t:'LUNCH 점심', c:selectedDate.lunch, bg:'bg-blue-50', txt:'text-blue-900', lbl:'text-blue-400'},
                                             {t:'DINNER 저녁', c:selectedDate.dinner, bg:'bg-purple-50', txt:'text-purple-900', lbl:'text-purple-400'}
                                         ].map(item => (
-                                            <div key={item.t} className={`${item.bg} p-8 rounded-[2rem]`}>
-                                                <span className={`${item.lbl} font-black text-[10px] block mb-2 tracking-widest uppercase`}>{item.t}</span>
-                                                <p className={`${item.txt} text-2xl font-black leading-snug whitespace-pre-wrap`}>{item.c || "메뉴 정보가 없습니다."}</p>
+                                            <div key={item.t} className={`${item.bg} p-8 rounded-[2.5rem] border border-white/50`}>
+                                                <span className={`${item.lbl} font-black text-[10px] block mb-3 tracking-widest`}>{item.t}</span>
+                                                <p className={`${item.txt} text-2xl font-black leading-tight whitespace-pre-wrap`}>{item.c || "준비된 메뉴가 없습니다."}</p>
                                             </div>
                                         ))}
                                     </div>
-                                    <button onClick={() => window.print()} className="no-print w-full mt-10 py-6 bg-blue-600 text-white rounded-[2rem] font-black text-xl hover:bg-blue-700 shadow-xl active:scale-95 transition-all">이 리포트 인쇄</button>
+                                    <button onClick={() => window.print()} className="no-print w-full mt-10 py-6 bg-slate-800 text-white rounded-[2rem] font-black text-xl hover:bg-black transition-all shadow-xl active:scale-95">이 리포트 인쇄</button>
                                 </div>
                             ) : (
-                                <div className="h-full flex flex-col items-center justify-center p-20 bg-white rounded-[3.5rem] border-2 border-dashed border-slate-200 text-center opacity-30">
-                                    <p className="text-xl font-black">날짜를 선택하세요.</p>
+                                <div className="h-full flex flex-col items-center justify-center p-20 bg-white rounded-[3.5rem] border-2 border-dashed border-slate-200 text-center">
+                                    <div className="text-6xl mb-4 opacity-20">📅</div>
+                                    <p className="text-xl font-black text-slate-300">확인할 날짜를<br/>선택해 주세요.</p>
                                 </div>
                             )}
                         </div>
