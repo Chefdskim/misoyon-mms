@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>미소연 MMS v11.9 - 원본 보존 및 기능 복구</title>
+    <title>미소연 MMS v11.9 - 원본 보존형</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -12,20 +12,15 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background: #f1f5f9; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
         #root { width: 100%; height: 100%; }
-        /* 달력 레이아웃 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 25px repeat(6, 1fr); flex: 1; background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; min-height: 0; }
         .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; position: relative; }
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
-        /* 검색 모달 */
-        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; }
-        /* 레시피 팝업 */
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
         .recipe-content { font-size: 14px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
-        .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
-        .clickable-menu { cursor: pointer !important; transition: all 0.2s; }
+        .clickable-menu { cursor: pointer !important; }
     </style>
 </head>
 <body>
@@ -34,7 +29,6 @@
         const { useState, useEffect, useMemo } = React;
 
         const MisoYonApp = () => {
-            // URL 설정
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS59rKx1l0C9M20mY_VqS3_3R_z7-mX3YxG0-v8l_z1K0/pub?gid=949808515&output=csv"; 
 
@@ -43,19 +37,14 @@
             const [selectedDate, setSelectedDate] = useState(null);
             const [currentMonth, setCurrentMonth] = useState(new Date());
             const [searchTerm, setSearchTerm] = useState("");
-            const [modalSearch, setModalSearch] = useState("");
-            const [activeModal, setActiveModal] = useState(false);
             const [viewRecipeList, setViewRecipeList] = useState([]);
 
-            const years = Array.from({length: 11}, (_, i) => 2020 + i);
-            const months = Array.from({length: 12}, (_, i) => i + 1);
-
             useEffect(() => {
-                // 메뉴 데이터 로드 및 원본 보존 파싱
+                // 메뉴 데이터 파싱 (가공 로직 완전 제거)
                 Papa.parse(MENU_URL, { download: true, complete: (res) => {
                     let temp = []; let headers = [];
                     res.data.forEach(row => {
-                        const label = (row[0] || "").replace(/\s/g, "");
+                        const label = (row[0] || "").trim();
                         const vals = row.slice(1);
                         if (label === "날짜") {
                             headers = vals.map(v => {
@@ -68,10 +57,10 @@
                                 if (!headers[i]) return;
                                 const t = temp.find(m => m.date === headers[i]);
                                 if (t) {
-                                    // 원본 텍스트 그대로 저장 (가공 금지)
-                                    if (label.includes("아침")) t.morning = v || "";
-                                    else if (label.includes("점심")) t.lunch = v || "";
-                                    else if (label.includes("저녁")) t.dinner = v || "";
+                                    // 셰프님 지시사항: 시트에 등록된 그대로(v) 저장
+                                    if (label.includes("아침")) t.morning = v;
+                                    else if (label.includes("점심")) t.lunch = v;
+                                    else if (label.includes("저녁")) t.dinner = v;
                                 }
                             });
                         }
@@ -79,32 +68,21 @@
                     setMenus(temp);
                 }});
 
-                // 레시피 데이터 로드
+                // 레시피 로드
                 Papa.parse(RECIPE_URL, { download: true, complete: (res) => {
                     const map = {};
                     res.data.slice(1).forEach(row => {
                         const name = (row[0] || "").trim();
-                        if (name) map[name] = { 
-                            name, 
-                            keywords: row[1] || "", 
-                            ingredients: row[2] || "", 
-                            process: row[3] || "", 
-                            tip: row[4] || "" 
-                        };
+                        if (name) map[name] = { name, ingredients: row[2]||"", process: row[3]||"", tip: row[4]||"" };
                     });
                     setRecipes(map);
                 }});
             }, []);
 
-            // 레시피 매칭 엔진 (메뉴명 원본을 유지하며 검색)
-            const findRecipes = (menuText) => {
-                if (!menuText || menuText === "일정없음") return [];
-                const target = menuText.replace(/\s/g, "").toLowerCase();
-                return Object.values(recipes).filter(r => {
-                    const rName = r.name.replace(/\s/g, "").toLowerCase();
-                    const kws = r.keywords.split(',').map(k => k.trim().replace(/\s/g, "").toLowerCase());
-                    return target.includes(rName) || kws.some(k => k && target.includes(k));
-                });
+            const findRecipes = (text) => {
+                if (!text || text === "일정없음") return [];
+                const cleanText = text.replace(/\s/g, "");
+                return Object.values(recipes).filter(r => cleanText.includes(r.name.replace(/\s/g, "")));
             };
 
             const calDays = useMemo(() => {
@@ -121,27 +99,15 @@
                 return days;
             }, [currentMonth, menus]);
 
-            const searchResults = useMemo(() => {
-                const q = (activeModal ? modalSearch : searchTerm).trim().toLowerCase();
-                if (!q) return [];
-                return menus.filter(m => (m.morning + m.lunch + m.dinner).toLowerCase().includes(q)).sort((a,b) => new Date(b.date) - new Date(a.date));
-            }, [modalSearch, searchTerm, activeModal, menus]);
-
-            const highlightText = (text, query) => {
-                if (!query || !text) return text;
-                const parts = text.split(new RegExp(`(${query})`, 'gi'));
-                return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
-            };
-
-            const MenuCard = ({text, type, query}) => {
+            const MenuCard = ({text, type}) => {
                 const matched = findRecipes(text);
                 const hasRecipe = matched.length > 0;
                 return (
-                    <div className={`p-4 rounded-xl border mb-3 transition-all clickable-menu ${hasRecipe ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}
+                    <div className={`p-4 rounded-xl border mb-3 ${hasRecipe ? 'bg-blue-50 border-blue-200 clickable-menu' : 'bg-slate-50 border-slate-100'}`}
                          onClick={() => hasRecipe && setViewRecipeList(matched)}>
                         <div className="text-[10px] font-black text-slate-400 uppercase mb-1">{type}</div>
                         <div className={`text-[13px] font-black ${hasRecipe ? 'text-blue-900' : 'text-slate-700'}`}>
-                            {highlightText(text, query)} {hasRecipe && "📋"}
+                            {text} {hasRecipe && "📋"}
                         </div>
                     </div>
                 );
@@ -149,35 +115,28 @@
 
             return (
                 <div className="flex flex-col h-screen w-full">
-                    {/* 상단 헤더 - 명칭 및 검색/연도 복구 */}
-                    <header className="flex justify-between items-center px-6 py-3 bg-white border-b shadow-sm shrink-0">
+                    <header className="flex justify-between items-center px-6 py-3 bg-white border-b shrink-0">
                         <div className="flex items-center gap-6">
-                            <h1 className="text-xl font-black italic tracking-tighter text-slate-800">미소연 <span className="text-blue-600 uppercase">MMS v11.9</span></h1>
+                            <h1 className="text-xl font-black italic text-slate-800">미소연 <span className="text-blue-600 uppercase">MMS v11.9</span></h1>
                             <div className="flex bg-slate-100 rounded-xl p-1 border font-bold text-sm">
                                 <select className="bg-transparent px-2 outline-none" value={currentMonth.getFullYear()} onChange={e=>setCurrentMonth(new Date(parseInt(e.target.value), currentMonth.getMonth()))}>
-                                    {years.map(y=><option key={y} value={y}>{y}년</option>)}
+                                    {[2024,2025,2026].map(y=><option key={y} value={y}>{y}년</option>)}
                                 </select>
                                 <select className="bg-transparent px-2 outline-none" value={currentMonth.getMonth()+1} onChange={e=>setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.target.value)-1))}>
-                                    {months.map(m=><option key={m} value={m}>{m}월</option>)}
+                                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(m=><option key={m} value={m}>{m}월</option>)}
                                 </select>
                             </div>
                         </div>
-                        <div className="flex gap-2">
-                            <input className="bg-slate-50 px-4 py-1.5 rounded-lg text-xs font-bold border w-60 outline-none focus:border-blue-500" placeholder="메뉴를 통합 검색하세요..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
-                            <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-black text-[11px] shadow-sm">SEARCH</button>
-                        </div>
                     </header>
 
-                    {/* 메인 섹션 */}
                     <main className="flex flex-1 min-h-0">
-                        {/* 달력 영역 */}
                         <div className="flex-[3] calendar-grid">
                             {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400 border-b uppercase">{d}</div>)}
                             {calDays.map((d,i)=>(
                                 <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
                                     {d && (
                                         <>
-                                            <span className={`text-[11px] font-black ${d.data ? 'text-slate-900' : 'text-slate-200'}`}>{d.day}</span>
+                                            <span className="text-[11px] font-black">{d.day}</span>
                                             {d.data && (
                                                 <div className="mt-1 flex flex-col gap-[1px]">
                                                     <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>
@@ -190,14 +149,54 @@
                                 </div>
                             ))}
                         </div>
-
-                        {/* 우측 메뉴 상세 */}
-                        <aside className="flex-1 bg-white p-6 overflow-y-auto border-l shadow-inner min-w-[360px]">
+                        <aside className="flex-1 bg-white p-6 overflow-y-auto border-l min-w-[360px]">
                             {selectedDate ? (
-                                <div className="animate-in fade-in duration-300">
-                                    <h2 className="text-2xl font-black italic text-slate-900 mb-1 uppercase tracking-tighter">Daily Menu</h2>
-                                    <div className="text-xs font-black text-blue-600 mb-6 underline underline-offset-4 decoration-2 italic">{selectedDate.date}</div>
+                                <div>
+                                    <h2 className="text-2xl font-black italic text-slate-900 mb-6 uppercase tracking-tighter">Daily Menu</h2>
                                     <MenuCard text={selectedDate.morning} type="Morning" />
                                     <MenuCard text={selectedDate.lunch} type="Lunch" />
                                     <MenuCard text={selectedDate.dinner} type="Dinner" />
+                                </div>
+                            ) : <div className="h-full flex items-center justify-center text-slate-300 font-black text-xs">날짜를 선택하세요</div>}
+                        </aside>
+                    </main>
 
+                    {viewRecipeList.length > 0 && (
+                        <div className="recipe-popup" onClick={() => setViewRecipeList([])}>
+                            <div className="bg-white rounded-[40px] w-full max-w-2xl p-10 shadow-2xl overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                                {viewRecipeList.map((recipe, idx) => (
+                                    <div key={idx} className="mb-10 last:mb-0 border-b last:border-0 pb-10">
+                                        <div className="bg-blue-600 text-white px-6 py-2 rounded-full inline-block text-sm font-black mb-6 uppercase">{recipe.name}</div>
+                                        <div className="space-y-6">
+                                            <section>
+                                                <div className="text-[10px] font-black text-blue-400 uppercase mb-2">Ingredients</div>
+                                                <div className="recipe-content bg-slate-50 p-6 rounded-3xl border">{recipe.ingredients}</div>
+                                            </section>
+                                            <section>
+                                                <div className="text-[10px] font-black text-blue-400 uppercase mb-2">Process</div>
+                                                <div className="recipe-content bg-slate-50 p-6 rounded-3xl border whitespace-pre-wrap">{recipe.process}</div>
+                                            </section>
+                                            {recipe.tip && (
+                                                <section className="bg-orange-50 p-6 rounded-3xl border border-orange-100 flex gap-4">
+                                                    <span className="text-2xl">👨‍🍳</span>
+                                                    <div>
+                                                        <div className="text-[10px] font-black text-orange-600 uppercase mb-1">Chef's Tip</div>
+                                                        <div className="recipe-content italic text-orange-950 font-bold">{recipe.tip}</div>
+                                                    </div>
+                                                </section>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MisoYonApp />);
+    </script>
+</body>
+</html>
