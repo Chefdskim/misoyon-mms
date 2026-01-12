@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v8.9 - 연속 분석 시스템</title>
+    <title>MISOYON MMS v9.0 - UI 최적화 완료</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -89,7 +89,6 @@
                 return days;
             }, [currentMonth, menus]);
 
-            // [수정] 메인 검색어와 모달 내 검색어를 통합 관리
             const activeQuery = activeModal ? modalSearch : searchTerm;
 
             const searchResults = useMemo(() => {
@@ -127,7 +126,7 @@
                     {/* 상단바 */}
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v8.9</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v9.0</span></h1>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl gap-1 border">
                                 <select value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
                                     {years.map(y => <option key={y} value={y}>{y}년</option>)}
@@ -138,7 +137,8 @@
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-32 md:w-48 border outline-none" placeholder="1월 또는 메뉴 검색" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && openSearch()}/>
+                            {/* [수정] 안내 문구 변경 */}
+                            <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-36 md:w-56 border outline-none" placeholder="월 선택 또는 메뉴 검색" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && openSearch()}/>
                             <button onClick={openSearch} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px] uppercase">Search</button>
                             <button onClick={loadData} className="bg-slate-800 text-white p-1.5 rounded-lg text-xs">🔄</button>
                         </div>
@@ -186,7 +186,7 @@
                         </aside>
                     </main>
 
-                    {/* [수정] 분석 모달 창 (상단 재검색 바 포함) */}
+                    {/* 분석 모달 창 */}
                     {activeModal && (
                         <div className="modal-view">
                             <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
@@ -194,37 +194,6 @@
                                     <div className="flex items-center gap-3">
                                         <h2 className="text-2xl font-black italic uppercase italic tracking-tighter shrink-0">Long-term Analysis</h2>
                                         <div className="flex gap-2 bg-slate-100 p-1 rounded-xl border">
-                                            <input className="bg-transparent px-3 py-1 text-sm font-black outline-none w-48" placeholder="메뉴 재검색..." value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
-                                            <div className="bg-blue-600 text-white px-3 py-1 rounded-lg text-[10px] font-black flex items-center">SEARCHING</div>
-                                        </div>
-                                    </div>
-                                    <button onClick={()=>setActiveModal(false)} className="text-4xl font-thin hover:text-red-500 self-end md:self-auto">&times;</button>
-                                </div>
-                                
-                                <div className="flex-1 overflow-y-auto space-y-3 pb-8">
-                                    {searchResults.length > 0 ? searchResults.map((m, i) => (
-                                        <div key={i} className="bg-white p-4 rounded-2xl border-2 border-slate-100 shadow-sm flex flex-col md:flex-row gap-5 hover:border-blue-200 transition-colors">
-                                            <div className="md:w-36 shrink-0">
-                                                <div className="font-black text-blue-600 text-lg">{m.date.replace(/-/g,'.')}</div>
-                                                <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{new Date(m.date).toLocaleDateString('ko-KR', {weekday: 'long'})}</div>
-                                            </div>
-                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3 font-bold text-[12px] leading-relaxed">
-                                                <div className="bg-orange-50/50 p-3 rounded-xl border border-orange-100">{getHighlightedMenu(m.morning, modalSearch)}</div>
-                                                <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100">{getHighlightedMenu(m.lunch, modalSearch)}</div>
-                                                <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-100">{getHighlightedMenu(m.dinner, modalSearch)}</div>
-                                            </div>
-                                        </div>
-                                    )) : <div className="text-center py-32 text-slate-300 font-black text-xl uppercase tracking-tighter">No Results for "{modalSearch}"</div>}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MisoYonApp />);
-    </script>
-</body>
-</html>
+                                            {/* [수정] 안내 문구 변경 */}
+                                            <input className="bg-transparent px-3 py-1 text-sm font-black outline-none w-48" placeholder="월 선택 또는 메뉴 검색" value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
+                                            <div className="bg-blue-600 text-white px-3 py-1 rounded-lg text
