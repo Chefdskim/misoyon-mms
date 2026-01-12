@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MISOYON MMS v6.8</title>
+    <title>MISOYON MMS v6.9</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -18,6 +18,7 @@
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 10px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; border-radius: 3px; padding: 1px 3px; }
         select { cursor: pointer; border: none; background: transparent; font-weight: 900; outline: none; appearance: none; text-align: center; color: #2563eb; }
+        .modal-overlay { background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); }
         @media print { .no-print { display: none !important; } }
     </style>
 </head>
@@ -32,7 +33,11 @@
             const [selectedDate, setSelectedDate] = useState(null);
             const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
             const [loading, setLoading] = useState(false);
-            const [search, setSearch] = useState(""); // 셰프님, 검색어 상태만 하나 추가했습니다.
+            
+            // 검색 관련 상태
+            const [menuQuery, setMenuQuery] = useState("");
+            const [recipeQuery, setRecipeQuery] = useState("");
+            const [showStats, setShowStats] = useState(false);
 
             const normalizeDate = (str) => {
                 if (!str) return null;
@@ -43,7 +48,6 @@
 
             const fetchSheetData = () => {
                 setLoading(true);
-                // 셰프님 원본 그대로 PapaParse 라이브러리를 정확히 사용합니다.
                 Papa.parse(FIXED_URL, {
                     download: true,
                     header: false,
@@ -78,6 +82,14 @@
 
             useEffect(() => { fetchSheetData(); }, []);
 
+            // 메뉴 검색 통계 데이터 (최근 5년치 중 검색어 포함된 것들)
+            const statsData = useMemo(() => {
+                if (!menuQuery) return [];
+                return menus
+                    .filter(m => (m.morning+m.lunch+m.dinner).includes(menuQuery))
+                    .sort((a, b) => new Date(b.date) - new Date(a.date)); // 최신순
+            }, [menuQuery, menus]);
+
             const calendarDays = useMemo(() => {
                 const year = currentMonth.getFullYear();
                 const month = currentMonth.getMonth();
@@ -95,93 +107,163 @@
 
             return (
                 <div className="max-w-7xl mx-auto p-4 md:p-8">
-                    <header className="flex justify-between items-center mb-6 no-print">
-                        <div className="flex items-center gap-4">
-                            <h1 className="text-xl font-black text-slate-800 italic">MISOYON <span className="text-blue-600">v6.8</span></h1>
-                            {/* 셰프님이 원하셨던 검색창 - 아주 얇고 세련되게 넣었습니다 */}
-                            <input 
-                                type="text" 
-                                placeholder="메뉴 검색..." 
-                                className="px-4 py-1.5 bg-white border rounded-full text-xs font-bold outline-none focus:ring-2 ring-blue-500 w-40 md:w-60"
-                                onChange={(e) => setSearch(e.target.value)}
-                            />
+                    {/* 헤더 섹션 */}
+                    <header className="flex flex-col md:flex-row justify-between items-center mb-8 no-print gap-4">
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-2xl font-black text-slate-800 italic">MISOYON <span className="text-blue-600">v6.9</span></h1>
                         </div>
-                        <button onClick={fetchSheetData} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all">🔄 동기화</button>
+                        
+                        <div className="flex flex-wrap items-center gap-3">
+                            {/* 메뉴 검색 (최근 통계 팝업) */}
+                            <div className="relative">
+                                <input 
+                                    type="text" 
+                                    placeholder="📊 메뉴 통계 검색 (불고기...)" 
+                                    className="px-4 py-2 bg-white border-2 border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-blue-500 w-48 shadow-sm"
+                                    value={menuQuery}
+                                    onChange={(e) => setMenuQuery(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && setShowStats(true)}
+                                />
+                                {menuQuery && (
+                                    <button onClick={() => setShowStats(true)} className="absolute right-2 top-2 text-blue-600 font-bold text-xs bg-blue-50 px-2 py-1 rounded-lg">분석</button>
+                                )}
+                            </div>
+
+                            {/* 레시피 검색 */}
+                            <div className="flex gap-1">
+                                <input 
+                                    type="text" 
+                                    placeholder="🍳 레시피 검색" 
+                                    className="px-4 py-2 bg-white border-2 border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-red-400 w-36 shadow-sm"
+                                    value={recipeQuery}
+                                    onChange={(e) => setRecipeQuery(e.target.value)}
+                                />
+                                <button 
+                                    onClick={() => window.open(`https://www.youtube.com/results?search_query=${recipeQuery}+레시피`)}
+                                    className="bg-red-500 text-white p-2 rounded-xl shadow-lg active:scale-90 transition-all"
+                                >▶</button>
+                            </div>
+
+                            <button onClick={fetchSheetData} className="bg-blue-600 text-white px-5 py-2 rounded-xl font-bold text-sm shadow-lg active:scale-95 transition-all">🔄 동기화</button>
+                        </div>
                     </header>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* 달력 영역 */}
                         <div className="lg:col-span-8 no-print">
-                            <div className="bg-white p-6 rounded-[2rem] border shadow-xl">
+                            <div className="bg-white p-6 rounded-[2.5rem] border shadow-xl">
                                 <div className="flex justify-between items-center mb-6 px-4">
-                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))} className="text-xl">◀</button>
-                                    <div className="flex items-center gap-1 text-2xl font-black bg-slate-50 px-6 py-2 rounded-2xl border-2 border-slate-100">
+                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))} className="text-2xl font-bold text-slate-400">◀</button>
+                                    <div className="flex items-center gap-1 text-2xl font-black bg-slate-50 px-8 py-3 rounded-2xl border-2 border-slate-100 shadow-inner">
                                         <select value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(parseInt(e.target.value), currentMonth.getMonth(), 1))}>
-                                            {Array.from({length: 11}, (_, i) => 2020 + i).concat(Array.from({length: 20}, (_, i) => 2031 + i)).map(y => <option key={y} value={y}>{y}년</option>)}
+                                            {Array.from({length: 40}, (_, i) => 2010 + i).map(y => <option key={y} value={y}>{y}년</option>)}
                                         </select>
                                         <select value={currentMonth.getMonth()} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.target.value), 1))}>
                                             {Array.from({length: 12}, (_, i) => i).map(m => <option key={m} value={m}>{m + 1}월</option>)}
                                         </select>
                                     </div>
-                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))} className="text-xl">▶</button>
+                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))} className="text-2xl font-bold text-slate-400">▶</button>
                                 </div>
                                 <div className="calendar-grid">
-                                    {['일','월','화','수','목','금','토'].map(d => <div key={d} className="bg-slate-50 py-3 text-center text-[11px] font-bold text-slate-400">{d}</div>)}
-                                    {calendarDays.map((d, i) => {
-                                        // 검색 결과 하이라이트 로직
-                                        const isMatch = search && d?.data && (
-                                            d.data.morning.includes(search) || 
-                                            d.data.lunch.includes(search) || 
-                                            d.data.dinner.includes(search)
-                                        );
-                                        return (
-                                            <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''} ${isMatch ? 'bg-yellow-50' : ''}`} onClick={() => d?.data && setSelectedDate(d.data)}>
-                                                {d && (
-                                                    <>
-                                                        <span className={`text-[13px] font-black ${isMatch ? 'text-blue-600' : (d.data ? 'text-slate-800' : 'text-slate-300')}`}>{d.day}</span>
-                                                        {d.data && (
-                                                            <div className="mt-1 flex flex-col gap-0.5">
-                                                                <div className={`menu-text ${isMatch && d.data.morning.includes(search) ? 'bg-yellow-200' : 'bg-orange-50 text-orange-700'}`}>조:{d.data.morning}</div>
-                                                                <div className={`menu-text ${isMatch && d.data.lunch.includes(search) ? 'bg-yellow-200' : 'bg-blue-50 text-blue-700'}`}>중:{d.data.lunch}</div>
-                                                                <div className={`menu-text ${isMatch && d.data.dinner.includes(search) ? 'bg-yellow-200' : 'bg-purple-50 text-purple-700'}`}>석:{d.data.dinner}</div>
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
+                                    {['일','월','화','수','목','금','토'].map(d => <div key={d} className="bg-slate-50 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-tighter">{d}</div>)}
+                                    {calendarDays.map((d, i) => (
+                                        <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={() => d?.data && setSelectedDate(d.data)}>
+                                            {d && (
+                                                <>
+                                                    <span className={`text-[14px] font-black ${d.data ? 'text-slate-800' : 'text-slate-300'}`}>{d.day}</span>
+                                                    {d.data && (
+                                                        <div className="mt-1 flex flex-col gap-0.5">
+                                                            <div className="menu-text bg-orange-50 text-orange-700">조:{d.data.morning}</div>
+                                                            <div className="menu-text bg-blue-50 text-blue-700">중:{d.data.lunch}</div>
+                                                            <div className="menu-text bg-purple-50 text-purple-700">석:{d.data.dinner}</div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </div>
 
+                        {/* 우측 리포트 영역 */}
                         <div className="lg:col-span-4">
                             {selectedDate ? (
-                                <div className="bg-white p-8 rounded-[2.5rem] border shadow-2xl">
-                                    <div className="mb-6">
-                                        <p className="text-blue-600 font-bold text-sm">{selectedDate.date}</p>
-                                        <h2 className="text-4xl font-black text-slate-900 italic">REPORT</h2>
+                                <div className="bg-white p-8 rounded-[3rem] border shadow-2xl sticky top-8">
+                                    <div className="mb-8">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <p className="text-blue-600 font-black text-sm mb-1 tracking-tight">{selectedDate.date}</p>
+                                                <h2 className="text-5xl font-black text-slate-900 italic tracking-tighter">REPORT</h2>
+                                            </div>
+                                            <div className="bg-slate-100 p-3 rounded-2xl text-center">
+                                                <p className="text-[9px] font-black text-slate-400 mb-1">STAFF</p>
+                                                <p className="text-sm font-black text-slate-700">{selectedDate.staff || "미지정"}</p>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
-                                        <div className="p-5 bg-slate-900 text-white rounded-2xl">
-                                            <p className="text-[10px] text-slate-400 mb-1 font-bold tracking-widest">STAFF</p>
-                                            <p className="text-md font-bold">{selectedDate.staff || "—"}</p>
-                                        </div>
                                         {[{l:'MORNING', c:selectedDate.morning, bg:'bg-orange-50', t:'text-orange-900'},
                                           {l:'LUNCH', c:selectedDate.lunch, bg:'bg-blue-50', t:'text-blue-900'},
                                           {l:'DINNER', c:selectedDate.dinner, bg:'bg-purple-50', t:'text-purple-900'}].map(item => (
-                                            <div key={item.l} className={`${item.bg} p-6 rounded-[2rem] border ${search && item.c.includes(search) ? 'border-blue-500 ring-2 ring-blue-200' : ''}`}>
-                                                <span className="font-black text-[9px] block mb-2 opacity-40">{item.l}</span>
-                                                <p className={`${item.t} text-xl font-black leading-tight whitespace-pre-wrap`}>{item.c || "없음"}</p>
+                                            <div key={item.l} className={`${item.bg} p-6 rounded-[2.5rem] border border-white/50 shadow-sm transition-all hover:shadow-md`}>
+                                                <span className="font-black text-[10px] block mb-2 opacity-30 tracking-widest">{item.l}</span>
+                                                <p className={`${item.t} text-xl font-black leading-tight whitespace-pre-wrap`}>{item.c || "—"}</p>
                                             </div>
                                         ))}
                                     </div>
-                                    <button onClick={() => window.print()} className="no-print w-full mt-8 py-5 bg-slate-800 text-white rounded-2xl font-black shadow-lg">출력하기</button>
+                                    <button onClick={() => window.print()} className="no-print w-full mt-10 py-5 bg-slate-900 text-white rounded-[2rem] font-black shadow-xl active:scale-95 transition-all">PRINT REPORT</button>
                                 </div>
                             ) : (
-                                <div className="h-full flex items-center justify-center p-10 bg-white rounded-[2.5rem] border-2 border-dashed border-slate-200 text-slate-300 font-bold">날짜를 클릭하세요</div>
+                                <div className="h-[600px] flex items-center justify-center p-12 bg-white rounded-[3rem] border-4 border-dashed border-slate-100 text-slate-200 font-black text-2xl text-center leading-relaxed">SELECT<br/>DATE</div>
                             )}
                         </div>
                     </div>
+
+                    {/* 셰프님이 요청하신 통계 분석 레이어 (오버레이) */}
+                    {showStats && (
+                        <div className="fixed inset-0 modal-overlay z-[100] flex items-center justify-center p-4">
+                            <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col">
+                                <div className="p-8 border-b flex justify-between items-center bg-slate-50">
+                                    <div>
+                                        <h2 className="text-3xl font-black text-slate-800 tracking-tighter italic">MENU ANALYSIS</h2>
+                                        <p className="text-blue-600 font-bold">'{menuQuery}' 검색 결과: 총 {statsData.length}번 제공됨</p>
+                                    </div>
+                                    <button onClick={() => setShowStats(false)} className="text-4xl font-light text-slate-400 hover:text-slate-800">&times;</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-8 space-y-4 bg-slate-100/50">
+                                    {statsData.length > 0 ? statsData.map((item, idx) => (
+                                        <div key={idx} className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col md:flex-row gap-6 hover:border-blue-300 transition-all">
+                                            <div className="md:w-32 flex-shrink-0">
+                                                <p className="text-blue-600 font-black text-lg">{item.date.split('-')[0]}년</p>
+                                                <p className="text-slate-400 font-bold">{item.date.split('-').slice(1).join('/')}</p>
+                                                <p className="mt-2 text-[10px] font-black bg-slate-100 px-2 py-1 rounded-md text-slate-500 text-center uppercase tracking-widest">{item.staff}</p>
+                                            </div>
+                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <div className={`p-4 rounded-2xl ${item.morning.includes(menuQuery) ? 'bg-orange-100 border-orange-200' : 'bg-slate-50 opacity-50'}`}>
+                                                    <p className="text-[9px] font-black text-orange-800/50 mb-1">MORNING</p>
+                                                    <p className="text-sm font-bold text-orange-900">{item.morning || "—"}</p>
+                                                </div>
+                                                <div className={`p-4 rounded-2xl ${item.lunch.includes(menuQuery) ? 'bg-blue-100 border-blue-200' : 'bg-slate-50 opacity-50'}`}>
+                                                    <p className="text-[9px] font-black text-blue-800/50 mb-1">LUNCH</p>
+                                                    <p className="text-sm font-bold text-blue-900">{item.lunch || "—"}</p>
+                                                </div>
+                                                <div className={`p-4 rounded-2xl ${item.dinner.includes(menuQuery) ? 'bg-purple-100 border-purple-200' : 'bg-slate-50 opacity-50'}`}>
+                                                    <p className="text-[9px] font-black text-purple-800/50 mb-1">DINNER</p>
+                                                    <p className="text-sm font-bold text-purple-900">{item.dinner || "—"}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <div className="text-center py-20 text-slate-300 font-black text-2xl italic">NO DATA FOUND</div>
+                                    )}
+                                </div>
+                                <div className="p-6 bg-slate-50 border-t text-center">
+                                    <button onClick={() => setShowStats(false)} className="px-10 py-3 bg-slate-800 text-white rounded-2xl font-black shadow-lg">CLOSE ANALYSIS</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
