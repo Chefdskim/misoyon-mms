@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MISOYON MMS v7.6</title>
+    <title>MISOYON MMS v7.7</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -11,13 +11,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
-        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border-radius: 20px; overflow: hidden; }
-        .calendar-day { min-height: 120px; background: white; padding: 10px; cursor: pointer; transition: 0.3s; }
-        .calendar-day:hover { background: #f8fafc; }
-        .calendar-day.selected { background: #e0f2fe !important; box-shadow: inset 0 0 0 3px #0ea5e9; z-index: 10; }
-        .menu-item { font-size: 11px; font-weight: 800; padding: 2px 5px; border-radius: 5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; overflow-y: auto; padding: 2rem; display: flex; flex-direction: column; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #e2e8f0; gap: 1px; border-radius: 15px; overflow: hidden; }
+        .calendar-day { min-height: 110px; background: white; padding: 8px; cursor: pointer; transition: 0.2s; position: relative; }
+        .calendar-day:hover { background: #f1f5f9; }
+        .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
+        .menu-text { font-size: 10px; font-weight: 800; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 4px; border-radius: 4px; }
+        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; overflow-y: auto; padding: 2rem; display: flex; flex-direction: column; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
 <body>
@@ -26,11 +27,9 @@
         const { useState, useEffect, useMemo } = React;
 
         const MisoYonApp = () => {
-            // 1. 식단표 시트 주소
-            const MENU_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
-            
-            // 2. 셰프님이 방금 주신 레시피 시트 주소 (적용 완료)
-            const RECIPE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
+            // 셰프님의 두 시트 주소
+            const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
+            const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
 
             const [menus, setMenus] = useState([]);
             const [recipes, setRecipes] = useState([]);
@@ -40,14 +39,13 @@
             const [recipeSearch, setRecipeSearch] = useState("");
             const [activeModal, setActiveModal] = useState(null);
 
-            const fetchData = () => {
-                // 식단표 데이터
-                Papa.parse(MENU_SHEET_URL, {
+            const loadAllData = () => {
+                // 1. 식단표 파싱
+                Papa.parse(MENU_URL, {
                     download: true, header: false,
-                    complete: (results) => {
-                        const rows = results.data;
+                    complete: (res) => {
                         let temp = []; let headers = [];
-                        rows.forEach(row => {
+                        res.data.forEach(row => {
                             const label = (row[0] || "").replace(/\s/g, "");
                             const vals = row.slice(1);
                             if (label === "날짜") {
@@ -73,92 +71,82 @@
                     }
                 });
 
-                // 레시피 데이터 (새 시트)
-                Papa.parse(RECIPE_SHEET_URL, {
+                // 2. 레시피 파싱
+                Papa.parse(RECIPE_URL, {
                     download: true, header: true,
-                    complete: (results) => setRecipes(results.data)
+                    complete: (res) => setRecipes(res.data)
                 });
             };
 
-            useEffect(() => fetchData(), []);
+            useEffect(() => loadAllData(), []);
 
-            // 메뉴 검색 로직 (최근 5년)
-            const menuSearchResults = useMemo(() => {
+            const menuResults = useMemo(() => {
                 if (!menuSearch) return [];
                 const q = menuSearch.toLowerCase();
-                const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12);
-                const monthNum = isMonthSearch ? q.replace("월", "").padStart(2, '0') : null;
+                const isMonth = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12);
+                const mNum = isMonth ? q.replace("월", "").padStart(2, '0') : null;
                 return menus.filter(m => {
-                    const dateObj = new Date(m.date);
-                    if (dateObj.getFullYear() < 2021) return false;
-                    if (isMonthSearch) return m.date.split('-')[1] === monthNum;
-                    return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
-                }).sort((a, b) => new Date(b.date) - new Date(a.date));
+                    const year = new Date(m.date).getFullYear();
+                    if (year < 2021) return false;
+                    return isMonth ? m.date.split('-')[1] === mNum : (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
+                }).sort((a,b) => new Date(b.date) - new Date(a.date));
             }, [menuSearch, menus]);
 
-            // 레시피 검색 로직
-            const recipeResults = useMemo(() => {
+            const recipeRes = useMemo(() => {
                 if (!recipeSearch) return [];
                 const q = recipeSearch.toLowerCase();
-                return recipes.filter(r => 
-                    Object.values(r).some(val => String(val).toLowerCase().includes(q))
-                );
+                return recipes.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
             }, [recipeSearch, recipes]);
 
-            const days = useMemo(() => {
-                const year = currentMonth.getFullYear();
-                const month = currentMonth.getMonth();
-                const first = new Date(year, month, 1).getDay();
-                const last = new Date(year, month + 1, 0).getDate();
-                const arr = [];
-                for (let i = 0; i < first; i++) arr.push(null);
-                for (let i = 1; i <= last; i++) {
-                    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                    arr.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
+            const calDays = useMemo(() => {
+                const y = currentMonth.getFullYear(), m = currentMonth.getMonth();
+                const first = new Date(y, m, 1).getDay(), last = new Date(y, m+1, 0).getDate();
+                const days = [];
+                for (let i=0; i<first; i++) days.push(null);
+                for (let i=1; i<=last; i++) {
+                    const dStr = `${y}-${String(m+1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    days.push({ d: i, dStr, data: menus.find(x => x.date === dStr) });
                 }
-                return arr;
+                return days;
             }, [currentMonth, menus]);
 
             return (
-                <div className="max-w-[1600px] mx-auto p-6">
-                    <header className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6 bg-white p-8 rounded-[2.5rem] shadow-sm border">
-                        <h1 className="text-3xl font-black text-slate-800 italic uppercase">MISOYON <span className="text-blue-600">v7.6</span></h1>
-                        <div className="flex flex-wrap gap-4 flex-1 justify-end">
-                            <div className="flex bg-slate-100 rounded-2xl p-1 focus-within:ring-2 ring-blue-500">
-                                <input className="bg-transparent px-4 py-2 outline-none font-bold text-sm w-48" placeholder="🍴 메뉴/월 검색 (최근 5년)" value={menuSearch} onChange={(e)=>setMenuSearch(e.target.value)} onKeyDown={(e)=>e.key==='Enter' && setActiveModal('menu')}/>
-                                <button onClick={()=>setActiveModal('menu')} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase">메뉴 분석</button>
+                <div className="max-w-7xl mx-auto p-4 md:p-8">
+                    <header className="flex flex-col lg:flex-row justify-between items-center mb-8 gap-6 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+                        <h1 className="text-2xl font-black text-slate-800 italic uppercase">MISOYON <span className="text-blue-600">v7.7</span></h1>
+                        <div className="flex flex-wrap gap-3 justify-end flex-1">
+                            <div className="flex bg-slate-50 rounded-xl p-1 border focus-within:border-blue-500">
+                                <input className="bg-transparent px-3 py-1.5 outline-none font-bold text-sm w-40" placeholder="🍴 메뉴/월 분석" value={menuSearch} onChange={e=>setMenuSearch(e.target.value)} onKeyDown={e=>e.key==='Enter' && setActiveModal('menu')}/>
+                                <button onClick={()=>setActiveModal('menu')} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] uppercase">Analysis</button>
                             </div>
-                            <div className="flex bg-slate-100 rounded-2xl p-1 focus-within:ring-2 ring-red-500">
-                                <input className="bg-transparent px-4 py-2 outline-none font-bold text-sm w-48" placeholder="📝 비법 레시피 검색" value={recipeSearch} onChange={(e)=>setRecipeSearch(e.target.value)} onKeyDown={(e)=>e.key==='Enter' && setActiveModal('recipe')}/>
-                                <button onClick={()=>setActiveModal('recipe')} className="bg-red-500 text-white px-4 py-2 rounded-xl font-black text-xs uppercase">레시피 검색</button>
+                            <div className="flex bg-slate-50 rounded-xl p-1 border focus-within:border-red-500">
+                                <input className="bg-transparent px-3 py-1.5 outline-none font-bold text-sm w-40" placeholder="📝 비법 레시피" value={recipeSearch} onChange={e=>setRecipeSearch(e.target.value)} onKeyDown={e=>e.key==='Enter' && setActiveModal('recipe')}/>
+                                <button onClick={()=>setActiveModal('recipe')} className="bg-red-500 text-white px-3 py-1.5 rounded-lg font-black text-[10px] uppercase">Recipe</button>
                             </div>
-                            <button onClick={fetchData} className="bg-slate-800 text-white p-3 rounded-2xl">🔄</button>
+                            <button onClick={loadAllData} className="bg-slate-800 text-white p-2.5 rounded-xl shadow-lg active:scale-95 transition-all">🔄</button>
                         </div>
                     </header>
 
                     <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
                         <div className="xl:col-span-8">
-                            <div className="bg-white p-8 rounded-[3rem] shadow-xl border">
-                                <div className="flex justify-between items-center mb-10 px-6">
-                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))} className="text-3xl text-slate-300">◀</button>
-                                    <div className="text-3xl font-black flex gap-4">
-                                        <span>{currentMonth.getFullYear()}년</span>
-                                        <span>{currentMonth.getMonth() + 1}월</span>
-                                    </div>
-                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))} className="text-3xl text-slate-300">▶</button>
+                            <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-slate-100">
+                                <div className="flex justify-between items-center mb-8 px-4 font-black text-2xl">
+                                    <button onClick={()=>setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))} className="text-slate-300 hover:text-blue-500 transition-colors">◀</button>
+                                    <div className="bg-slate-50 px-8 py-2 rounded-2xl shadow-inner">{currentMonth.getFullYear()}년 {currentMonth.getMonth()+1}월</div>
+                                    <button onClick={()=>setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))} className="text-slate-300 hover:text-blue-500 transition-colors">▶</button>
                                 </div>
                                 <div className="calendar-grid">
-                                    {['SUN','MON','TUE','WED','THU','FRI','SAT'].map(d => <div key={d} className="bg-slate-50 py-5 text-center text-[11px] font-black text-slate-400 tracking-widest">{d}</div>)}
-                                    {days.map((d, i) => (
-                                        <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={() => d?.data && setSelectedDate(d.data)}>
+                                    {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-3 text-center text-[11px] font-black text-slate-400">{d}</div>)}
+                                    {calDays.map((d,i)=>(
+                                        <div key={i} className={`calendar-day ${d?.dStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
                                             {d && (
                                                 <>
-                                                    <span className={`text-base font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
+                                                    <span className={`text-sm font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.d}</span>
                                                     {d.data && (
-                                                        <div className="mt-2">
-                                                            <div className="menu-item bg-orange-50 text-orange-700">조:{d.data.morning}</div>
-                                                            <div className="menu-item bg-blue-50 text-blue-700">중:{d.data.lunch}</div>
-                                                            <div className="menu-item bg-purple-50 text-purple-700">석:{d.data.dinner}</div>
+                                                        <div className="mt-1">
+                                                            <div className="menu-text bg-orange-50 text-orange-700">조:{d.data.morning}</div>
+                                                            <div className="menu-text bg-blue-50 text-blue-700">중:{d.data.lunch}</div>
+                                                            <div className="menu-text bg-purple-50 text-purple-700">석:{d.data.dinner}</div>
                                                         </div>
                                                     )}
                                                 </>
@@ -171,37 +159,37 @@
 
                         <div className="xl:col-span-4">
                             {selectedDate ? (
-                                <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border border-slate-100 sticky top-6">
-                                    <div className="mb-10">
+                                <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-blue-50 sticky top-6">
+                                    <div className="mb-8">
                                         <p className="text-blue-600 font-black mb-1">{selectedDate.date}</p>
-                                        <h2 className="text-6xl font-black text-slate-900 italic tracking-tighter uppercase">Report</h2>
+                                        <h2 className="text-5xl font-black text-slate-900 italic tracking-tighter uppercase">Report</h2>
                                     </div>
-                                    <div className="space-y-5 font-black">
-                                        <div className="bg-slate-900 text-white p-6 rounded-3xl flex justify-between items-center"><span className="opacity-40 text-xs uppercase">Chef</span><span>{selectedDate.staff || "—"}</span></div>
-                                        <div className="bg-orange-50 p-6 rounded-[2rem] border-orange-100"><p className="text-orange-900 text-xl font-black">{selectedDate.morning || "—"}</p></div>
-                                        <div className="bg-blue-50 p-6 rounded-[2rem] border-blue-100"><p className="text-blue-900 text-xl font-black">{selectedDate.lunch || "—"}</p></div>
-                                        <div className="bg-purple-50 p-6 rounded-[2rem] border-purple-100"><p className="text-purple-900 text-xl font-black">{selectedDate.dinner || "—"}</p></div>
+                                    <div className="space-y-4 font-black">
+                                        <div className="bg-slate-900 text-white p-5 rounded-2xl flex justify-between items-center"><span className="opacity-40 text-[10px] uppercase">Chef</span><span className="text-sm">{selectedDate.staff || "—"}</span></div>
+                                        <div className="bg-orange-50 p-5 rounded-3xl border border-orange-100"><p className="text-orange-900 text-lg">{selectedDate.morning || "—"}</p></div>
+                                        <div className="bg-blue-50 p-5 rounded-3xl border border-blue-100"><p className="text-blue-900 text-lg">{selectedDate.lunch || "—"}</p></div>
+                                        <div className="bg-purple-50 p-5 rounded-3xl border border-purple-100"><p className="text-purple-900 text-lg">{selectedDate.dinner || "—"}</p></div>
                                     </div>
                                 </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black text-2xl">SELECT DATE</div>}
+                            ) : <div className="h-[500px] flex items-center justify-center bg-white rounded-[3rem] border-4 border-dashed border-slate-100 text-slate-200 font-black text-2xl uppercase">Select Date</div>}
                         </div>
                     </div>
 
                     {activeModal === 'menu' && (
                         <div className="modal-view">
-                            <div className="max-w-5xl mx-auto w-full">
-                                <div className="flex justify-between items-center mb-10 border-b-4 border-blue-600 pb-6">
-                                    <h2 className="text-4xl font-black uppercase italic tracking-tighter">Menu Analysis</h2>
-                                    <button onClick={()=>setActiveModal(null)} className="text-5xl font-thin">&times;</button>
+                            <div className="max-w-4xl mx-auto w-full">
+                                <div className="flex justify-between items-center mb-8 border-b-4 border-blue-600 pb-6">
+                                    <h2 className="text-3xl font-black uppercase italic tracking-tighter">Menu Analysis</h2>
+                                    <button onClick={()=>setActiveModal(null)} className="text-4xl">&times;</button>
                                 </div>
-                                <div className="space-y-6">
-                                    {menuSearchResults.map((m, i) => (
-                                        <div key={i} className="bg-slate-50 p-8 rounded-[2.5rem] flex gap-8">
-                                            <div className="w-40 font-black"><p className="text-2xl text-blue-600">{m.date}</p></div>
-                                            <div className="flex-1 grid grid-cols-3 gap-4 font-bold">
-                                                <div className="bg-white p-4 rounded-2xl">{m.morning}</div>
-                                                <div className="bg-white p-4 rounded-2xl">{m.lunch}</div>
-                                                <div className="bg-white p-4 rounded-2xl">{m.dinner}</div>
+                                <div className="space-y-4">
+                                    {menuResults.map((m,i)=>(
+                                        <div key={i} className="bg-slate-50 p-6 rounded-3xl border flex flex-col md:flex-row gap-6">
+                                            <div className="w-32 font-black text-blue-600">{m.date}</div>
+                                            <div className="flex-1 grid grid-cols-3 gap-4 font-bold text-sm">
+                                                <div className="bg-white p-3 rounded-xl shadow-sm">{m.morning}</div>
+                                                <div className="bg-white p-3 rounded-xl shadow-sm">{m.lunch}</div>
+                                                <div className="bg-white p-3 rounded-xl shadow-sm">{m.dinner}</div>
                                             </div>
                                         </div>
                                     ))}
@@ -212,27 +200,25 @@
 
                     {activeModal === 'recipe' && (
                         <div className="modal-view">
-                            <div className="max-w-5xl mx-auto w-full">
+                            <div className="max-w-6xl mx-auto w-full">
                                 <div className="flex justify-between items-center mb-10 border-b-4 border-red-500 pb-6">
-                                    <h2 className="text-4xl font-black uppercase italic tracking-tighter">Recipe Master</h2>
-                                    <button onClick={()=>setActiveModal(null)} className="text-5xl font-thin">&times;</button>
+                                    <h2 className="text-3xl font-black uppercase italic tracking-tighter">Recipe Master</h2>
+                                    <button onClick={()=>setActiveModal(null)} className="text-4xl">&times;</button>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                     <div className="space-y-6">
                                         <h3 className="text-xl font-black">👨‍🍳 셰프님의 비법 노트</h3>
-                                        {recipeResults.length > 0 ? recipeResults.map((r, i) => (
-                                            <div key={i} className="bg-red-50 p-6 rounded-3xl border-2 border-red-100">
-                                                {Object.entries(r).map(([key, val]) => (
-                                                    <p key={key} className="mb-2 text-red-900 font-bold"><span className="text-red-400 text-xs mr-2">{key}:</span> {val}</p>
-                                                ))}
+                                        {recipeRes.length > 0 ? recipeRes.map((r,i)=>(
+                                            <div key={i} className="bg-red-50 p-6 rounded-3xl border-2 border-red-100 shadow-sm">
+                                                {Object.entries(r).map(([k,v])=><p key={k} className="mb-2 text-red-900 font-bold text-sm"><span className="text-red-400 text-[10px] uppercase mr-2">{k}:</span> {v}</p>)}
                                             </div>
-                                        )) : <p className="text-slate-300 font-black text-center py-20">시트에 등록된 레시피가 없습니다.</p>}
+                                        )) : <div className="text-center py-20 bg-slate-50 rounded-3xl text-slate-300 font-black">시트에 등록된 데이터가 없습니다.</div>}
                                     </div>
-                                    <div className="bg-slate-50 p-10 rounded-[3rem] h-fit sticky top-0">
-                                        <h3 className="text-xl font-black mb-8 text-center uppercase tracking-widest">Support Search</h3>
+                                    <div className="bg-slate-900 p-8 rounded-[3rem] h-fit sticky top-0 text-center">
+                                        <h3 className="text-white text-xl font-black mb-8 uppercase tracking-widest">Support Search</h3>
                                         <div className="space-y-4">
-                                            <button onClick={()=>window.open(`https://www.youtube.com/results?search_query=${recipeSearch}+레시피`)} className="w-full py-6 bg-red-600 text-white rounded-3xl font-black text-xl shadow-xl hover:scale-105 transition-all">YOUTUBE</button>
-                                            <button onClick={()=>window.open(`https://www.google.com/search?q=${recipeSearch}+레시피`)} className="w-full py-6 bg-slate-800 text-white rounded-3xl font-black text-xl shadow-xl hover:scale-105 transition-all">GOOGLE</button>
+                                            <button onClick={()=>window.open(`https://www.youtube.com/results?search_query=${recipeSearch}+레시피`)} className="w-full py-5 bg-red-600 text-white rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all">YOUTUBE</button>
+                                            <button onClick={()=>window.open(`https://www.google.com/search?q=${recipeSearch}+레시피`)} className="w-full py-5 bg-white text-slate-900 rounded-2xl font-black text-xl shadow-xl active:scale-95 transition-all">GOOGLE</button>
                                         </div>
                                     </div>
                                 </div>
