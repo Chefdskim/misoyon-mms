@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v8.4 - 박스 밀착형 달력</title>
+    <title>MISOYON MMS v8.5 - 검색 강조 시스템</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -11,47 +11,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
-        
-        /* [핵심] 모든 여백 제거 및 화면 꽉 채우기 */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { width: 100%; height: 100%; overflow: hidden; font-family: 'Pretendard', sans-serif; background: #f8fafc; }
         #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
-
-        /* 달력 그리드: 가로/세로 100% 비율 고정 */
-        .calendar-grid { 
-            display: grid; 
-            grid-template-columns: repeat(7, 1fr); 
-            grid-template-rows: 25px repeat(6, 1fr); /* 요일행 제외 6주 자동 높이 */
-            flex: 1; 
-            background: #cbd5e1; 
-            gap: 1px; 
-            border: 1px solid #cbd5e1;
-            min-height: 0;
-        }
-        .calendar-day { 
-            background: white; 
-            padding: 2px 4px; 
-            cursor: pointer; 
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
-            min-height: 0;
-        }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 25px repeat(6, 1fr); flex: 1; background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; min-height: 0; }
+        .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
-        
-        /* 메뉴 텍스트: 칸 안에 무조건 한 줄로 압축 */
-        .menu-text { 
-            font-size: 9px; 
-            font-weight: 800; 
-            line-height: 1.1; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            margin-top: 1px; 
-            padding: 1px 2px; 
-            border-radius: 2px; 
-        }
+        .menu-text { font-size: 9px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
         .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; }
+        /* 하이라이트 스타일 */
+        .highlight { background-color: #ef4444; color: white; padding: 0 2px; border-radius: 2px; }
     </style>
 </head>
 <body>
@@ -61,7 +30,6 @@
 
         const MisoYonApp = () => {
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
-            
             const [menus, setMenus] = useState([]);
             const [selectedDate, setSelectedDate] = useState(null);
             const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
@@ -111,119 +79,4 @@
                 for (let i = 0; i < firstDay; i++) days.push(null);
                 for (let i = 1; i <= lastDate; i++) {
                     const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                    days.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
-                }
-                while (days.length < 42) days.push(null);
-                return days;
-            }, [currentMonth, menus]);
-
-            const searchResults = useMemo(() => {
-                if (!searchTerm) return [];
-                const q = searchTerm.replace(/\s/g, "").toLowerCase();
-                const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12);
-                const targetMonth = isMonthSearch ? q.replace("월", "").padStart(2, '0') : null;
-
-                return menus.filter(m => {
-                    const mDate = new Date(m.date);
-                    const mMonthStr = String(mDate.getMonth() + 1).padStart(2, '0');
-                    const isWithin5Years = mDate.getFullYear() >= 2022 && mDate.getFullYear() <= 2026;
-                    
-                    if (isMonthSearch) return isWithin5Years && mMonthStr === targetMonth;
-                    return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
-                }).sort((a,b) => new Date(b.date) - new Date(a.date));
-            }, [searchTerm, menus]);
-
-            return (
-                <div className="flex flex-col h-screen w-full">
-                    {/* 상단바: 고정 높이 */}
-                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0">
-                        <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v8.4</span></h1>
-                            <div className="flex items-center gap-2 font-black text-sm text-slate-700">
-                                <button onClick={()=>setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))}>◀</button>
-                                <span className="w-24 text-center">{currentMonth.getFullYear()}년 {currentMonth.getMonth()+1}월</span>
-                                <button onClick={()=>setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))}>▶</button>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-32 md:w-48 border outline-none focus:ring-1 ring-blue-500" placeholder="1월 또는 메뉴 검색" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && setActiveModal(true)}/>
-                            <button onClick={()=>setActiveModal(true)} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px] uppercase">Search</button>
-                            <button onClick={loadData} className="bg-slate-800 text-white p-1.5 rounded-lg text-xs">🔄</button>
-                        </div>
-                    </header>
-
-                    {/* 메인 영역: 남은 모든 공간 차지 */}
-                    <main className="flex flex-1 min-height-0 w-full overflow-hidden">
-                        <div className="flex-[3] flex flex-col h-full border-r min-width-0">
-                            <div className="calendar-grid">
-                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-1 text-center text-[9px] font-black text-slate-400 border-b">{d}</div>)}
-                                {calDays.map((d,i)=>(
-                                    <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
-                                        {d && (
-                                            <>
-                                                <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
-                                                {d.data && (
-                                                    <div className="flex flex-col gap-[1px] mt-[1px]">
-                                                        <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>
-                                                        <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>
-                                                        <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* 우측 리포트 패널: 높이 고정 */}
-                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-width-[250px]">
-                            {selectedDate ? (
-                                <div className="space-y-4">
-                                    <h2 className="text-xl font-black text-slate-900 border-b-2 border-blue-600 pb-1 italic uppercase">Daily Report</h2>
-                                    <div className="space-y-3">
-                                        <div className="bg-slate-100 p-2 rounded flex justify-between text-[10px] font-black uppercase"><span>Chef</span><span>{selectedDate.staff || "Master"}</span></div>
-                                        <div className="bg-orange-50 p-3 rounded-lg border border-orange-100"><p className="text-[8px] text-orange-400 font-black mb-1">MORNING</p><p className="text-xs font-bold">{selectedDate.morning || "—"}</p></div>
-                                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100"><p className="text-[8px] text-blue-400 font-black mb-1">LUNCH</p><p className="text-xs font-bold">{selectedDate.lunch || "—"}</p></div>
-                                        <div className="bg-purple-50 p-3 rounded-lg border border-purple-100"><p className="text-[8px] text-purple-400 font-black mb-1">DINNER</p><p className="text-xs font-bold">{selectedDate.dinner || "—"}</p></div>
-                                    </div>
-                                    <button onClick={()=>window.print()} className="w-full py-2 bg-slate-800 text-white rounded font-black text-xs uppercase shadow-sm">Print PDF</button>
-                                </div>
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-slate-200 font-black text-center text-xs uppercase leading-relaxed">🗓️<br/>날짜 선택</div>
-                            )}
-                        </aside>
-                    </main>
-
-                    {/* 분석 모달 */}
-                    {activeModal && (
-                        <div className="modal-view">
-                            <div className="max-w-4xl mx-auto w-full flex flex-col h-full">
-                                <div className="flex justify-between items-center mb-4 border-b-2 border-blue-600 pb-1">
-                                    <h2 className="text-xl font-black italic uppercase">5-Year Analysis: {searchTerm}</h2>
-                                    <button onClick={()=>setActiveModal(false)} className="text-2xl font-thin">&times;</button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto space-y-2 pb-4">
-                                    {searchResults.length > 0 ? searchResults.map((m, i) => (
-                                        <div key={i} className="bg-slate-50 p-3 rounded-xl border flex flex-col md:flex-row gap-3">
-                                            <div className="md:w-24 font-black text-blue-600 text-sm shrink-0">{m.date.replace(/-/g,'.')}</div>
-                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2 font-bold text-[11px]">
-                                                <div className="bg-white p-2 rounded-lg shadow-sm border-l-2 border-orange-400">{m.morning}</div>
-                                                <div className="bg-white p-2 rounded-lg shadow-sm border-l-2 border-blue-400">{m.lunch}</div>
-                                                <div className="bg-white p-2 rounded-lg shadow-sm border-l-2 border-purple-400">{m.dinner}</div>
-                                            </div>
-                                        </div>
-                                    )) : <p className="text-center py-20 text-slate-400 text-sm font-bold uppercase">No records found for recent 5 years</p>}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MisoYonApp />);
-    </script>
-</body>
-</html>
+                    days.push({ day: i, dateStr: ds, data: menus.find(m
