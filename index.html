@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v13.1</title>
+    <title>MISOYON MMS v13.2</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -154,12 +154,18 @@
                 );
             };
 
+            // 검색 실행 핸들러
+            const handleSearch = () => {
+                setModalSearch(searchTerm);
+                setActiveModal(true);
+            };
+
             return (
                 <div className="flex flex-col h-full w-full">
                     {/* Header: Fixed Height */}
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v13.1</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v13.2</span></h1>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm hidden md:flex">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
                                     {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
@@ -176,7 +182,15 @@
                             </select>
                         </div>
                         <div className="flex gap-2">
-                             <button onClick={()=>{setModalSearch(""); setActiveModal(true);}} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
+                             {/* 검색어 입력창 추가 */}
+                             <input 
+                                className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-28 md:w-40 border outline-none" 
+                                placeholder="메뉴/날짜 검색" 
+                                value={searchTerm} 
+                                onChange={e=>setSearchTerm(e.target.value)} 
+                                onKeyDown={e=>e.key==='Enter' && handleSearch()}
+                             />
+                             <button onClick={handleSearch} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
                         </div>
                     </header>
 
