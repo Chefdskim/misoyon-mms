@@ -1,42 +1,125 @@
-/**
- * 미소연 통합 검색 시스템 v1.0
- * 셰프님의 레시피 폼과 외부 검색을 결합합니다.
- */
-function getIntegratedSearch(query) {
-  const recipeData = searchInternalRecipes(query); // 시트 내 레시피 검색
-  const externalLinks = generateExternalLinks(query); // 유튜브/웹 검색 링크 생성
-  
-  return {
-    internal: recipeData,
-    external: externalLinks
-  };
-}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MISOYON MMS v6.8 - Integrated</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #e2e8f0; gap: 1px; border-radius: 15px; overflow: hidden; }
+        .calendar-day { min-height: 110px; background: white; padding: 6px; cursor: pointer; transition: 0.2s; overflow: hidden; }
+        .calendar-day:hover { background: #f1f5f9; }
+        .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
+        .menu-text { font-size: 10px; font-weight: 700; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; border-radius: 3px; padding: 1px 3px; }
+        select { cursor: pointer; border: none; background: transparent; font-weight: 900; outline: none; appearance: none; text-align: center; color: #2563eb; }
+        @media print { .no-print { display: none !important; } }
+        /* 검색창 애니메이션 */
+        .search-focus:focus { width: 250px; background: white; border-color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
 
-// 셰프님이 만드신 '레시피' 시트의 폼 구조를 추적하는 함수
-function searchInternalRecipes(query) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("레시피");
-  const data = sheet.getDataRange().getValues();
-  let results = [];
+        const MisoYonApp = () => {
+            const FIXED_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
+            const [menus, setMenus] = useState([]);
+            const [selectedDate, setSelectedDate] = useState(null);
+            const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
+            const [loading, setLoading] = useState(false);
+            const [searchQuery, setSearchQuery] = useState(""); // 검색어 상태 추가
 
-  for (let i = 0; i < data.length; i++) {
-    // C열(메뉴명)에서 검색어 확인
-    if (data[i][2] && String(data[i][2]).includes(query)) {
-      results.push({
-        name: data[i][2],
-        code: data[i+1][2], // 관리코드
-        mainIngred: data[i+6][2], // 주재료
-        rowIndex: i + 1
-      });
-    }
-  }
-  return results;
-}
+            const normalizeDate = (str) => {
+                if (!str) return null;
+                const match = str.match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
+                if (match) return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+                return null;
+            };
 
-// 유튜브 및 웹 검색 쿼리 생성 (기능 유지)
-function generateExternalLinks(query) {
-  return {
-    youtube: "https://www.youtube.com/results?search_query=" + encodeURIComponent(query + " 레시피"),
-    web: "https://www.google.com/search?q=" + encodeURIComponent(query + " 전문 레시피")
-  };
-}
+            const fetchSheetData = () => {
+                setLoading(true);
+                Papa.parse(FIXED_URL, {
+                    download: true,
+                    header: false,
+                    complete: (results) => {
+                        const rows = results.data;
+                        let tempMenus = [];
+                        let headers = [];
+                        rows.forEach(row => {
+                            const label = (row[0] || "").replace(/\s/g, "");
+                            const values = row.slice(1);
+                            if (label === "날짜") {
+                                headers = values.map(v => normalizeDate(v));
+                                headers.forEach(d => { if(d) tempMenus.push({ date: d, staff: "", morning: "", lunch: "", dinner: "" }); });
+                            } else if (headers.length > 0) {
+                                values.forEach((val, idx) => {
+                                    if (!headers[idx]) return;
+                                    const target = tempMenus.find(m => m.date === headers[idx]);
+                                    if (target) {
+                                        if (label.includes("근무")) target.staff = val;
+                                        else if (label.includes("아침")) target.morning = val;
+                                        else if (label.includes("점심")) target.lunch = val;
+                                        else if (label.includes("저녁")) target.dinner = val;
+                                    }
+                                });
+                            }
+                        });
+                        setMenus(tempMenus.filter(m => m.date));
+                        setLoading(false);
+                    }
+                });
+            };
+
+            useEffect(() => { fetchSheetData(); }, []);
+
+            // 검색 결과 필터링 (달력 표기용)
+            const calendarDays = useMemo(() => {
+                const year = currentMonth.getFullYear();
+                const month = currentMonth.getMonth();
+                const firstDay = new Date(year, month, 1).getDay();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const days = [];
+                for (let i = 0; i < firstDay; i++) days.push(null);
+                for (let i = 1; i <= daysInMonth; i++) {
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    const dayData = menus.find(m => m.date === dateStr);
+                    days.push({ day: i, dateStr, data: dayData });
+                }
+                return days;
+            }, [currentMonth, menus]);
+
+            // 검색어에 해당하는 날짜들 필터링
+            const searchResults = useMemo(() => {
+                if (!searchQuery) return [];
+                return menus.filter(m => 
+                    (m.morning && m.morning.includes(searchQuery)) ||
+                    (m.lunch && m.lunch.includes(searchQuery)) ||
+                    (m.dinner && m.dinner.includes(searchQuery))
+                );
+            }, [searchQuery, menus]);
+
+            return (
+                <div className="max-w-7xl mx-auto p-4 md:p-8">
+                    <header className="flex justify-between items-center mb-6 no-print gap-4">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                            <h1 className="text-xl font-black text-slate-800 italic">MISOYON <span className="text-blue-600">v6.8</span></h1>
+                        </div>
+                        
+                        {/* 검색창 추가 - 원본 디자인을 해치지 않게 세련되게 배치 */}
+                        <div className="flex-1 flex justify-center max-w-md">
+                            <input 
+                                type="text" 
+                                placeholder="메뉴 검색 (예: 옥돔)" 
+                                className="w-full px-4 py-2 bg-slate-100 border-none rounded-xl text-sm font-bold outline-none search-focus transition-all"
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+
+                        <button onClick={fetchSheetData} className
