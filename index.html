@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v9.0 - UI 최적화 완료</title>
+    <title>MISOYON MMS v9.1 - 안정화 완료</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -69,7 +69,8 @@
                             }
                         });
                         setMenus(temp);
-                    }
+                    },
+                    error: () => alert("데이터를 불러오는데 실패했습니다.")
                 });
             };
 
@@ -99,21 +100,21 @@
 
                 return menus.filter(m => {
                     const mDate = new Date(m.date);
-                    if (isNaN(mDate)) return false;
+                    if (isNaN(mDate.getTime())) return false;
                     const isAfter2020 = mDate.getFullYear() >= 2020;
                     if (isMonthSearch) return isAfter2020 && String(mDate.getMonth() + 1).padStart(2, '0') === targetMonth;
                     return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
                 }).sort((a,b) => new Date(b.date) - new Date(a.date));
             }, [activeQuery, menus]);
 
+            // [핵심] 가장 안전한 텍스트 하이라이트 함수 (오류 방지)
             const getHighlightedMenu = (text, query) => {
                 if (!query || query.endsWith("월") || !isNaN(query)) return text;
-                const parts = text.split(new RegExp(`(${query})`, 'gi'));
-                return parts.map((part, i) => 
-                    part.toLowerCase() === query.toLowerCase() 
-                    ? <span key={i} className="hl-red">{part}</span> 
-                    : part
-                );
+                const parts = text.split(query); 
+                return parts.reduce((prev, current, i) => {
+                    if (!i) return [current];
+                    return prev.concat(<span key={i} className="hl-red">{query}</span>, current);
+                }, []);
             };
 
             const openSearch = () => {
@@ -123,10 +124,9 @@
 
             return (
                 <div className="flex flex-col h-screen w-full">
-                    {/* 상단바 */}
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v9.0</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v9.1</span></h1>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl gap-1 border">
                                 <select value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
                                     {years.map(y => <option key={y} value={y}>{y}년</option>)}
@@ -137,14 +137,12 @@
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            {/* [수정] 안내 문구 변경 */}
                             <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-36 md:w-56 border outline-none" placeholder="월 선택 또는 메뉴 검색" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && openSearch()}/>
                             <button onClick={openSearch} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px] uppercase">Search</button>
                             <button onClick={loadData} className="bg-slate-800 text-white p-1.5 rounded-lg text-xs">🔄</button>
                         </div>
                     </header>
 
-                    {/* 메인 달력 영역 */}
                     <main className="flex flex-1 min-height-0 w-full overflow-hidden">
                         <div className="flex-[3] flex flex-col h-full border-r min-width-0">
                             <div className="calendar-grid">
@@ -168,16 +166,15 @@
                             </div>
                         </div>
 
-                        {/* 리포트 패널 */}
                         <aside className="flex-1 bg-white p-4 overflow-y-auto min-width-[250px]">
                             {selectedDate ? (
                                 <div className="space-y-4">
                                     <h2 className="text-xl font-black text-slate-900 border-b-2 border-blue-600 pb-1 italic uppercase tracking-tighter">Daily Report</h2>
                                     <div className="space-y-3 font-bold text-xs">
                                         <div className="bg-slate-100 p-2 rounded flex justify-between uppercase font-black"><span>Chef</span><span>{selectedDate.staff || "Master"}</span></div>
-                                        <div className="bg-orange-50 p-3 rounded-lg border border-orange-100 text-xs">{selectedDate.morning || "—"}</div>
-                                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-xs">{selectedDate.lunch || "—"}</div>
-                                        <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 text-xs">{selectedDate.dinner || "—"}</div>
+                                        <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">{selectedDate.morning || "—"}</div>
+                                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">{selectedDate.lunch || "—"}</div>
+                                        <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">{selectedDate.dinner || "—"}</div>
                                     </div>
                                 </div>
                             ) : (
@@ -186,14 +183,9 @@
                         </aside>
                     </main>
 
-                    {/* 분석 모달 창 */}
                     {activeModal && (
                         <div className="modal-view">
                             <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
                                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b-2 border-blue-600 pb-3 shrink-0">
                                     <div className="flex items-center gap-3">
-                                        <h2 className="text-2xl font-black italic uppercase italic tracking-tighter shrink-0">Long-term Analysis</h2>
-                                        <div className="flex gap-2 bg-slate-100 p-1 rounded-xl border">
-                                            {/* [수정] 안내 문구 변경 */}
-                                            <input className="bg-transparent px-3 py-1 text-sm font-black outline-none w-48" placeholder="월 선택 또는 메뉴 검색" value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
-                                            <div className="bg-blue-600 text-white px-3 py-1 rounded-lg text
+                                        <h2 className="text-2
