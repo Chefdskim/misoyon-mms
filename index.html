@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>미소연 MMS v11.9 - 완벽 복구본</title>
+    <title>미소연 MMS v11.9 - 원본 복구본</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -31,18 +31,18 @@
         const MisoYonApp = () => {
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             
-            // 셰프님이 주신 레시피 데이터 (원본 그대로 고정)
-            const RECIPE_DATA = {
-                "불고기": { name: "서울식 불고기", ingredients: "한우 불고기(등심) 1kg, 배 1, 양파 1, 팽이버섯 1, 느타리버섯 50, 불린 당면 100, 대파 1, 다시마 육수 200, 참기름 15, 매실액 5, 진간장 100, 다진 마늘 30, 설탕 45, 후추", process: "1. 배즙에 양념장을 만든다.\n2. 채소 손질 후 고기를 재운다.\n3. 육수를 부어 익히다 버섯, 당면, 대파로 마무리.", tip: "배즙을 사용하면 연육 작용으로 고기가 부드러워집니다." },
-                "갈비탕": { name: "갈비탕", ingredients: "한우갈비 500, 무 200, 대파 30, 통마늘 5알, 계란 1개, 소금, 국간장, 양념(국간장 5, 소금 2, 다진파 5, 다진마늘 5, 참기름 2, 후추)", process: "1. 갈비 핏물을 빼고 데쳐낸다.\n2. 물을 새로 받아 갈비를 푹 끓인다.\n3. 무, 마늘, 대파를 넣고 고기가 익으면 건져 양념한다.\n4. 지단을 올려 완성.", tip: "고기와 무를 따로 양념에 버무려 두었다가 국물에 넣으면 맛이 더 깊습니다." },
-                "무국": { name: "경상도식 소고기 무국", ingredients: "한우양지 300, 무 300, 대파 2, 숙주 200, 멸치육수 1.8L, 국간장 25, 액젓 15, 다진마늘 15, 고춧가루 30", process: "1. 양지 핏물을 빼고 무와 함께 육수에 끓인다.\n2. 국간장, 액젓으로 간을 한다.\n3. 대파, 마늘, 고춧가루를 넣고 마지막에 숙주를 넣어 8분간 끓인다.", tip: "마지막에 숙주를 넣어야 아삭한 식감이 살아납니다." },
-                "소머리국밥": { name: "곤지암 소머리국밥", ingredients: "사골 1kg, 소머리고기 800g, 인삼 150g, 무 200g, 쌀, 물, 양념장(국간장 30g, 다진 파 5g, 식초 10g, 통깨 5g)", process: "1. 사골과 고기 핏물을 뺀다.\n2. 사골을 먼저 끓여 뽀얗게 우려낸다.\n3. 머리고기를 넣고 2시간 삶은 뒤 무와 인삼을 넣고 더 삶는다.", tip: "양념장에 식초를 살짝 넣으면 고기의 기름진 맛을 잡아줍니다." },
-                "곰국": { name: "곰국", ingredients: "사골 1kg, 우잡뼈 1kg, 양지 500, 대파, 다진마늘, 소금, 후추", process: "1. 뼈 핏물을 빼고 팔팔 끓인다.\n2. 색이 우러나면 양지를 넣고 기름을 걷어내며 끓인다.\n3. 양지를 얇게 썰어 국물과 함께 낸다.", tip: "끓이는 동안 떠오르는 거품과 기름을 수시로 걷어내야 국물이 맑습니다." },
-                "백합탕": { name: "냉이백합탕", ingredients: "백합 2kg, 냉이 300g, 두부 1, 황금팽이, 대파, 청양고추, 홍고추, 소금, 새우젓, 멸치육수 10L", process: "1. 백합 해감 후 육수에 끓여 건져낸다.\n2. 육수를 면포에 거른 뒤 다시 끓여 두부와 채소를 넣는다.\n3. 소금, 새우젓으로 간을 하고 백합을 합친다.", tip: "냉이는 너무 오래 끓이면 향이 날아가므로 마지막에 살짝만 익히세요." },
-                "다슬기국": { name: "다슬기국 (골부리국)", ingredients: "다슬기 500g, 얼갈이 100g, 부추 50g, 대파 30g, 다진마늘 15g, 국간장 10g, 고춧가루 30g, 소금 5g, 밀가루 10g, 황태육수 3L, 된장 15g", process: "1. 다슬기를 삶아 살을 바른다.\n2. 나물과 양념, 밀가루를 버무린다.\n3. 육수에 다슬기 삶은 물을 섞어 끓이다 나물을 넣고 부추로 마무리.", tip: "나물에 밀가루를 입혀 끓이면 국물이 걸쭉해지고 구수한 맛이 배가됩니다." },
-                "매운탕": { name: "우럭매운탕", ingredients: "우럭 3마리, 서더리 1kg, 무 150, 두부 1모, 쑥갓, 호박 60, 멸치육수 5L, 다데기", process: "1. 서더리 육수를 내고 다데기를 푼다.\n2. 육수를 걸러 무를 넣고 끓인다.\n3. 우럭, 호박, 두부를 넣고 쑥갓으로 마무리.", tip: "서더리를 먼저 끓여 육수를 진하게 내는 것이 비법입니다." },
-                "미역국": { name: "바지락 미역국", ingredients: "바지락, 미역, 불린쌀 250, 소고기민찌 150, 다시마 육수 1L, 참기름, 소금, 표고버섯 5개, 파, 양파, 당근, 국간장", process: "1. 미역과 바지락을 손질한다.\n2. 참기름에 소고기를 볶다 쌀과 채소를 넣고 볶는다.\n3. 육수를 붓고 끓이다 미역과 바지락을 넣어 완성.", tip: "쌀을 참기름에 충분히 볶아야 국물이 뽀얗고 고소해집니다." },
-                "배추국": { name: "배추국", ingredients: "배추 250, 한우사태 100, 쌀뜨물 6컵, 홍고추, 청양고추, 다진마늘 10, 대파, 된장", process: "1. 쌀뜨물 육수를 낸다.\n2. 육수에 된장을 풀고 배추와 사태를 넣고 끓인다.\n3. 고추와 마늘로 마무리.", tip: "쌀뜨물을 사용하면 된장의 떫은맛을 잡고 구수한 맛을 더해줍니다." }
+            // 셰프님이 주신 레시피 10종 원본 텍스트 데이터
+            const RECIPE_STORE = {
+                "불고기": { name: "서울식 불고기", ingredients: "한우 불고기(등심) 1kg, 배 1, 양파 1, 팽이버섯 1, 느타리버섯 50, 불린 당면 100, 대파 1, 다시마 육수 200, 참기름 15, 매실액 5, 진간장 100, 다진 마늘 30, 설탕 45, 후추", process: "1. 배즙에 양념장을 만든다.\n2. 채소 손질 후 고기를 재운다.\n3. 센 불에 익히다 육수를 부어 완성." },
+                "갈비탕": { name: "갈비탕", ingredients: "한우갈비 500, 무 200, 대파 30, 통마늘 5알, 계란 1개, 소금, 국간장, 양념(국간장 5, 소금 2, 다진파 5, 다진마늘 5, 참기름 2, 후추)", process: "1. 갈비 핏물을 빼고 데쳐낸다.\n2. 물을 새로 받아 푹 끓인다.\n3. 무, 마늘, 대파를 넣고 고기가 익으면 건져 양념한다.\n4. 지단을 올려 완성." },
+                "무국": { name: "경상도식 소고기 무국", ingredients: "한우양지 300, 무 300, 대파 2, 숙주 200, 멸치육수 1.8L, 국간장 25, 액젓 15, 다진마늘 15, 고춧가루 30", process: "1. 양지 핏물을 빼고 무와 함께 육수에 끓인다.\n2. 국간장, 액젓으로 간을 한다.\n3. 대파, 마늘, 고춧가루를 넣고 숙주를 넣어 끓인다." },
+                "소머리국밥": { name: "곤지암 소머리국밥", ingredients: "사골 1kg, 소머리고기 800g, 인삼 150g, 무 200g, 쌀, 물, 양념장(국간장 30g, 다진 파 5g, 식초 10g, 통깨 5g)", process: "1. 사골과 고기 핏물을 뺀다.\n2. 사골을 끓여 우려낸 뒤 머리고기를 넣고 2시간 삶는다.\n3. 무와 인삼을 넣어 마무리." },
+                "곰국": { name: "곰국", ingredients: "사골 1kg, 우잡뼈 1kg, 양지 500, 대파, 다진마늘, 소금, 후추", process: "1. 뼈 핏물을 빼고 끓인다.\n2. 양지를 넣고 거품을 걷어내며 끓인다.\n3. 양지를 썰어 국물과 함께 낸다." },
+                "백합탕": { name: "냉이백합탕", ingredients: "백합 2kg, 냉이 300g, 두부 1, 황금팽이, 대파, 청양고추, 홍고추, 소금, 새우젓, 멸치육수 10L", process: "1. 백합 해감 후 육수에 끓여 건진다.\n2. 육수를 걸러 두부, 채소를 넣고 끓인다.\n3. 소금, 새우젓 간을 하고 백합을 넣는다." },
+                "다슬기국": { name: "다슬기국 (안동 골부리국)", ingredients: "다슬기 500g, 얼갈이 100g, 부추 50g, 대파 30g, 다진마늘 15g, 국간장 10g, 고춧가루 30g, 밀가루 10g, 된장 15g", process: "1. 다슬기를 삶아 살을 바른다.\n2. 나물과 양념, 밀가루를 버무린다.\n3. 육수에 넣고 끓이다 부추로 마무리." },
+                "매운탕": { name: "우럭매운탕", ingredients: "우럭 3마리, 서더리 1kg, 무 150, 두부 1모, 쑥갓, 호박 60, 멸치육수 5L, 다데기", process: "1. 서더리 육수를 내고 다데기를 푼다.\n2. 무를 넣고 끓이다 우럭, 호박, 두부를 넣는다.\n3. 쑥갓을 올려 마무리." },
+                "미역국": { name: "바지락 미역국", ingredients: "바지락, 미역, 불린쌀 250, 소고기민찌 150, 다시마 육수 1L, 참기름, 소금, 표고버섯, 파, 양파, 당근, 국간장", process: "1. 미역과 바지락 손질.\n2. 참기름에 소고기, 쌀을 볶다 육수 붓고 끓임.\n3. 미역과 바지락 넣어 완성." },
+                "배추국": { name: "배추국", ingredients: "배추 250, 한우사태 100, 쌀뜨물 6컵, 홍고추, 청양고추, 다진마늘 10, 대파, 된장", process: "1. 쌀뜨물 육수에 된장을 푼다.\n2. 배추와 사태를 넣고 끓인다.\n3. 고추, 마늘로 마무리." }
             };
 
             const [menus, setMenus] = useState([]);
@@ -50,7 +50,7 @@
             const [currentMonth, setCurrentMonth] = useState(new Date());
             const [searchTerm, setSearchTerm] = useState("");
             const [activeModal, setActiveModal] = useState(false);
-            const [viewRecipeList, setViewRecipeList] = useState([]);
+            const [viewRecipe, setViewRecipe] = useState(null);
 
             useEffect(() => {
                 Papa.parse(MENU_URL, { download: true, complete: (res) => {
@@ -69,7 +69,6 @@
                                 if (!headers[i]) return;
                                 const t = temp.find(m => m.date === headers[i]);
                                 if (t) {
-                                    // 원본 텍스트 그대로 저장 (가공 금지)
                                     if (label.includes("아침")) t.morning = v;
                                     else if (label.includes("점심")) t.lunch = v;
                                     else if (label.includes("저녁")) t.dinner = v;
@@ -81,50 +80,36 @@
                 }});
             }, []);
 
-            const findRecipes = (text) => {
-                if (!text) return [];
-                return Object.keys(RECIPE_DATA)
-                    .filter(key => text.replace(/\s/g, "").includes(key))
-                    .map(key => RECIPE_DATA[key]);
-            };
-
-            const calDays = useMemo(() => {
-                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
-                const firstDay = new Date(year, month, 1).getDay();
-                const lastDate = new Date(year, month + 1, 0).getDate();
-                const days = [];
-                for (let i = 0; i < firstDay; i++) days.push(null);
-                for (let i = 1; i <= lastDate; i++) {
-                    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                    days.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
-                }
-                while (days.length < 42) days.push(null);
-                return days;
-            }, [currentMonth, menus]);
-
             const searchResults = useMemo(() => {
                 const q = searchTerm.trim().toLowerCase();
                 if (!q) return [];
                 return menus.filter(m => (m.morning + m.lunch + m.dinner).toLowerCase().includes(q));
             }, [searchTerm, menus]);
 
+            const getMatchedRecipe = (text) => {
+                if (!text) return null;
+                const key = Object.keys(RECIPE_STORE).find(k => text.replace(/\s/g,"").includes(k));
+                return key ? RECIPE_STORE[key] : null;
+            };
+
             const MenuCard = ({text, type}) => {
-                const matched = findRecipes(text);
-                const hasRecipe = matched.length > 0;
+                const recipe = getMatchedRecipe(text);
                 return (
-                    <div className={`p-4 rounded-xl border mb-3 ${hasRecipe ? 'bg-blue-50 border-blue-200 cursor-pointer' : 'bg-slate-50 border-slate-100'}`}
-                         onClick={() => hasRecipe && setViewRecipeList(matched)}>
+                    <div className={`p-4 rounded-xl border mb-3 ${recipe ? 'bg-blue-50 border-blue-200 cursor-pointer' : 'bg-slate-50 border-slate-100'}`}
+                         onClick={() => recipe && setViewRecipe(recipe)}>
                         <div className="text-[10px] font-black text-slate-400 uppercase mb-1">{type}</div>
-                        <div className={`text-[13px] font-black ${hasRecipe ? 'text-blue-900' : 'text-slate-700'}`}>
-                            {text} {hasRecipe && "📋"}
-                        </div>
+                        <div className="text-[13px] font-black text-slate-700">{text} {recipe && "📋"}</div>
                     </div>
                 );
             };
 
             return (
-                <div className="flex flex-col h-screen w-full">
-                    <header className="flex justify-between items-center px-6 py-3 bg-white border-b shrink-0 shadow-sm">
+                <div id="root">
+                    <header className="flex justify-between items-center px-6 py-3 bg-white border-b shrink-0">
                         <div className="flex items-center gap-6">
                             <h1 className="text-xl font-black italic text-slate-800">미소연 <span className="text-blue-600">MMS v11.9</span></h1>
-                            <div className="flex bg-slate-100 rounded-xl p-
+                            <div className="flex bg-slate-100 rounded-xl p-1 border text-sm font-bold">
+                                <select className="bg-transparent px-2" value={currentMonth.getFullYear()} onChange={e=>setCurrentMonth(new Date(parseInt(e.target.value), currentMonth.getMonth()))}>
+                                    {[2024,2025,2026].map(y=><option key={y} value={y}>{y}년</option>)}
+                                </select>
+                                <select className="bg-transparent px-2" value={currentMonth.getMonth()+1} onChange={e=>setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.
