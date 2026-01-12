@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>미소연 MMS v11.9 - 원본 복구본</title>
+    <title>MISOYON MMS v11.9 - 레시피/검색 완전체</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -14,13 +14,26 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
         #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
+        
+        /* 달력 스타일 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 25px repeat(6, 1fr); flex: 1; background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; min-height: 0; }
-        .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; position: relative; }
+        .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
-        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; }
-        .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
-        .recipe-content { font-size: 14px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
+        
+        /* 분석창 및 팝업 스타일 */
+        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+        .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
+        
+        /* 클릭 가능한 메뉴 상자 - 셰프님 요청사항 반영 */
+        .clickable-menu { cursor: pointer !important; transition: all 0.2s; border: 1px solid transparent; }
+        .clickable-menu:hover { background: #f0f7ff !important; border-color: #3b82f6 !important; transform: scale(1.02); }
+        .has-recipe::after { content: ' 📋'; font-size: 10px; }
+
+        .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
     </style>
 </head>
 <body>
@@ -30,40 +43,50 @@
 
         const MisoYonApp = () => {
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
-            
-            // 셰프님이 주신 레시피 10종 원본 텍스트 데이터
-            const RECIPE_STORE = {
-                "불고기": { name: "서울식 불고기", ingredients: "한우 불고기(등심) 1kg, 배 1, 양파 1, 팽이버섯 1, 느타리버섯 50, 불린 당면 100, 대파 1, 다시마 육수 200, 참기름 15, 매실액 5, 진간장 100, 다진 마늘 30, 설탕 45, 후추", process: "1. 배즙에 양념장을 만든다.\n2. 채소 손질 후 고기를 재운다.\n3. 센 불에 익히다 육수를 부어 완성." },
-                "갈비탕": { name: "갈비탕", ingredients: "한우갈비 500, 무 200, 대파 30, 통마늘 5알, 계란 1개, 소금, 국간장, 양념(국간장 5, 소금 2, 다진파 5, 다진마늘 5, 참기름 2, 후추)", process: "1. 갈비 핏물을 빼고 데쳐낸다.\n2. 물을 새로 받아 푹 끓인다.\n3. 무, 마늘, 대파를 넣고 고기가 익으면 건져 양념한다.\n4. 지단을 올려 완성." },
-                "무국": { name: "경상도식 소고기 무국", ingredients: "한우양지 300, 무 300, 대파 2, 숙주 200, 멸치육수 1.8L, 국간장 25, 액젓 15, 다진마늘 15, 고춧가루 30", process: "1. 양지 핏물을 빼고 무와 함께 육수에 끓인다.\n2. 국간장, 액젓으로 간을 한다.\n3. 대파, 마늘, 고춧가루를 넣고 숙주를 넣어 끓인다." },
-                "소머리국밥": { name: "곤지암 소머리국밥", ingredients: "사골 1kg, 소머리고기 800g, 인삼 150g, 무 200g, 쌀, 물, 양념장(국간장 30g, 다진 파 5g, 식초 10g, 통깨 5g)", process: "1. 사골과 고기 핏물을 뺀다.\n2. 사골을 끓여 우려낸 뒤 머리고기를 넣고 2시간 삶는다.\n3. 무와 인삼을 넣어 마무리." },
-                "곰국": { name: "곰국", ingredients: "사골 1kg, 우잡뼈 1kg, 양지 500, 대파, 다진마늘, 소금, 후추", process: "1. 뼈 핏물을 빼고 끓인다.\n2. 양지를 넣고 거품을 걷어내며 끓인다.\n3. 양지를 썰어 국물과 함께 낸다." },
-                "백합탕": { name: "냉이백합탕", ingredients: "백합 2kg, 냉이 300g, 두부 1, 황금팽이, 대파, 청양고추, 홍고추, 소금, 새우젓, 멸치육수 10L", process: "1. 백합 해감 후 육수에 끓여 건진다.\n2. 육수를 걸러 두부, 채소를 넣고 끓인다.\n3. 소금, 새우젓 간을 하고 백합을 넣는다." },
-                "다슬기국": { name: "다슬기국 (안동 골부리국)", ingredients: "다슬기 500g, 얼갈이 100g, 부추 50g, 대파 30g, 다진마늘 15g, 국간장 10g, 고춧가루 30g, 밀가루 10g, 된장 15g", process: "1. 다슬기를 삶아 살을 바른다.\n2. 나물과 양념, 밀가루를 버무린다.\n3. 육수에 넣고 끓이다 부추로 마무리." },
-                "매운탕": { name: "우럭매운탕", ingredients: "우럭 3마리, 서더리 1kg, 무 150, 두부 1모, 쑥갓, 호박 60, 멸치육수 5L, 다데기", process: "1. 서더리 육수를 내고 다데기를 푼다.\n2. 무를 넣고 끓이다 우럭, 호박, 두부를 넣는다.\n3. 쑥갓을 올려 마무리." },
-                "미역국": { name: "바지락 미역국", ingredients: "바지락, 미역, 불린쌀 250, 소고기민찌 150, 다시마 육수 1L, 참기름, 소금, 표고버섯, 파, 양파, 당근, 국간장", process: "1. 미역과 바지락 손질.\n2. 참기름에 소고기, 쌀을 볶다 육수 붓고 끓임.\n3. 미역과 바지락 넣어 완성." },
-                "배추국": { name: "배추국", ingredients: "배추 250, 한우사태 100, 쌀뜨물 6컵, 홍고추, 청양고추, 다진마늘 10, 대파, 된장", process: "1. 쌀뜨물 육수에 된장을 푼다.\n2. 배추와 사태를 넣고 끓인다.\n3. 고추, 마늘로 마무리." }
-            };
+            const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS59rKx1l0C9M20mY_VqS3_3R_z7-mX3YxG0-v8l_z1K0/pub?gid=949808515&output=csv"; 
 
             const [menus, setMenus] = useState([]);
+            const [recipes, setRecipes] = useState({});
             const [selectedDate, setSelectedDate] = useState(null);
-            const [currentMonth, setCurrentMonth] = useState(new Date());
+            const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
             const [searchTerm, setSearchTerm] = useState("");
+            const [modalSearch, setModalSearch] = useState("");
             const [activeModal, setActiveModal] = useState(false);
-            const [viewRecipe, setViewRecipe] = useState(null);
+            const [viewRecipeList, setViewRecipeList] = useState([]); // 다중 레시피 대응
 
-            useEffect(() => {
+            const years = Array.from({length: 11}, (_, i) => 2020 + i);
+            const months = Array.from({length: 12}, (_, i) => i + 1);
+
+            const parseRecipes = (data) => {
+                const recipeMap = {};
+                let currentMenu = null;
+                data.forEach(row => {
+                    const colA = (row[0] || "").trim();
+                    const colB = (row[1] || "").trim();
+                    if (colA === "기본정보") {
+                        currentMenu = colB;
+                        recipeMap[currentMenu] = { name: colB, ingredients: "", process: "", tip: "" };
+                    } else if (currentMenu && recipeMap[currentMenu]) {
+                        if (colA.includes("식재료")) recipeMap[currentMenu].ingredients += (colB + " ");
+                        if (colA.includes("조리공정")) recipeMap[currentMenu].process += (colB + "\n");
+                        if (colA.includes("전문가TIP")) recipeMap[currentMenu].tip = colB;
+                    }
+                });
+                return recipeMap;
+            };
+
+            const loadData = () => {
                 Papa.parse(MENU_URL, { download: true, complete: (res) => {
                     let temp = []; let headers = [];
                     res.data.forEach(row => {
-                        const label = (row[0] || "").trim();
+                        const label = (row[0] || "").replace(/\s/g, "");
                         const vals = row.slice(1);
-                        if (label.includes("날짜")) {
+                        if (label === "날짜") {
                             headers = vals.map(v => {
                                 const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
                                 return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
                             });
-                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "" }); });
+                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "", staff: "" }); });
                         } else if (headers.length > 0) {
                             vals.forEach((v, i) => {
                                 if (!headers[i]) return;
@@ -78,107 +101,160 @@
                     });
                     setMenus(temp);
                 }});
-            }, []);
-
-            const searchResults = useMemo(() => {
-                const q = searchTerm.trim().toLowerCase();
-                if (!q) return [];
-                return menus.filter(m => (m.morning + m.lunch + m.dinner).toLowerCase().includes(q));
-            }, [searchTerm, menus]);
-
-            const getMatchedRecipe = (text) => {
-                if (!text) return null;
-                const key = Object.keys(RECIPE_STORE).find(k => text.replace(/\s/g,"").includes(k));
-                return key ? RECIPE_STORE[key] : null;
+                Papa.parse(RECIPE_URL, { download: true, complete: (res) => setRecipes(parseRecipes(res.data)) });
             };
 
-            const MenuCard = ({text, type}) => {
-                const recipe = getMatchedRecipe(text);
+            useEffect(() => { loadData(); }, []);
+
+            // 셰프님 요청: 키워드 포함 레시피 모두 찾기 로직
+            const findMatchedRecipes = (menuName) => {
+                if (!menuName || menuName === "일정없음") return [];
+                const target = menuName.replace(/\s/g, "");
+                return Object.values(recipes).filter(r => {
+                    const rName = r.name.replace(/\s/g, "");
+                    return target.includes(rName) || rName.includes(target) || 
+                           (target.length > 2 && rName.includes(target.substring(0,2)));
+                });
+            };
+
+            const calDays = useMemo(() => {
+                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
+                const firstDay = new Date(year, month, 1).getDay();
+                const lastDate = new Date(year, month + 1, 0).getDate();
+                const days = [];
+                for (let i = 0; i < firstDay; i++) days.push(null);
+                for (let i = 1; i <= lastDate; i++) {
+                    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    days.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
+                }
+                while (days.length < 42) days.push(null);
+                return days;
+            }, [currentMonth, menus]);
+
+            const currentSearchResults = useMemo(() => {
+                const q = (activeModal ? modalSearch : searchTerm).trim().toLowerCase();
+                if (!q) return [];
+                const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12 && q !== "");
+                return menus.filter(m => {
+                    if (isMonthSearch) return String(new Date(m.date).getMonth() + 1).padStart(2, '0') === q.replace("월","").padStart(2,'0');
+                    return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
+                }).sort((a,b) => new Date(b.date) - new Date(a.date));
+            }, [modalSearch, searchTerm, activeModal, menus]);
+
+            const highlightText = (text, query) => {
+                if (!query || !text || !isNaN(query)) return text;
+                const parts = text.split(new RegExp(`(${query})`, 'gi'));
+                return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
+            };
+
+            // 공통 메뉴 컴포넌트 (클릭 가능하도록 수정)
+            const MenuCard = ({text, type, query}) => {
+                const matched = findMatchedRecipes(text);
+                const hasRecipe = matched.length > 0;
                 return (
-                    <div className={`p-4 rounded-xl border mb-3 ${recipe ? 'bg-blue-50 border-blue-200 cursor-pointer' : 'bg-slate-50 border-slate-100'}`}
-                         onClick={() => recipe && setViewRecipe(recipe)}>
-                        <div className="text-[10px] font-black text-slate-400 uppercase mb-1">{type}</div>
-                        <div className="text-[13px] font-black text-slate-700">{text} {recipe && "📋"}</div>
+                    <div className={`p-3 rounded-xl border mb-2 transition-all clickable-menu ${hasRecipe ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}
+                         onClick={() => hasRecipe && setViewRecipeList(matched)}>
+                        <div className="text-[9px] font-black text-slate-400 uppercase mb-1">{type}</div>
+                        <div className={`text-[12px] font-black ${hasRecipe ? 'text-blue-900' : 'text-slate-600'}`}>
+                            {highlightText(text, query)} {hasRecipe && "📋"}
+                        </div>
                     </div>
                 );
             };
 
             return (
-                <div id="root">
-                    <header className="flex justify-between items-center px-6 py-3 bg-white border-b shrink-0">
-                        <div className="flex items-center gap-6">
-                            <h1 className="text-xl font-black italic text-slate-800">미소연 <span className="text-blue-600">MMS v11.9</span></h1>
-                            <div className="flex bg-slate-100 rounded-xl p-1 border text-sm font-bold">
-                                <select className="bg-transparent px-2" value={currentMonth.getFullYear()} onChange={e=>setCurrentMonth(new Date(parseInt(e.target.value), currentMonth.getMonth()))}>
-                                    {[2024,2025,2026].map(y=><option key={y} value={y}>{y}년</option>)}
+                <div className="flex flex-col h-screen w-full">
+                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0">
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v11.9</span></h1>
+                            <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border">
+                                <select value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
+                                    {years.map(y => <option key={y} value={y}>{y}년</option>)}
                                 </select>
-                                <select className="bg-transparent px-2" value={currentMonth.getMonth()+1} onChange={e=>setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.target.value)-1))}>
-                                    {Array.from({length:12},(_,i)=>i+1).map(m=><option key={m} value={m}>{m}월</option>)}
+                                <select value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
+                                    {months.map(m => <option key={m} value={m}>{m}월</option>)}
                                 </select>
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <input className="bg-slate-50 px-4 py-1.5 rounded-lg text-xs font-bold border w-60 outline-none" placeholder="통합 검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && setActiveModal(true)}/>
-                            <button onClick={()=>setActiveModal(true)} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-black text-[11px]">SEARCH</button>
+                            <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-48 border outline-none" placeholder="메뉴 또는 'n월' 검색" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
+                            <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
                         </div>
                     </header>
 
-                    <main className="flex flex-1 min-h-0">
-                        <div className="flex-[3] calendar-grid">
-                            {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400 border-b">{d}</div>)}
-                            {Array.from({length:42}).map((_,i)=>{
-                                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
-                                const firstDay = new Date(year, month, 1).getDay();
-                                const lastDate = new Date(year, month + 1, 0).getDate();
-                                const dayNum = i - firstDay + 1;
-                                const ds = (dayNum > 0 && dayNum <= lastDate) ? `${year}-${String(month+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}` : null;
-                                const data = ds ? menus.find(m=>m.date===ds) : null;
-                                return (
-                                    <div key={i} className={`calendar-day ${ds === selectedDate?.date ? 'selected' : ''}`} onClick={()=>data && setSelectedDate(data)}>
-                                        {ds && (
+                    <main className="flex flex-1 min-height-0 overflow-hidden">
+                        <div className="flex-[3] flex flex-col h-full border-r">
+                            <div className="calendar-grid">
+                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-1 text-center text-[9px] font-black text-slate-400 border-b">{d}</div>)}
+                                {calDays.map((d,i)=>(
+                                    <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
+                                        {d && (
                                             <>
-                                                <span className="text-[11px] font-black">{dayNum}</span>
-                                                {data && (
-                                                    <div className="mt-1 flex flex-col gap-[1px]">
-                                                        <div className="menu-text bg-orange-50 text-orange-600">조:{data.morning}</div>
-                                                        <div className="menu-text bg-blue-50 text-blue-600">중:{data.lunch}</div>
-                                                        <div className="menu-text bg-purple-50 text-purple-600">석:{data.dinner}</div>
+                                                <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
+                                                {d.data && (
+                                                    <div className="flex flex-col gap-[1px] mt-[1px]">
+                                                        <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>
+                                                        <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>
+                                                        <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>
                                                     </div>
                                                 )}
                                             </>
                                         )}
                                     </div>
-                                );
-                            })}
+                                ))}
+                            </div>
                         </div>
-                        <aside className="flex-1 bg-white p-6 overflow-y-auto border-l min-w-[360px]">
+
+                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-w-[340px] shadow-inner">
                             {selectedDate ? (
-                                <div>
-                                    <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter italic">Daily Menu</h2>
+                                <div className="space-y-4">
+                                    <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1">DAILY REPORT</h2>
                                     <MenuCard text={selectedDate.morning} type="Morning" />
                                     <MenuCard text={selectedDate.lunch} type="Lunch" />
                                     <MenuCard text={selectedDate.dinner} type="Dinner" />
+                                    <div className="mt-6 p-4 bg-blue-900 text-white rounded-2xl text-[11px] font-bold shadow-lg">
+                                        💡 파란색 메뉴를 클릭하면 상세 레시피가 열립니다.
+                                    </div>
                                 </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-300 font-black">날짜를 선택하세요</div>}
+                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black text-xs">Select Date</div>}
                         </aside>
                     </main>
 
-                    {activeModal && (
-                        <div className="modal-view">
-                            <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
-                                <div className="flex justify-between items-center mb-8 border-b-2 border-blue-600 pb-4">
-                                    <h2 className="text-2xl font-black italic">SEARCH RESULTS</h2>
-                                    <button onClick={()=>setActiveModal(false)} className="text-5xl font-thin">&times;</button>
+                    {/* 다중 레시피 대응 팝업 */}
+                    {viewRecipeList.length > 0 && (
+                        <div className="recipe-popup" onClick={() => setViewRecipeList([])}>
+                            <div className="bg-white rounded-3xl w-full max-w-2xl p-8 shadow-2xl overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-start mb-6 border-b pb-4">
+                                    <h3 className="text-2xl font-black text-slate-900 italic tracking-tighter">RECIPE MASTER</h3>
+                                    <button onClick={() => setViewRecipeList([])} className="text-4xl font-thin hover:text-red-500 transition-colors">&times;</button>
                                 </div>
-                                <div className="flex-1 overflow-y-auto space-y-4">
-                                    {searchResults.map((m, i) => (
-                                        <div key={i} className="bg-white p-6 rounded-3xl border flex gap-6 shadow-sm">
-                                            <div className="w-36 shrink-0 border-r pr-4 font-black text-blue-600 text-xl">{m.date}</div>
-                                            <div className="flex-1 grid grid-cols-3 gap-4">
-                                                <MenuCard text={m.morning} type="Morning" />
-                                                <MenuCard text={m.lunch} type="Lunch" />
-                                                <MenuCard text={m.dinner} type="Dinner" />
+                                
+                                <div className="space-y-10">
+                                    {viewRecipeList.map((recipe, idx) => (
+                                        <div key={idx} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full inline-block text-xs font-black mb-4 uppercase tracking-widest">
+                                                {recipe.name}
                                             </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div>
+                                                    <div className="text-[10px] font-black text-slate-400 uppercase mb-2">Ingredients List</div>
+                                                    <div className="recipe-content bg-slate-50 p-4 rounded-2xl border">{recipe.ingredients || "정보 없음"}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] font-black text-slate-400 uppercase mb-2">Cooking Instructions</div>
+                                                    <div className="recipe-content bg-slate-50 p-4 rounded-2xl border">{recipe.process || "정보 없음"}</div>
+                                                </div>
+                                            </div>
+                                            {recipe.tip && (
+                                                <div className="mt-4 p-4 bg-orange-50 rounded-2xl border border-orange-100 flex gap-3">
+                                                    <span className="text-xl">👨‍🍳</span>
+                                                    <div>
+                                                        <div className="text-[10px] font-black text-orange-600 uppercase">Chef's Secret Tip</div>
+                                                        <div className="recipe-content italic text-orange-900 font-bold">{recipe.tip}</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {idx < viewRecipeList.length - 1 && <hr className="mt-10 border-dashed border-slate-200" />}
                                         </div>
                                     ))}
                                 </div>
@@ -186,19 +262,42 @@
                         </div>
                     )}
 
-                    {viewRecipe && (
-                        <div className="recipe-popup" onClick={()=>setViewRecipe(null)}>
-                            <div className="bg-white rounded-[40px] w-full max-w-2xl p-10 shadow-2xl" onClick={e=>e.stopPropagation()}>
-                                <h3 className="text-2xl font-black text-blue-600 mb-8 border-b pb-4 uppercase italic">{viewRecipe.name}</h3>
-                                <div className="space-y-6">
-                                    <section>
-                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-2">Ingredients</div>
-                                        <div className="recipe-content bg-slate-50 p-6 rounded-3xl border">{viewRecipe.ingredients}</div>
-                                    </section>
-                                    <section>
-                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-2">Process</div>
-                                        <div className="recipe-content bg-slate-50 p-6 rounded-3xl border whitespace-pre-wrap">{viewRecipe.process}</div>
-                                    </section>
+                    {/* 분석 모달 - 검색창 복구 및 클릭 연동 */}
+                    {activeModal && (
+                        <div className="modal-view">
+                            <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
+                                <div className="flex justify-between items-center mb-6 border-b-2 border-blue-600 pb-3">
+                                    <div className="flex items-center gap-6">
+                                        <h2 className="text-2xl font-black italic uppercase tracking-tighter">Long-term Analysis</h2>
+                                        {/* 이미지에서 사라졌던 검색창 복구 */}
+                                        <div className="relative">
+                                            <input className="bg-slate-100 px-6 py-2.5 rounded-2xl text-sm font-black outline-none border-2 border-transparent focus:border-blue-600 w-80 transition-all" 
+                                                   placeholder="검색어 입력..." value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
+                                            <span className="absolute right-4 top-3 opacity-30">🔍</span>
+                                        </div>
+                                    </div>
+                                    <button onClick={()=>setActiveModal(false)} className="text-4xl font-thin hover:rotate-90 transition-transform">&times;</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto space-y-4 pb-12 pr-2">
+                                    {currentSearchResults.map((m, i) => (
+                                        <div key={i} className="bg-white p-5 rounded-3xl border flex flex-col md:flex-row gap-6 hover:shadow-xl transition-all">
+                                            <div className="md:w-36 shrink-0 border-r pr-4">
+                                                <div className="font-black text-blue-600 text-xl tracking-tighter">{m.date.replace(/-/g,'.')}</div>
+                                                <div className="text-[11px] text-slate-400 font-black uppercase tracking-widest">{new Date(m.date).toLocaleDateString('en-US',{weekday:'long'})}</div>
+                                            </div>
+                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <MenuCard text={m.morning} type="Morning" query={modalSearch} />
+                                                <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
+                                                <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {currentSearchResults.length === 0 && (
+                                        <div className="h-full flex flex-col items-center justify-center text-slate-300 py-20">
+                                            <span className="text-6xl mb-4">🍽️</span>
+                                            <div className="text-xl font-black italic uppercase">No Menus Found</div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
