@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v15.0</title>
+    <title>MISOYON MMS v15.1</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -15,7 +15,7 @@
         body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
         #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
         
-        /* 안전한 그리드 설정 (v13.2 기반) */
+        /* 안전한 그리드 설정 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; height: 100%; }
         .calendar-grid { grid-auto-rows: minmax(60px, 1fr); } 
         @media (min-width: 1024px) {
@@ -44,8 +44,7 @@
         const MisoYonApp = () => {
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             
-            // ★ v15.0: 올인원 데이터 탑재 (로딩 오류 없음) ★
-            // 셰프님이 주신 14종 레시피가 모두 여기 안전하게 보관됩니다.
+            // v15.0: 올인원 데이터 탑재
             const RECIPE_STORE = {
                 "영광굴비": { name: "영광굴비 구이", ingredients: `영광굴비, 쌀뜨물, 참기름, 생강술`, process: `1. 쌀뜨물 전처리로 비린내 제거\n2. 비늘/지느러미 손질 및 밑간\n3. 참기름 바르고 180도 오븐 10분, 뒤집어 5분`, tip: "쌀뜨물 전처리가 비린내를 잡는 핵심입니다." },
                 "주꾸미전복": { name: "주꾸미 전복볶음", ingredients: `주꾸미 10마리, 전복 5마리, 굴소스 15g, 버터 5g, 마늘, 생강`, process: `1. 해산물 살짝 데치기\n2. 마늘/생강 기름에 향 내기\n3. 센 불에 빠르게 볶다가 버터로 향 입히기`, tip: "버터는 마지막에 넣어 풍미를 가두세요." },
@@ -147,129 +146,4 @@
                 return (
                     <div className={`p-3 rounded-xl border mb-2 transition-all clickable-menu ${hasRecipe ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}
                          onClick={() => hasRecipe && setViewRecipeList(matched)}>
-                        <div className="text-[9px] font-black text-slate-400 uppercase mb-1">{type}</div>
-                        <div className={`text-[12px] font-black ${hasRecipe ? 'text-blue-900' : 'text-slate-600'}`}>
-                            {highlightText(text, query)} {hasRecipe && "📋"}
-                        </div>
-                    </div>
-                );
-            };
-
-            const handleSearch = () => {
-                setModalSearch(searchTerm);
-                setActiveModal(true);
-            };
-
-            return (
-                <div className="flex flex-col h-full w-full">
-                    {/* Header */}
-                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
-                        <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v15.0</span></h1>
-                            <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm hidden md:flex">
-                                <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
-                                    {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
-                                </select>
-                                <select className="bg-transparent ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
-                                    {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="md:hidden font-bold text-sm bg-slate-100 px-2 py-1 rounded-lg">
-                             <select className="bg-transparent" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
-                                {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}
-                            </select>
-                        </div>
-                        <div className="flex gap-2">
-                             <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-28 md:w-40 border outline-none" placeholder="메뉴/날짜 검색" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleSearch()}/>
-                             <button onClick={handleSearch} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
-                        </div>
-                    </header>
-
-                    {/* Main */}
-                    <main className="flex flex-col lg:flex-row flex-1 overflow-hidden">
-                        <div className="flex-[2] flex flex-col min-h-[50%] lg:min-h-full border-b lg:border-b-0 lg:border-r overflow-hidden">
-                            <div className="calendar-grid">
-                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="calendar-header">{d}</div>)}
-                                {calDays.map((d,i)=>(
-                                    <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
-                                        {d && (
-                                            <>
-                                                <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
-                                                {d.data && (
-                                                    <div className="flex flex-col gap-[1px] mt-[1px]">
-                                                        <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>
-                                                        <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>
-                                                        <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        
-                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-h-[40%]">
-                            {selectedDate ? (
-                                <div className="space-y-4">
-                                    <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1">DAILY MENU</h2>
-                                    <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
-                                    <MenuCard text={selectedDate.morning} type="Morning" />
-                                    <MenuCard text={selectedDate.lunch} type="Lunch" />
-                                    <MenuCard text={selectedDate.dinner} type="Dinner" />
-                                </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black">SELECT DATE</div>}
-                        </aside>
-                    </main>
-
-                    {activeModal && (
-                        <div className="modal-view">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h2 className="text-xl font-black italic">SEARCH</h2>
-                                <button onClick={()=>setActiveModal(false)} className="text-3xl">&times;</button>
-                            </div>
-                            <input className="bg-slate-100 px-4 py-3 rounded-xl w-full font-bold mb-4 border-2 border-blue-500 outline-none" placeholder="검색어 입력..." autoFocus value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
-                            <div className="flex-1 overflow-y-auto space-y-4 pb-10">
-                                {currentSearchResults.map((m, i) => (
-                                    <div key={i} className="bg-slate-50 p-4 rounded-xl border">
-                                        <div className="font-black text-blue-600 mb-2">{m.date}</div>
-                                        <MenuCard text={m.morning} type="Morning" query={modalSearch} />
-                                        <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
-                                        <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
-                                    </div>
-                                ))}
-                                {currentSearchResults.length === 0 && modalSearch && <div className="text-center py-10 text-slate-400 font-bold">결과가 없습니다.</div>}
-                            </div>
-                        </div>
-                    )}
-
-                    {viewRecipeList.length > 0 && (
-                        <div className="recipe-popup" onClick={() => setViewRecipeList([])}>
-                            <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                    <h3 className="text-xl font-black uppercase italic text-blue-600">Recipe</h3>
-                                    <button onClick={() => setViewRecipeList([])} className="text-4xl font-thin">&times;</button>
-                                </div>
-                                {viewRecipeList.map((r, i) => (
-                                    <div key={i} className="mb-8">
-                                        <div className="bg-blue-600 text-white px-3 py-1 rounded-full inline-block text-xs font-black mb-3 uppercase">{r.name}</div>
-                                        <div className="space-y-4">
-                                            <div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Ingredients</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{r.ingredients}</div></div>
-                                            <div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Instructions</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{r.process}</div></div>
-                                            {r.tip && <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 font-bold text-orange-950 text-xs">👨‍🍳 {r.tip}</div>}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MisoYonApp />);
-    </script>
-</body>
-</html>
+                        <div className="text-[9px] font-black text-slate-
