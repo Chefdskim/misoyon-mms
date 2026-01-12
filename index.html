@@ -26,10 +26,11 @@
         const { useState, useEffect, useMemo } = React;
 
         const MisoYonApp = () => {
-            // 1. 기존 식단표 시트 (달력 및 메뉴 검색용)
+            // 1. 식단표 시트 주소
             const MENU_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
-            // 2. 새로 만드신 레시피 시트 (레시피 검색용)
-            const RECIPE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5N3T9... (레시피 시트의 CSV 주소를 여기에 넣으세요) .../pub?output=csv";
+            
+            // 2. 셰프님이 방금 주신 레시피 시트 주소 (적용 완료)
+            const RECIPE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
 
             const [menus, setMenus] = useState([]);
             const [recipes, setRecipes] = useState([]);
@@ -40,7 +41,7 @@
             const [activeModal, setActiveModal] = useState(null);
 
             const fetchData = () => {
-                // 식단표 데이터 불러오기
+                // 식단표 데이터
                 Papa.parse(MENU_SHEET_URL, {
                     download: true, header: false,
                     complete: (results) => {
@@ -72,7 +73,7 @@
                     }
                 });
 
-                // 레시피 데이터 불러오기 (새로 만드신 시트)
+                // 레시피 데이터 (새 시트)
                 Papa.parse(RECIPE_SHEET_URL, {
                     download: true, header: true,
                     complete: (results) => setRecipes(results.data)
@@ -81,13 +82,12 @@
 
             useEffect(() => fetchData(), []);
 
-            // [메뉴 검색] 최근 5년치 기록 분석
+            // 메뉴 검색 로직 (최근 5년)
             const menuSearchResults = useMemo(() => {
                 if (!menuSearch) return [];
                 const q = menuSearch.toLowerCase();
                 const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12);
                 const monthNum = isMonthSearch ? q.replace("월", "").padStart(2, '0') : null;
-
                 return menus.filter(m => {
                     const dateObj = new Date(m.date);
                     if (dateObj.getFullYear() < 2021) return false;
@@ -96,7 +96,7 @@
                 }).sort((a, b) => new Date(b.date) - new Date(a.date));
             }, [menuSearch, menus]);
 
-            // [레시피 검색] 새 시트에서 검색
+            // 레시피 검색 로직
             const recipeResults = useMemo(() => {
                 if (!recipeSearch) return [];
                 const q = recipeSearch.toLowerCase();
@@ -105,51 +105,134 @@
                 );
             }, [recipeSearch, recipes]);
 
-            // 달력 그리기 로직 (생략 - 위 버전과 동일)
-            // ...
+            const days = useMemo(() => {
+                const year = currentMonth.getFullYear();
+                const month = currentMonth.getMonth();
+                const first = new Date(year, month, 1).getDay();
+                const last = new Date(year, month + 1, 0).getDate();
+                const arr = [];
+                for (let i = 0; i < first; i++) arr.push(null);
+                for (let i = 1; i <= last; i++) {
+                    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    arr.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
+                }
+                return arr;
+            }, [currentMonth, menus]);
 
             return (
                 <div className="max-w-[1600px] mx-auto p-6">
-                    {/* 상단 듀얼 검색바 - UI 구성은 셰프님 요청대로 2개 배치 */}
                     <header className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6 bg-white p-8 rounded-[2.5rem] shadow-sm border">
                         <h1 className="text-3xl font-black text-slate-800 italic uppercase">MISOYON <span className="text-blue-600">v7.6</span></h1>
                         <div className="flex flex-wrap gap-4 flex-1 justify-end">
                             <div className="flex bg-slate-100 rounded-2xl p-1 focus-within:ring-2 ring-blue-500">
                                 <input className="bg-transparent px-4 py-2 outline-none font-bold text-sm w-48" placeholder="🍴 메뉴/월 검색 (최근 5년)" value={menuSearch} onChange={(e)=>setMenuSearch(e.target.value)} onKeyDown={(e)=>e.key==='Enter' && setActiveModal('menu')}/>
-                                <button onClick={()=>setActiveModal('menu')} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs">메뉴 분석</button>
+                                <button onClick={()=>setActiveModal('menu')} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase">메뉴 분석</button>
                             </div>
                             <div className="flex bg-slate-100 rounded-2xl p-1 focus-within:ring-2 ring-red-500">
                                 <input className="bg-transparent px-4 py-2 outline-none font-bold text-sm w-48" placeholder="📝 비법 레시피 검색" value={recipeSearch} onChange={(e)=>setRecipeSearch(e.target.value)} onKeyDown={(e)=>e.key==='Enter' && setActiveModal('recipe')}/>
-                                <button onClick={()=>setActiveModal('recipe')} className="bg-red-500 text-white px-4 py-2 rounded-xl font-black text-xs">레시피 검색</button>
+                                <button onClick={()=>setActiveModal('recipe')} className="bg-red-500 text-white px-4 py-2 rounded-xl font-black text-xs uppercase">레시피 검색</button>
                             </div>
+                            <button onClick={fetchData} className="bg-slate-800 text-white p-3 rounded-2xl">🔄</button>
                         </div>
                     </header>
 
-                    {/* 달력 및 리포트 영역 - (기존 코드와 동일하게 배치) */}
-                    {/* ... */}
+                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+                        <div className="xl:col-span-8">
+                            <div className="bg-white p-8 rounded-[3rem] shadow-xl border">
+                                <div className="flex justify-between items-center mb-10 px-6">
+                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))} className="text-3xl text-slate-300">◀</button>
+                                    <div className="text-3xl font-black flex gap-4">
+                                        <span>{currentMonth.getFullYear()}년</span>
+                                        <span>{currentMonth.getMonth() + 1}월</span>
+                                    </div>
+                                    <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))} className="text-3xl text-slate-300">▶</button>
+                                </div>
+                                <div className="calendar-grid">
+                                    {['SUN','MON','TUE','WED','THU','FRI','SAT'].map(d => <div key={d} className="bg-slate-50 py-5 text-center text-[11px] font-black text-slate-400 tracking-widest">{d}</div>)}
+                                    {days.map((d, i) => (
+                                        <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={() => d?.data && setSelectedDate(d.data)}>
+                                            {d && (
+                                                <>
+                                                    <span className={`text-base font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
+                                                    {d.data && (
+                                                        <div className="mt-2">
+                                                            <div className="menu-item bg-orange-50 text-orange-700">조:{d.data.morning}</div>
+                                                            <div className="menu-item bg-blue-50 text-blue-700">중:{d.data.lunch}</div>
+                                                            <div className="menu-item bg-purple-50 text-purple-700">석:{d.data.dinner}</div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
 
-                    {/* 모달창 (분석 결과 & 레시피 결과) - 셰프님 요청사항 반영 */}
+                        <div className="xl:col-span-4">
+                            {selectedDate ? (
+                                <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border border-slate-100 sticky top-6">
+                                    <div className="mb-10">
+                                        <p className="text-blue-600 font-black mb-1">{selectedDate.date}</p>
+                                        <h2 className="text-6xl font-black text-slate-900 italic tracking-tighter uppercase">Report</h2>
+                                    </div>
+                                    <div className="space-y-5 font-black">
+                                        <div className="bg-slate-900 text-white p-6 rounded-3xl flex justify-between items-center"><span className="opacity-40 text-xs uppercase">Chef</span><span>{selectedDate.staff || "—"}</span></div>
+                                        <div className="bg-orange-50 p-6 rounded-[2rem] border-orange-100"><p className="text-orange-900 text-xl font-black">{selectedDate.morning || "—"}</p></div>
+                                        <div className="bg-blue-50 p-6 rounded-[2rem] border-blue-100"><p className="text-blue-900 text-xl font-black">{selectedDate.lunch || "—"}</p></div>
+                                        <div className="bg-purple-50 p-6 rounded-[2rem] border-purple-100"><p className="text-purple-900 text-xl font-black">{selectedDate.dinner || "—"}</p></div>
+                                    </div>
+                                </div>
+                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black text-2xl">SELECT DATE</div>}
+                        </div>
+                    </div>
+
+                    {activeModal === 'menu' && (
+                        <div className="modal-view">
+                            <div className="max-w-5xl mx-auto w-full">
+                                <div className="flex justify-between items-center mb-10 border-b-4 border-blue-600 pb-6">
+                                    <h2 className="text-4xl font-black uppercase italic tracking-tighter">Menu Analysis</h2>
+                                    <button onClick={()=>setActiveModal(null)} className="text-5xl font-thin">&times;</button>
+                                </div>
+                                <div className="space-y-6">
+                                    {menuSearchResults.map((m, i) => (
+                                        <div key={i} className="bg-slate-50 p-8 rounded-[2.5rem] flex gap-8">
+                                            <div className="w-40 font-black"><p className="text-2xl text-blue-600">{m.date}</p></div>
+                                            <div className="flex-1 grid grid-cols-3 gap-4 font-bold">
+                                                <div className="bg-white p-4 rounded-2xl">{m.morning}</div>
+                                                <div className="bg-white p-4 rounded-2xl">{m.lunch}</div>
+                                                <div className="bg-white p-4 rounded-2xl">{m.dinner}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {activeModal === 'recipe' && (
                         <div className="modal-view">
                             <div className="max-w-5xl mx-auto w-full">
                                 <div className="flex justify-between items-center mb-10 border-b-4 border-red-500 pb-6">
-                                    <h2 className="text-4xl font-black uppercase italic">Recipe Master</h2>
+                                    <h2 className="text-4xl font-black uppercase italic tracking-tighter">Recipe Master</h2>
                                     <button onClick={()=>setActiveModal(null)} className="text-5xl font-thin">&times;</button>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                     <div className="space-y-6">
-                                        <h3 className="text-xl font-black">👨‍🍳 셰프님의 새 시트 기록</h3>
+                                        <h3 className="text-xl font-black">👨‍🍳 셰프님의 비법 노트</h3>
                                         {recipeResults.length > 0 ? recipeResults.map((r, i) => (
-                                            <div key={i} className="bg-red-50 p-6 rounded-3xl border-2 border-red-100 shadow-sm">
-                                                <p className="font-bold text-red-900 whitespace-pre-wrap">{JSON.stringify(r)}</p>
+                                            <div key={i} className="bg-red-50 p-6 rounded-3xl border-2 border-red-100">
+                                                {Object.entries(r).map(([key, val]) => (
+                                                    <p key={key} className="mb-2 text-red-900 font-bold"><span className="text-red-400 text-xs mr-2">{key}:</span> {val}</p>
+                                                ))}
                                             </div>
-                                        )) : <p className="text-slate-400 font-bold">새 레시피 시트에서 내용을 찾을 수 없습니다.</p>}
+                                        )) : <p className="text-slate-300 font-black text-center py-20">시트에 등록된 레시피가 없습니다.</p>}
                                     </div>
                                     <div className="bg-slate-50 p-10 rounded-[3rem] h-fit sticky top-0">
-                                        <h3 className="text-xl font-black mb-8 text-center">🔎 외부 레시피 지원</h3>
+                                        <h3 className="text-xl font-black mb-8 text-center uppercase tracking-widest">Support Search</h3>
                                         <div className="space-y-4">
-                                            <button onClick={()=>window.open(`https://www.youtube.com/results?search_query=${recipeSearch}+레시피`)} className="w-full py-6 bg-red-600 text-white rounded-3xl font-black text-xl shadow-xl">YOUTUBE</button>
-                                            <button onClick={()=>window.open(`https://www.google.com/search?q=${recipeSearch}+레시피`)} className="w-full py-6 bg-slate-800 text-white rounded-3xl font-black text-xl shadow-xl">GOOGLE</button>
+                                            <button onClick={()=>window.open(`https://www.youtube.com/results?search_query=${recipeSearch}+레시피`)} className="w-full py-6 bg-red-600 text-white rounded-3xl font-black text-xl shadow-xl hover:scale-105 transition-all">YOUTUBE</button>
+                                            <button onClick={()=>window.open(`https://www.google.com/search?q=${recipeSearch}+레시피`)} className="w-full py-6 bg-slate-800 text-white rounded-3xl font-black text-xl shadow-xl hover:scale-105 transition-all">GOOGLE</button>
                                         </div>
                                     </div>
                                 </div>
