@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v15.2 (Auto Sync)</title>
+    <title>MISOYON MMS v15.3</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -31,8 +31,15 @@
         
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
-        .clickable-menu { cursor: pointer !important; transition: all 0.2s; border: 1px solid transparent; }
+        
+        /* v15.3 New Styles */
+        .recipe-tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; margin-right: 4px; margin-top: 4px; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; }
+        .recipe-tag:hover { background: #2563eb; color: white; }
         .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
+        
+        /* 탭 스타일 */
+        .tab-btn { padding: 8px 16px; font-size: 12px; font-weight: 900; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; }
+        .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
     </style>
 </head>
 <body>
@@ -41,20 +48,20 @@
         const { useState, useEffect, useMemo } = React;
 
         const MisoYonApp = () => {
-            // 식단표 URL
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
-            
-            // ★ 셰프님의 레시피 시트 주소 (자동 연동) ★
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
 
             const [menus, setMenus] = useState([]);
-            const [recipeMap, setRecipeMap] = useState({}); // 레시피를 담을 그릇
+            const [recipeMap, setRecipeMap] = useState({});
             const [selectedDate, setSelectedDate] = useState(null);
             const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
             const [searchTerm, setSearchTerm] = useState("");
             const [modalSearch, setModalSearch] = useState("");
             const [activeModal, setActiveModal] = useState(false);
-            const [viewRecipeList, setViewRecipeList] = useState([]);
+            
+            // 팝업 관련 상태
+            const [popupRecipes, setPopupRecipes] = useState([]);
+            const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
 
             const yearOptions = useMemo(() => {
                 const years = [];
@@ -62,9 +69,7 @@
                 return years;
             }, []);
 
-            // 데이터 로딩 (식단 + 레시피)
             useEffect(() => {
-                // 1. 식단 로딩
                 Papa.parse(MENU_URL, { download: true, complete: (res) => {
                     let temp = []; let headers = [];
                     res.data.forEach(row => {
@@ -91,15 +96,13 @@
                     setMenus(temp);
                 }});
 
-                // 2. 레시피 시트 로딩 (여기가 자동화의 핵심)
                 Papa.parse(RECIPE_URL, { download: true, complete: (res) => {
                     const newRecipes = {};
                     res.data.forEach(row => {
-                        // 데이터가 없거나 헤더인 경우 건너뜀 (스마트 필터링)
                         if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
-                        
                         const key = row[0].trim();
                         newRecipes[key] = {
+                            key: key, // 키 저장 (매칭용)
                             name: row[1] || key,
                             ingredients: row[2] || "",
                             process: row[3] || "",
@@ -110,13 +113,17 @@
                 }});
             }, []);
 
+            // ★ 개선된 매칭 로직 (공백 무시) ★
             const findMatchedRecipes = (menuName) => {
                 if (!menuName || menuName === "일정없음") return [];
-                const target = menuName.replace(/\s/g, "");
-                // 불러온 레시피 맵에서 검색
-                return Object.keys(recipeMap)
-                    .filter(key => target.includes(key))
-                    .map(key => recipeMap[key]);
+                // 메뉴명에서 공백 제거
+                const cleanMenu = menuName.replace(/\s/g, "");
+                
+                return Object.values(recipeMap).filter(recipe => {
+                    // 레시피 키에서 공백 제거 후 포함 여부 확인
+                    const cleanKey = recipe.key.replace(/\s/g, "");
+                    return cleanMenu.includes(cleanKey);
+                });
             };
 
             const calDays = useMemo(() => {
@@ -149,16 +156,36 @@
                 return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
             };
 
+            const openRecipe = (recipes, index = 0) => {
+                setPopupRecipes(recipes);
+                setActiveRecipeIndex(index);
+            };
+
             const MenuCard = ({text, type, query}) => {
                 const matched = findMatchedRecipes(text);
-                const hasRecipe = matched.length > 0;
+                
                 return (
-                    <div className={`p-3 rounded-xl border mb-2 transition-all clickable-menu ${hasRecipe ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}
-                         onClick={() => hasRecipe && setViewRecipeList(matched)}>
-                        <div className="text-[9px] font-black text-slate-400 uppercase mb-1">{type}</div>
-                        <div className={`text-[12px] font-black ${hasRecipe ? 'text-blue-900' : 'text-slate-600'}`}>
-                            {highlightText(text, query)} {hasRecipe && "📋"}
+                    <div className={`p-4 rounded-xl border mb-3 transition-all ${matched.length > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
+                        <div className="text-[10px] font-black text-slate-400 uppercase mb-1 flex justify-between">
+                            <span>{type}</span>
+                            {matched.length > 0 && <span className="text-blue-500">Found: {matched.length}</span>}
                         </div>
+                        <div className="text-sm font-black text-slate-700 mb-2 leading-relaxed">
+                            {highlightText(text, query)}
+                        </div>
+                        
+                        {/* ★ 셰프님 요청: 개별 레시피 버튼 노출 ★ */}
+                        {matched.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-blue-100">
+                                {matched.map((r, idx) => (
+                                    <span key={idx} 
+                                          className="recipe-tag" 
+                                          onClick={(e) => { e.stopPropagation(); openRecipe(matched, idx); }}>
+                                        📖 {r.name}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 );
             };
@@ -168,13 +195,14 @@
                 setActiveModal(true);
             };
 
+            // 현재 보고 있는 레시피 객체
+            const currentRecipe = popupRecipes[activeRecipeIndex];
+
             return (
                 <div className="flex flex-col h-full w-full">
-                    {/* Header: 높이 고정 */}
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v15.2</span></h1>
-                            {/* PC용 년/월 선택 */}
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v15.3</span></h1>
                             <div className="hidden md:flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
                                     {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
@@ -184,8 +212,6 @@
                                 </select>
                             </div>
                         </div>
-                        
-                        {/* 모바일용 년/월 선택 (셰프님 요청사항 반영) */}
                         <div className="md:hidden flex items-center font-bold text-xs bg-slate-100 px-2 py-1 rounded-lg gap-1">
                              <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
                                 {yearOptions.map(y => <option key={y} value={y}>{String(y).slice(2)}년</option>)}
@@ -195,14 +221,12 @@
                                 {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}
                             </select>
                         </div>
-
                         <div className="flex gap-2">
                              <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-28 md:w-40 border outline-none" placeholder="메뉴/날짜 검색" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleSearch()}/>
                              <button onClick={handleSearch} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
                         </div>
                     </header>
 
-                    {/* Main Content */}
                     <main className="flex flex-col lg:flex-row flex-1 overflow-hidden">
                         <div className="flex-[2] flex flex-col min-h-[50%] lg:min-h-full border-b lg:border-b-0 lg:border-r overflow-hidden">
                             <div className="calendar-grid">
@@ -214,9 +238,9 @@
                                                 <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
                                                 {d.data && (
                                                     <div className="flex flex-col gap-[1px] mt-[1px]">
-                                                        <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>
-                                                        <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>
-                                                        <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>
+                                                        {d.data.morning && <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>}
+                                                        {d.data.lunch && <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>}
+                                                        {d.data.dinner && <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>}
                                                     </div>
                                                 )}
                                             </>
@@ -225,7 +249,6 @@
                                 ))}
                             </div>
                         </div>
-                        
                         <aside className="flex-1 bg-white p-4 overflow-y-auto min-h-[40%]">
                             {selectedDate ? (
                                 <div className="space-y-4">
@@ -260,32 +283,44 @@
                         </div>
                     )}
 
-                    {viewRecipeList.length > 0 && (
-                        <div className="recipe-popup" onClick={() => setViewRecipeList([])}>
+                    {/* ★ 레시피 팝업 (멀티 탭 지원) ★ */}
+                    {popupRecipes.length > 0 && currentRecipe && (
+                        <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                    <h3 className="text-xl font-black uppercase italic text-blue-600">Recipe</h3>
-                                    <button onClick={() => setViewRecipeList([])} className="text-4xl font-thin">&times;</button>
+                                <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                    <h3 className="text-xl font-black uppercase italic text-blue-600">Recipe Master</h3>
+                                    <button onClick={() => setPopupRecipes([])} className="text-4xl font-thin">&times;</button>
                                 </div>
-                                {viewRecipeList.map((r, i) => (
-                                    <div key={i} className="mb-8">
-                                        <div className="bg-blue-600 text-white px-3 py-1 rounded-full inline-block text-xs font-black mb-3 uppercase">{r.name}</div>
-                                        <div className="space-y-4">
-                                            <div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Ingredients</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{r.ingredients}</div></div>
-                                            <div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Instructions</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{r.process}</div></div>
-                                            {r.tip && <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 font-bold text-orange-950 text-xs">👨‍🍳 {r.tip}</div>}
-                                        </div>
+                                
+                                {/* 요리가 여러 개일 때 탭 메뉴 표시 */}
+                                {popupRecipes.length > 1 && (
+                                    <div className="flex overflow-x-auto border-b mb-4 no-scrollbar">
+                                        {popupRecipes.map((r, i) => (
+                                            <div key={i} 
+                                                 onClick={() => setActiveRecipeIndex(i)}
+                                                 className={`tab-btn whitespace-nowrap ${i === activeRecipeIndex ? 'active' : ''}`}>
+                                                {r.name}
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
+                                )}
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MisoYonApp />);
-    </script>
-</body>
-</html>
+                                <div className="animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="bg-blue-600 text-white px-3 py-1 rounded-full inline-block text-xs font-black mb-3 uppercase">
+                                        {currentRecipe.name}
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Ingredients</div>
+                                            <div className="recipe-content bg-slate-50 p-3 rounded-xl border">
+                                                {currentRecipe.ingredients}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Instructions</div>
+                                            <div className="recipe-content bg-slate-50 p-3 rounded-xl border">
+                                                {currentRecipe.process}
+                                            </div>
+                                        </div>
+                                        {currentRecipe.tip && (
+                                            <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 font-bold text-orange-950 text-xs">
