@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v11.9 - 데이터 최적화 버전</title>
+    <title>MISOYON MMS v11.9 - 긴급 복구 버전</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -47,20 +47,19 @@
             const years = Array.from({length: 11}, (_, i) => 2020 + i);
             const months = Array.from({length: 12}, (_, i) => i + 1);
 
-            // [핵심 변경] 한 줄 구조의 레시피 데이터를 파싱하는 함수
+            // 데이터 정제 함수 (안전장치 추가)
             const parseRecipes = (data) => {
                 const recipeMap = {};
-                if (data.length < 2) return recipeMap; // 헤더뿐인 경우 방지
-
+                if (!data || data.length < 2) return recipeMap;
                 data.slice(1).forEach(row => {
-                    const name = (row[0] || "").trim(); // A열: 레시피명
+                    const name = (row[0] || "").trim();
                     if (name) {
                         recipeMap[name] = {
                             name: name,
-                            keywords: (row[1] || "").trim(),    // B열: 매칭 키워드
-                            ingredients: (row[2] || "").trim(), // C열: 식재료
-                            process: (row[3] || "").trim(),     // D열: 조리공정
-                            tip: (row[4] || "").trim()          // E열: 전문가 TIP
+                            keywords: (row[1] || "").trim(),
+                            ingredients: (row[2] || "").trim(),
+                            process: (row[3] || "").trim(),
+                            tip: (row[4] || "").trim()
                         };
                     }
                 });
@@ -68,49 +67,49 @@
             };
 
             const loadData = () => {
-                // 메뉴 로드
-                Papa.parse(MENU_URL, { download: true, complete: (res) => {
-                    let temp = []; let headers = [];
-                    res.data.forEach(row => {
-                        const label = (row[0] || "").replace(/\s/g, "");
-                        const vals = row.slice(1);
-                        if (label === "날짜") {
-                            headers = vals.map(v => {
-                                const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
-                                return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
-                            });
-                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "" }); });
-                        } else if (headers.length > 0) {
-                            vals.forEach((v, i) => {
-                                if (!headers[i]) return;
-                                const t = temp.find(m => m.date === headers[i]);
-                                if (t) {
-                                    if (label.includes("아침")) t.morning = v;
-                                    else if (label.includes("점심")) t.lunch = v;
-                                    else if (label.includes("저녁")) t.dinner = v;
-                                }
-                            });
-                        }
-                    });
-                    setMenus(temp);
-                }});
-                // 레시피 로드
-                Papa.parse(RECIPE_URL, { download: true, complete: (res) => setRecipes(parseRecipes(res.data)) });
+                try {
+                    Papa.parse(MENU_URL, { download: true, complete: (res) => {
+                        let temp = []; let headers = [];
+                        res.data.forEach(row => {
+                            const label = (row[0] || "").replace(/\s/g, "");
+                            const vals = row.slice(1);
+                            if (label === "날짜") {
+                                headers = vals.map(v => {
+                                    const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
+                                    return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
+                                });
+                                headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "" }); });
+                            } else if (headers.length > 0) {
+                                vals.forEach((v, i) => {
+                                    if (!headers[i]) return;
+                                    const t = temp.find(m => m.date === headers[i]);
+                                    if (t) {
+                                        if (label.includes("아침")) t.morning = v;
+                                        else if (label.includes("점심")) t.lunch = v;
+                                        else if (label.includes("저녁")) t.dinner = v;
+                                    }
+                                });
+                            }
+                        });
+                        setMenus(temp);
+                    }, error: (err) => console.error("Menu Load Error:", err) });
+
+                    Papa.parse(RECIPE_URL, { download: true, complete: (res) => {
+                        setRecipes(parseRecipes(res.data));
+                    }, error: (err) => console.error("Recipe Load Error:", err) });
+                } catch (e) {
+                    console.error("Data Parsing Fatal Error:", e);
+                }
             };
 
             useEffect(() => { loadData(); }, []);
 
-            // [핵심 변경] 메뉴명과 키워드를 모두 대조하여 레시피를 찾는 검색 로직
             const findMatchedRecipes = (menuName) => {
                 if (!menuName || menuName === "일정없음") return [];
                 const target = menuName.replace(/\s/g, "").toLowerCase();
-                
                 return Object.values(recipes).filter(r => {
                     const rName = r.name.replace(/\s/g, "").toLowerCase();
                     const keywords = r.keywords.split(',').map(k => k.trim().replace(/\s/g, "").toLowerCase());
-                    
-                    // 1. 레시피 이름이 메뉴에 포함되거나
-                    // 2. 키워드 중 하나라도 메뉴에 포함되면 결과에 추가
                     return target.includes(rName) || keywords.some(k => k && target.includes(k));
                 });
             };
@@ -159,12 +158,12 @@
                 <div className="flex flex-col h-screen w-full">
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v11.9 최적화</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600 font-black underline decoration-2">v11.9 Stable</span></h1>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border">
-                                <select className="bg-transparent font-bold outline-none" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
+                                <select className="bg-transparent font-bold outline-none" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(parseInt(e.target.value), currentMonth.getMonth()))}>
                                     {years.map(y => <option key={y} value={y}>{y}년</option>)}
                                 </select>
-                                <select className="bg-transparent font-bold outline-none ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
+                                <select className="bg-transparent font-bold outline-none ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.target.value) - 1))}>
                                     {months.map(m => <option key={m} value={m}>{m}월</option>)}
                                 </select>
                             </div>
@@ -201,12 +200,12 @@
                             {selectedDate ? (
                                 <div className="space-y-4">
                                     <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1 uppercase">Daily Menu List</h2>
-                                    <div className="text-[10px] text-blue-600 font-bold mb-4">{selectedDate.date}</div>
+                                    <div className="text-[10px] text-blue-600 font-bold mb-4 italic underline underline-offset-4">{selectedDate.date}</div>
                                     <MenuCard text={selectedDate.morning} type="Morning" />
                                     <MenuCard text={selectedDate.lunch} type="Lunch" />
                                     <MenuCard text={selectedDate.dinner} type="Dinner" />
                                 </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black text-xs text-center">날짜를 선택하면<br/>메뉴가 표시됩니다</div>}
+                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black text-xs text-center">달력에서 날짜를 선택하세요</div>}
                         </aside>
                     </main>
 
@@ -215,7 +214,7 @@
                             <div className="bg-white rounded-3xl w-full max-w-2xl p-8 shadow-2xl overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
                                 <div className="flex justify-between items-start mb-6 border-b pb-4">
                                     <h3 className="text-2xl font-black text-slate-900 italic">RECIPE DETAILS</h3>
-                                    <button onClick={() => setViewRecipeList([])} className="text-4xl font-thin">&times;</button>
+                                    <button onClick={() => setViewRecipeList([])} className="text-4xl font-thin hover:text-red-500 transition-colors">&times;</button>
                                 </div>
                                 <div className="space-y-10">
                                     {viewRecipeList.map((recipe, idx) => (
@@ -246,12 +245,12 @@
                             </div>
                         </div>
                     )}
+                </div>
+            );
+        };
 
-                    {activeModal && (
-                        <div className="modal-view">
-                            <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
-                                <div className="flex justify-between items-center mb-6 border-b-2 border-blue-600 pb-3">
-                                    <div className="flex items-center gap-6">
-                                        <h2 className="text-2xl font-black italic uppercase">Long-term Analysis</h2>
-                                        <input className="bg-slate-100 px-6 py-2 rounded-xl text-sm font-black outline-
-
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MisoYonApp />);
+    </script>
+</body>
+</html>
