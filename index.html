@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v12.0 - 레시피 통합본</title>
+    <title>MISOYON MMS v12.0</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -18,12 +18,9 @@
         .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; position: relative; }
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
-        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; }
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
-        .clickable-menu { cursor: pointer !important; transition: all 0.2s; border: 1px solid transparent; }
-        .clickable-menu:hover { background: #f0f7ff !important; border-color: #3b82f6 !important; transform: scale(1.02); }
         .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
     </style>
 </head>
@@ -35,18 +32,18 @@
         const MisoYonApp = () => {
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             
-            // 제미니가 수정한 "읽기 좋은 레시피" 데이터 통합 (V12 핵심)
+            // 셰프님이 승인하신 "읽기 좋은 레시피" 10종 데이터 (Syntax 무결성 확보)
             const RECIPE_STORE = {
-                "불고기": { name: "서울식 불고기", ingredients: "한우 불고기 1kg, 배 1개, 양파 1개, 팽이버섯, 느타리버섯, 당면, 대파, 다시마 육수 200ml\n양념: 진간장 100ml, 다진 마늘 30g, 설탕 45g, 참기름, 매실액, 후추", process: "1. 배즙과 양념 재료를 섞어 양념장을 만듭니다.\n2. 고기를 양념에 재운 뒤 버섯, 채소와 함께 준비합니다.\n3. 육수를 붓고 자작하게 끓이다가 당면과 대파로 마무리합니다.", tip: "배즙은 고기를 연하게 하고 천연의 단맛을 줍니다." },
-                "갈비탕": { name: "명품 갈비탕", ingredients: "한우 갈비 500g, 무 200g, 대파, 통마늘, 계란, 다시마\n양념: 국간장, 다진 마늘, 참기름, 후추, 소금", process: "1. 갈비는 핏물을 충분히 빼고 한 번 데쳐 불순물을 제거합니다.\n2. 깨끗한 물에 갈비, 무, 마늘을 넣고 고기가 부드러워질 때까지 푹 끓입니다.\n3. 고기와 무를 건져 양념한 뒤 국물과 합쳐 한소끔 더 끓입니다.", tip: "건져낸 고기에 밑간을 먼저 하면 국물맛이 겉돌지 않습니다." },
-                "무국": { name: "소고기 무국", ingredients: "한우 양지 300g, 무 300g, 대파 2대, 숙주 200g, 멸치 육수 1.8L\n양념: 고춧가루 30g, 국간장 25g, 액젓 15g, 다진 마늘 15g", process: "1. 육수에 양지와 무를 넣고 시원하게 끓입니다.\n2. 국간장과 액젓으로 깊은 간을 맞춥니다.\n3. 고춧가루, 대파를 넣고 마지막에 숙주를 넣어 식감을 살립니다.", tip: "숙주는 마지막에 넣어 짧게 끓여야 아삭함이 유지됩니다." },
-                "소머리국밥": { name: "진 사골 소머리국밥", ingredients: "사골 1kg, 소머리고기 800g, 인삼 150g, 무 200g, 대파\n양념: 국간장, 식초, 통깨, 다진 파", process: "1. 사골을 푹 고아 뽀얀 육수를 먼저 만듭니다.\n2. 머리고기를 넣어 잡내 없이 삶아낸 뒤 먹기 좋게 썹니다.\n3. 육수에 고기, 인삼, 무를 넣고 진하게 우려냅니다.", tip: "서빙 시 양념장에 식초 한 방울을 곁들여 풍미를 올리세요." },
-                "곰국": { name: "정성 곰국", ingredients: "사골 1kg, 잡뼈 1kg, 양지 500g, 대파, 마늘, 소금, 후추", process: "1. 뼈의 핏물을 확실히 제거한 후 초탕 물은 버립니다.\n2. 새 물을 받아 진국이 나올 때까지 반복해서 고아냅니다.\n3. 삶아진 양지를 얇게 썰어 고명으로 올립니다.", tip: "끓이는 내내 기름과 거품을 수시로 걷어내야 국물이 깔끔합니다." },
-                "백합탕": { name: "냉이 백합탕", ingredients: "백합 2kg, 냉이 300g, 두부, 황금팽이버섯, 대파, 고추\n육수: 멸치 육수 10L, 소금, 새우젓", process: "1. 해감한 백합을 육수에 끓여 입을 벌리면 따로 건져둡니다.\n2. 육수를 정밀하게 걸러 두부와 채소를 넣고 끓입니다.\n3. 마지막에 냉이와 백합을 넣어 향을 입힙니다.", tip: "냉이 향을 살리려면 불을 끄기 직전에 넣는 것이 포인트입니다." },
-                "다슬기국": { name: "안동 다슬기국", ingredients: "다슬기 500g, 얼갈이 배추 100g, 부추 50g, 된장 15g, 밀가루 10g\n육수: 황태 육수 3L, 다진 마늘, 국간장, 고춧가루", process: "1. 다슬기 살을 발라내고 나물은 된장과 밀가루에 버무립니다.\n2. 육수에 나물을 넣고 끓여 구수한 맛을 냅니다.\n3. 마지막에 부추를 듬뿍 넣어 완성합니다.", tip: "나물에 밀가루를 묻히면 국물이 걸쭉하고 더 고소해집니다." },
-                "매운탕": { name: "우럭 매운탕", ingredients: "우럭 3마리, 서더리 1kg, 무 150g, 두부, 쑥갓, 호박\n양념: 비법 다데기, 멸치 육수 5L", process: "1. 서더리로 깊은 기본 육수를 먼저 우려냅니다.\n2. 무와 다데기를 넣고 끓이다가 우럭과 채소를 넣습니다.\n3. 두부와 쑥갓을 올려 시원하게 마무리합니다.", tip: "생선 살이 부서지지 않게 무가 익은 후 생선을 넣으세요." },
-                "미역국": { name: "바지락 미역국", ingredients: "바지락, 미역, 불린 쌀 250g, 소고기 민찌 150g, 표고버섯\n육수: 다시마 육수 1L, 참기름, 국간장", process: "1. 참기름에 고기와 쌀을 충분히 볶아 고소함을 극대화합니다.\n2. 육수를 붓고 미역과 함께 뭉근하게 끓입니다.\n3. 바지락을 넣어 시원한 감칠맛을 더합니다.", tip: "쌀을 함께 볶으면 국물이 우유처럼 뽀얗고 진해집니다." },
-                "배추국": { name: "사태 배추 된장국", ingredients: "배추 250g, 한우 사태 100g, 쌀뜨물 1.2L, 된장, 마늘, 대파, 고추", process: "1. 쌀뜨물에 된장을 풀고 핏물을 뺀 사태를 넣어 끓입니다.\n2. 달큰한 배추를 듬뿍 넣고 부드러워질 때까지 익힙니다.\n3. 대파와 고추로 칼칼한 끝맛을 잡습니다.", tip: "사태를 충분히 익혀야 배추의 단맛과 잘 어우러집니다." }
+                "불고기": { name: "서울식 불고기", ingredients: `한우 불고기 1kg, 배 1개, 양파 1개, 팽이버섯, 느타리버섯, 당면, 대파\n양념: 진간장 100ml, 다진 마늘 30g, 설탕 45g, 참기름, 매실액, 후추`, process: `1. 배즙과 양념 재료를 섞어 양념장을 만듭니다.\n2. 고기를 양념에 재운 뒤 버섯, 채소와 함께 준비합니다.\n3. 육수를 붓고 자작하게 끓이다가 당면과 대파로 마무리합니다.`, tip: "배즙은 고기를 연하게 하고 천연의 단맛을 줍니다." },
+                "갈비탕": { name: "명품 갈비탕", ingredients: `한우 갈비 500g, 무 200g, 대파, 통마늘, 계란, 다시마\n양념: 국간장, 다진 마늘, 참기름, 후추, 소금`, process: `1. 갈비는 핏물을 충분히 빼고 한 번 데쳐 불순물을 제거합니다.\n2. 깨끗한 물에 갈비, 무, 마늘을 넣고 고기가 부드러워질 때까지 푹 끓입니다.\n3. 고기와 무를 건져 양념한 뒤 국물과 합쳐 한소끔 더 끓입니다.`, tip: "건져낸 고기에 밑간을 먼저 하면 국물맛이 겉돌지 않습니다." },
+                "무국": { name: "소고기 무국", ingredients: `한우 양지 300g, 무 300g, 대파 2대, 숙주 200g, 멸치 육수 1.8L\n양념: 고춧가루 30g, 국간장 25g, 액젓 15g, 다진 마늘 15g`, process: `1. 육수에 양지와 무를 넣고 시원하게 끓입니다.\n2. 국간장과 액젓으로 깊은 간을 맞춥니다.\n3. 고춧가루, 대파를 넣고 마지막에 숙주를 넣어 식감을 살립니다.`, tip: "숙주는 마지막에 넣어 짧게 끓여야 아삭함이 유지됩니다." },
+                "소머리국밥": { name: "진 사골 소머리국밥", ingredients: `사골 1kg, 소머리고기 800g, 인삼 150g, 무 200g, 대파\n양념: 국간장, 식초, 통깨, 다진 파`, process: `1. 사골을 푹 고아 뽀얀 육수를 먼저 만듭니다.\n2. 머리고기를 넣어 잡내 없이 삶아낸 뒤 먹기 좋게 썹니다.\n3. 육수에 고기, 인삼, 무를 넣고 진하게 우려냅니다.`, tip: "서빙 시 양념장에 식초 한 방울을 곁들여 풍미를 올리세요." },
+                "곰국": { name: "정성 곰국", ingredients: `사골 1kg, 잡뼈 1kg, 양지 500g, 대파, 마늘, 소금, 후추`, process: `1. 뼈의 핏물을 확실히 제거한 후 초탕 물은 버립니다.\n2. 새 물을 받아 진국이 나올 때까지 반복해서 고아냅니다.\n3. 삶아진 양지를 얇게 썰어 고명으로 올립니다.`, tip: "끓이는 내내 기름과 거품을 수시로 걷어내야 국물이 깔끔합니다." },
+                "백합탕": { name: "냉이 백합탕", ingredients: `백합 2kg, 냉이 300g, 두부, 황금팽이버섯, 대파, 고추\n육수: 멸치 육수 10L, 소금, 새우젓`, process: `1. 해감한 백합을 육수에 끓여 입을 벌리면 따로 건져둡니다.\n2. 육수를 정밀하게 걸러 두부와 채소를 넣고 끓입니다.\n3. 마지막에 냉이와 백합을 넣어 향을 입힙니다.`, tip: "냉이 향을 살리려면 불을 끄기 직전에 넣는 것이 포인트입니다." },
+                "다슬기국": { name: "안동 다슬기국", ingredients: `다슬기 500g, 얼갈이 배추 100g, 부추 50g, 된장 15g, 밀가루 10g\n육수: 황태 육수 3L, 다진 마늘, 국간장, 고춧가루`, process: `1. 다슬기 살을 발라내고 나물은 된장과 밀가루에 버무립니다.\n2. 육수에 나물을 넣고 끓여 구수한 맛을 냅니다.\n3. 마지막에 부추를 듬뿍 넣어 완성합니다.`, tip: "나물에 밀가루를 묻히면 국물이 걸쭉하고 더 고소해집니다." },
+                "매운탕": { name: "우럭 매운탕", ingredients: `우럭 3마리, 서더리 1kg, 무 150g, 두부, 쑥갓, 호박\n양념: 비법 다데기, 멸치 육수 5L`, process: `1. 서더리로 깊은 기본 육수를 먼저 우려냅니다.\n2. 무와 다데기를 넣고 끓이다가 우럭과 채소를 넣습니다.\n3. 두부와 쑥갓을 올려 시원하게 마무리합니다.`, tip: "생선 살이 부서지지 않게 무가 익은 후 생선을 넣으세요." },
+                "미역국": { name: "바지락 미역국", ingredients: `바지락, 미역, 불린 쌀 250g, 소고기 민찌 150g, 표고버섯\n육수: 다시마 육수 1L, 참기름, 국간장`, process: `1. 참기름에 고기와 쌀을 충분히 볶아 고소함을 극대화합니다.\n2. 육수를 붓고 미역과 함께 뭉근하게 끓입니다.\n3. 바지락을 넣어 시원한 감칠맛을 더합니다.`, tip: "쌀을 함께 볶으면 국물이 우유처럼 뽀얗고 진해집니다." },
+                "배추국": { name: "사태 배추 된장국", ingredients: `배추 250g, 한우 사태 100g, 쌀뜨물 1.2L, 된장, 마늘, 대파, 고추`, process: `1. 쌀뜨물에 된장을 풀고 핏물을 뺀 사태를 넣어 끓입니다.\n2. 달큰한 배추를 듬뿍 넣고 부드러워질 때까지 익힙니다.\n3. 대파와 고추로 칼칼한 끝맛을 잡습니다.`, tip: "사태를 충분히 익혀야 배추의 단맛과 잘 어우러집니다." }
             };
 
             const [menus, setMenus] = useState([]);
@@ -109,4 +106,124 @@
 
             const currentSearchResults = useMemo(() => {
                 const q = (activeModal ? modalSearch : searchTerm).trim().toLowerCase();
-                if
+                if (!q) return [];
+                return menus.filter(m => (m.morning + m.lunch + m.dinner).toLowerCase().includes(q))
+                            .sort((a,b) => new Date(b.date) - new Date(a.date));
+            }, [modalSearch, searchTerm, activeModal, menus]);
+
+            const MenuCard = ({text, type, query}) => {
+                const matched = findMatchedRecipes(text);
+                const hasRecipe = matched.length > 0;
+                return (
+                    <div className={`p-3 rounded-xl border mb-2 transition-all cursor-pointer ${hasRecipe ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}
+                         onClick={() => hasRecipe && setViewRecipeList(matched)}>
+                        <div className="text-[9px] font-black text-slate-400 uppercase mb-1">{type}</div>
+                        <div className={`text-[12px] font-black ${hasRecipe ? 'text-blue-900' : 'text-slate-600'}`}>
+                            {text} {hasRecipe && "📋"}
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="flex flex-col h-screen w-full">
+                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 shadow-sm">
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v12.0</span></h1>
+                            <div className="flex bg-slate-100 px-3 py-1 rounded-xl border text-sm font-bold">
+                                <select value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
+                                    {[2024,2025,2026].map(y => <option key={y} value={y}>{y}년</option>)}
+                                </select>
+                                <select className="ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
+                                    {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-48 border outline-none" placeholder="검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
+                            <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
+                        </div>
+                    </header>
+
+                    <main className="flex flex-1 min-height-0 overflow-hidden">
+                        <div className="flex-[3] calendar-grid">
+                            {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-1 text-center text-[9px] font-black text-slate-400 border-b">{d}</div>)}
+                            {calDays.map((d,i)=>(
+                                <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
+                                    {d && (
+                                        <>
+                                            <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
+                                            {d.data && (
+                                                <div className="mt-[1px]">
+                                                    <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>
+                                                    <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>
+                                                    <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-w-[340px]">
+                            {selectedDate ? (
+                                <div className="space-y-4">
+                                    <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1">DAILY MENU</h2>
+                                    <MenuCard text={selectedDate.morning} type="Morning" />
+                                    <MenuCard text={selectedDate.lunch} type="Lunch" />
+                                    <MenuCard text={selectedDate.dinner} type="Dinner" />
+                                </div>
+                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black">날짜를 선택하세요</div>}
+                        </aside>
+                    </main>
+
+                    {activeModal && (
+                        <div className="modal-view">
+                            <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
+                                <div className="flex justify-between items-center mb-6 border-b-2 border-blue-600 pb-3">
+                                    <h2 className="text-2xl font-black italic">ANALYSIS</h2>
+                                    <button onClick={()=>setActiveModal(false)} className="text-4xl font-thin">&times;</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto space-y-4 pb-10">
+                                    {currentSearchResults.map((m, i) => (
+                                        <div key={i} className="bg-white p-5 rounded-3xl border flex gap-6">
+                                            <div className="w-36 font-black text-blue-600 text-xl">{m.date}</div>
+                                            <div className="flex-1 grid grid-cols-3 gap-4">
+                                                <MenuCard text={m.morning} type="Morning" />
+                                                <MenuCard text={m.lunch} type="Lunch" />
+                                                <MenuCard text={m.dinner} type="Dinner" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {viewRecipeList.length > 0 && (
+                        <div className="recipe-popup" onClick={() => setViewRecipeList([])}>
+                            <div className="bg-white rounded-3xl w-full max-w-2xl p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-6 border-b pb-4">
+                                    <h3 className="text-2xl font-black uppercase">Recipe</h3>
+                                    <button onClick={() => setViewRecipeList([])} className="text-4xl font-thin">&times;</button>
+                                </div>
+                                {viewRecipeList.map((r, i) => (
+                                    <div key={i} className="space-y-4">
+                                        <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-xs inline-block font-black">{r.name}</div>
+                                        <div><div className="text-[10px] font-black text-slate-400">재료</div><div className="recipe-content bg-slate-50 p-4 rounded-xl border">{r.ingredients}</div></div>
+                                        <div><div className="text-[10px] font-black text-slate-400">조리법</div><div className="recipe-content bg-slate-50 p-4 rounded-xl border">{r.process}</div></div>
+                                        {r.tip && <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 font-bold text-orange-800 text-sm italic">👨‍🍳 {r.tip}</div>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MisoYonApp />);
+    </script>
+</body>
+</html>
