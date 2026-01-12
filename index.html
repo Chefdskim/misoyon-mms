@@ -1,19 +1,112 @@
-// 1. 셰프님이 정리해준 레시피를 데이터베이스화 (원본 코드의 RECIPE_STORE 대체)
-const RECIPE_STORE = {
-    "불고기": { 
-        name: "서울식 불고기", 
-        ingredients: "한우 등심 1kg, 배즙, 양파, 버섯, 당면, 대파", // 셰프님이 수정한 간결한 목록
-        process: "1. 배즙 양념장에 고기 재우기\n2. 채소 손질 후 육수와 함께 익히기", // 읽기 좋은 공정
-        tip: "배즙의 연육작용으로 부드러운 식감 극대화" 
-    },
-    // ... 나머지 9개 레시피도 동일한 구조로 입력
-};
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MISOYON MMS v12.0 - 레시피 통합본</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
+        #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 25px repeat(6, 1fr); flex: 1; background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; min-height: 0; }
+        .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; position: relative; }
+        .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
+        .menu-text { font-size: 9px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
+        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+        .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
+        .clickable-menu { cursor: pointer !important; transition: all 0.2s; border: 1px solid transparent; }
+        .clickable-menu:hover { background: #f0f7ff !important; border-color: #3b82f6 !important; transform: scale(1.02); }
+        .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
 
-// 2. 검색 및 매칭 로직 강화 (문자열 포함 여부 정밀 체크)
-const findMatchedRecipes = (menuName) => {
-    if (!menuName || menuName === "일정없음") return [];
-    // 셰프님의 원본 메뉴명에서 레시피 키워드만 추출하여 매칭
-    return Object.keys(RECIPE_STORE)
-        .filter(key => menuName.includes(key))
-        .map(key => RECIPE_STORE[key]);
-};
+        const MisoYonApp = () => {
+            const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
+            
+            // 제미니가 수정한 "읽기 좋은 레시피" 데이터 통합 (V12 핵심)
+            const RECIPE_STORE = {
+                "불고기": { name: "서울식 불고기", ingredients: "한우 불고기 1kg, 배 1개, 양파 1개, 팽이버섯, 느타리버섯, 당면, 대파, 다시마 육수 200ml\n양념: 진간장 100ml, 다진 마늘 30g, 설탕 45g, 참기름, 매실액, 후추", process: "1. 배즙과 양념 재료를 섞어 양념장을 만듭니다.\n2. 고기를 양념에 재운 뒤 버섯, 채소와 함께 준비합니다.\n3. 육수를 붓고 자작하게 끓이다가 당면과 대파로 마무리합니다.", tip: "배즙은 고기를 연하게 하고 천연의 단맛을 줍니다." },
+                "갈비탕": { name: "명품 갈비탕", ingredients: "한우 갈비 500g, 무 200g, 대파, 통마늘, 계란, 다시마\n양념: 국간장, 다진 마늘, 참기름, 후추, 소금", process: "1. 갈비는 핏물을 충분히 빼고 한 번 데쳐 불순물을 제거합니다.\n2. 깨끗한 물에 갈비, 무, 마늘을 넣고 고기가 부드러워질 때까지 푹 끓입니다.\n3. 고기와 무를 건져 양념한 뒤 국물과 합쳐 한소끔 더 끓입니다.", tip: "건져낸 고기에 밑간을 먼저 하면 국물맛이 겉돌지 않습니다." },
+                "무국": { name: "소고기 무국", ingredients: "한우 양지 300g, 무 300g, 대파 2대, 숙주 200g, 멸치 육수 1.8L\n양념: 고춧가루 30g, 국간장 25g, 액젓 15g, 다진 마늘 15g", process: "1. 육수에 양지와 무를 넣고 시원하게 끓입니다.\n2. 국간장과 액젓으로 깊은 간을 맞춥니다.\n3. 고춧가루, 대파를 넣고 마지막에 숙주를 넣어 식감을 살립니다.", tip: "숙주는 마지막에 넣어 짧게 끓여야 아삭함이 유지됩니다." },
+                "소머리국밥": { name: "진 사골 소머리국밥", ingredients: "사골 1kg, 소머리고기 800g, 인삼 150g, 무 200g, 대파\n양념: 국간장, 식초, 통깨, 다진 파", process: "1. 사골을 푹 고아 뽀얀 육수를 먼저 만듭니다.\n2. 머리고기를 넣어 잡내 없이 삶아낸 뒤 먹기 좋게 썹니다.\n3. 육수에 고기, 인삼, 무를 넣고 진하게 우려냅니다.", tip: "서빙 시 양념장에 식초 한 방울을 곁들여 풍미를 올리세요." },
+                "곰국": { name: "정성 곰국", ingredients: "사골 1kg, 잡뼈 1kg, 양지 500g, 대파, 마늘, 소금, 후추", process: "1. 뼈의 핏물을 확실히 제거한 후 초탕 물은 버립니다.\n2. 새 물을 받아 진국이 나올 때까지 반복해서 고아냅니다.\n3. 삶아진 양지를 얇게 썰어 고명으로 올립니다.", tip: "끓이는 내내 기름과 거품을 수시로 걷어내야 국물이 깔끔합니다." },
+                "백합탕": { name: "냉이 백합탕", ingredients: "백합 2kg, 냉이 300g, 두부, 황금팽이버섯, 대파, 고추\n육수: 멸치 육수 10L, 소금, 새우젓", process: "1. 해감한 백합을 육수에 끓여 입을 벌리면 따로 건져둡니다.\n2. 육수를 정밀하게 걸러 두부와 채소를 넣고 끓입니다.\n3. 마지막에 냉이와 백합을 넣어 향을 입힙니다.", tip: "냉이 향을 살리려면 불을 끄기 직전에 넣는 것이 포인트입니다." },
+                "다슬기국": { name: "안동 다슬기국", ingredients: "다슬기 500g, 얼갈이 배추 100g, 부추 50g, 된장 15g, 밀가루 10g\n육수: 황태 육수 3L, 다진 마늘, 국간장, 고춧가루", process: "1. 다슬기 살을 발라내고 나물은 된장과 밀가루에 버무립니다.\n2. 육수에 나물을 넣고 끓여 구수한 맛을 냅니다.\n3. 마지막에 부추를 듬뿍 넣어 완성합니다.", tip: "나물에 밀가루를 묻히면 국물이 걸쭉하고 더 고소해집니다." },
+                "매운탕": { name: "우럭 매운탕", ingredients: "우럭 3마리, 서더리 1kg, 무 150g, 두부, 쑥갓, 호박\n양념: 비법 다데기, 멸치 육수 5L", process: "1. 서더리로 깊은 기본 육수를 먼저 우려냅니다.\n2. 무와 다데기를 넣고 끓이다가 우럭과 채소를 넣습니다.\n3. 두부와 쑥갓을 올려 시원하게 마무리합니다.", tip: "생선 살이 부서지지 않게 무가 익은 후 생선을 넣으세요." },
+                "미역국": { name: "바지락 미역국", ingredients: "바지락, 미역, 불린 쌀 250g, 소고기 민찌 150g, 표고버섯\n육수: 다시마 육수 1L, 참기름, 국간장", process: "1. 참기름에 고기와 쌀을 충분히 볶아 고소함을 극대화합니다.\n2. 육수를 붓고 미역과 함께 뭉근하게 끓입니다.\n3. 바지락을 넣어 시원한 감칠맛을 더합니다.", tip: "쌀을 함께 볶으면 국물이 우유처럼 뽀얗고 진해집니다." },
+                "배추국": { name: "사태 배추 된장국", ingredients: "배추 250g, 한우 사태 100g, 쌀뜨물 1.2L, 된장, 마늘, 대파, 고추", process: "1. 쌀뜨물에 된장을 풀고 핏물을 뺀 사태를 넣어 끓입니다.\n2. 달큰한 배추를 듬뿍 넣고 부드러워질 때까지 익힙니다.\n3. 대파와 고추로 칼칼한 끝맛을 잡습니다.", tip: "사태를 충분히 익혀야 배추의 단맛과 잘 어우러집니다." }
+            };
+
+            const [menus, setMenus] = useState([]);
+            const [selectedDate, setSelectedDate] = useState(null);
+            const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
+            const [searchTerm, setSearchTerm] = useState("");
+            const [modalSearch, setModalSearch] = useState("");
+            const [activeModal, setActiveModal] = useState(false);
+            const [viewRecipeList, setViewRecipeList] = useState([]);
+
+            useEffect(() => {
+                Papa.parse(MENU_URL, { download: true, complete: (res) => {
+                    let temp = []; let headers = [];
+                    res.data.forEach(row => {
+                        const label = (row[0] || "").replace(/\s/g, "");
+                        const vals = row.slice(1);
+                        if (label === "날짜") {
+                            headers = vals.map(v => {
+                                const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
+                                return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
+                            });
+                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "" }); });
+                        } else if (headers.length > 0) {
+                            vals.forEach((v, i) => {
+                                if (!headers[i]) return;
+                                const t = temp.find(m => m.date === headers[i]);
+                                if (t) {
+                                    if (label.includes("아침")) t.morning = v;
+                                    else if (label.includes("점심")) t.lunch = v;
+                                    else if (label.includes("저녁")) t.dinner = v;
+                                }
+                            });
+                        }
+                    });
+                    setMenus(temp);
+                }});
+            }, []);
+
+            const findMatchedRecipes = (menuName) => {
+                if (!menuName || menuName === "일정없음") return [];
+                const target = menuName.replace(/\s/g, "");
+                return Object.keys(RECIPE_STORE)
+                    .filter(key => target.includes(key))
+                    .map(key => RECIPE_STORE[key]);
+            };
+
+            const calDays = useMemo(() => {
+                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
+                const firstDay = new Date(year, month, 1).getDay();
+                const lastDate = new Date(year, month + 1, 0).getDate();
+                const days = [];
+                for (let i = 0; i < firstDay; i++) days.push(null);
+                for (let i = 1; i <= lastDate; i++) {
+                    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    days.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
+                }
+                while (days.length < 42) days.push(null);
+                return days;
+            }, [currentMonth, menus]);
+
+            const currentSearchResults = useMemo(() => {
+                const q = (activeModal ? modalSearch : searchTerm).trim().toLowerCase();
+                if
