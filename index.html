@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v9.2 - 최종 안정화 버전</title>
+    <title>MISOYON MMS v9.3 - 실행 보장 버전</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -12,74 +12,77 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { width: 100%; height: 100%; overflow: hidden; font-family: 'Pretendard', sans-serif; background: #f1f5f9; }
-        #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 25px repeat(6, 1fr); flex: 1; background: #e2e8f0; gap: 1px; border: 1px solid #cbd5e1; min-height: 0; }
+        body, html { width: 100%; height: 100%; overflow: hidden; font-family: 'Pretendard', sans-serif; background: #f8fafc; }
+        #root { width: 100%; height: 100%; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 25px repeat(6, 1fr); flex: 1; background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; min-height: 0; }
         .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
-        .calendar-day.selected { background: #f0f9ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
+        .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
         .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; }
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
-        select { border: none; background: transparent; font-weight: 900; cursor: pointer; outline: none; color: #1e293b; }
+        select { border: none; background: transparent; font-weight: 900; cursor: pointer; outline: none; color: #334155; }
     </style>
 </head>
 <body>
-    <div id="root">
-        <div style="display:flex; height:100%; align-items:center; justify-content:center; font-weight:bold; color:#64748b;">
-            시스템을 불러오는 중입니다...
-        </div>
-    </div>
+    <div id="root"></div>
+
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useCallback } = React;
 
         const MisoYonApp = () => {
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             const [menus, setMenus] = useState([]);
             const [selectedDate, setSelectedDate] = useState(null);
-            const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
+            const [currentMonth, setCurrentMonth] = useState(new Date());
             const [searchTerm, setSearchTerm] = useState("");
             const [modalSearch, setModalSearch] = useState("");
             const [activeModal, setActiveModal] = useState(false);
+            const [isLoading, setIsLoading] = useState(true);
 
             const years = Array.from({length: 11}, (_, i) => 2020 + i);
             const months = Array.from({length: 12}, (_, i) => i + 1);
 
-            const loadData = () => {
-                try {
-                    Papa.parse(MENU_URL, {
-                        download: true, header: false,
-                        complete: (res) => {
-                            let temp = []; let headers = [];
-                            res.data.forEach(row => {
-                                const label = (row[0] || "").replace(/\s/g, "");
-                                const vals = row.slice(1);
-                                if (label === "날짜") {
-                                    headers = vals.map(v => {
-                                        if (!v) return null;
-                                        const m = v.match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
-                                        return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
-                                    });
-                                    headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "", staff: "" }); });
-                                } else if (headers.length > 0) {
-                                    vals.forEach((v, i) => {
-                                        if (!headers[i]) return;
-                                        const t = temp.find(m => m.date === headers[i]);
-                                        if (t) {
-                                            if (label.includes("아침")) t.morning = v;
-                                            else if (label.includes("점심")) t.lunch = v;
-                                            else if (label.includes("저녁")) t.dinner = v;
-                                            else if (label.includes("근무")) t.staff = v;
-                                        }
-                                    });
-                                }
-                            });
-                            setMenus(temp);
-                        }
-                    });
-                } catch (e) { console.error("Data Load Error", e); }
-            };
+            const loadData = useCallback(() => {
+                setIsLoading(true);
+                Papa.parse(MENU_URL, {
+                    download: true,
+                    header: false,
+                    complete: (res) => {
+                        let temp = []; let headers = [];
+                        res.data.forEach(row => {
+                            const label = (row[0] || "").replace(/\s/g, "");
+                            const vals = row.slice(1);
+                            if (label === "날짜") {
+                                headers = vals.map(v => {
+                                    if (!v) return null;
+                                    const m = v.match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
+                                    return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
+                                });
+                                headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "", staff: "" }); });
+                            } else if (headers.length > 0) {
+                                vals.forEach((v, i) => {
+                                    if (!headers[i]) return;
+                                    const t = temp.find(m => m.date === headers[i]);
+                                    if (t) {
+                                        if (label.includes("아침")) t.morning = v;
+                                        else if (label.includes("점심")) t.lunch = v;
+                                        else if (label.includes("저녁")) t.dinner = v;
+                                        else if (label.includes("근무")) t.staff = v;
+                                    }
+                                });
+                            }
+                        });
+                        setMenus(temp);
+                        setIsLoading(false);
+                    },
+                    error: () => {
+                        setIsLoading(false);
+                        console.error("CSV Load Error");
+                    }
+                });
+            }, []);
 
-            useEffect(() => { loadData(); }, []);
+            useEffect(() => { loadData(); }, [loadData]);
 
             const calDays = useMemo(() => {
                 const year = currentMonth.getFullYear();
@@ -96,8 +99,10 @@
                 return days;
             }, [currentMonth, menus]);
 
+            const activeQuery = activeModal ? modalSearch : searchTerm;
+
             const searchResults = useMemo(() => {
-                const q = (activeModal ? modalSearch : searchTerm).trim().toLowerCase();
+                const q = activeQuery.trim().toLowerCase();
                 if (!q) return [];
                 const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12 && q.length > 0);
                 const targetMonth = isMonthSearch ? q.replace("월", "").padStart(2, '0') : null;
@@ -108,7 +113,7 @@
                     if (isMonthSearch) return mDate.getFullYear() >= 2020 && String(mDate.getMonth() + 1).padStart(2, '0') === targetMonth;
                     return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
                 }).sort((a,b) => new Date(b.date) - new Date(a.date));
-            }, [searchTerm, modalSearch, activeModal, menus]);
+            }, [activeQuery, menus]);
 
             const getHighlightedMenu = (text, query) => {
                 if (!query || query.endsWith("월") || !isNaN(query)) return text;
@@ -119,16 +124,17 @@
                 }, []);
             };
 
-            const handleOpenModal = () => {
-                setModalSearch(searchTerm);
-                setActiveModal(true);
-            };
-
             return (
-                <div className="flex flex-col h-screen w-full">
-                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 shadow-sm">
+                <div className="flex flex-col h-screen w-full relative">
+                    {isLoading && (
+                        <div className="absolute inset-0 z-[300] bg-white/80 flex items-center justify-center font-black text-blue-600">
+                            DATA LOADING...
+                        </div>
+                    )}
+                    
+                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v9.2</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v9.3</span></h1>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl gap-1 border">
                                 <select value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
                                     {years.map(y => <option key={y} value={y}>{y}년</option>)}
@@ -139,16 +145,16 @@
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <input className="bg-slate-50 px-3 py-1 rounded-lg text-xs font-bold w-40 md:w-60 border focus:border-blue-500 outline-none transition-all" placeholder="월 선택 또는 메뉴 검색" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleOpenModal()}/>
-                            <button onClick={handleOpenModal} className="bg-blue-600 text-white px-4 py-1 rounded-lg font-black text-[10px] uppercase shadow-md active:scale-95 transition-all">Search</button>
-                            <button onClick={loadData} className="bg-slate-800 text-white p-1.5 rounded-lg text-xs hover:bg-black">🔄</button>
+                            <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-40 md:w-60 border outline-none" placeholder="월 선택 또는 메뉴 검색" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
+                            <button onClick={()=>(setModalSearch(searchTerm), setActiveModal(true))} className="bg-blue-600 text-white px-4 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
+                            <button onClick={loadData} className="bg-slate-800 text-white p-1.5 rounded-lg text-xs">🔄</button>
                         </div>
                     </header>
 
                     <main className="flex flex-1 min-height-0 w-full overflow-hidden">
-                        <div className="flex-[3] flex flex-col h-full border-r min-width-0">
+                        <div className="flex-[3] flex flex-col h-full border-r">
                             <div className="calendar-grid">
-                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-1 text-center text-[9px] font-black text-slate-400 border-b uppercase">{d}</div>)}
+                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-1 text-center text-[9px] font-black text-slate-400 border-b">{d}</div>)}
                                 {calDays.map((d,i)=>(
                                     <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
                                         {d && (
@@ -170,12 +176,34 @@
 
                         <aside className="flex-1 bg-white p-5 overflow-y-auto min-width-[280px]">
                             {selectedDate ? (
-                                <div className="space-y-5">
-                                    <h2 className="text-xl font-black text-slate-900 border-b-4 border-blue-600 pb-1 italic uppercase tracking-tighter">Daily Report</h2>
+                                <div className="space-y-4">
+                                    <h2 className="text-xl font-black text-slate-900 border-b-2 border-blue-600 pb-1 italic uppercase tracking-tighter italic">Daily Report</h2>
                                     <div className="space-y-3 font-bold text-xs">
-                                        <div className="bg-slate-100 p-3 rounded-lg flex justify-between uppercase font-black"><span>Chef</span><span>{selectedDate.staff || "Master"}</span></div>
-                                        <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 shadow-sm"><p className="text-[9px] text-orange-400 font-black mb-1">MORNING</p>{selectedDate.morning || "—"}</div>
-                                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm"><p className="text-[9px] text-blue-400 font-black mb-1">LUNCH</p>{selectedDate.lunch || "—"}</div>
-                                        <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 shadow-sm"><p className="text-[9px] text-purple-400 font-black mb-1">DINNER</p>{selectedDate.dinner || "—"}</div>
+                                        <div className="bg-slate-100 p-2 rounded flex justify-between uppercase font-black text-[10px]"><span>Chef</span><span>{selectedDate.staff || "Master"}</span></div>
+                                        <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
+                                            <p className="text-[8px] text-orange-400 font-black mb-1 uppercase tracking-widest">Morning</p>
+                                            {selectedDate.morning || "—"}
+                                        </div>
+                                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                            <p className="text-[8px] text-blue-400 font-black mb-1 uppercase tracking-widest">Lunch</p>
+                                            {selectedDate.lunch || "—"}
+                                        </div>
+                                        <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
+                                            <p className="text-[8px] text-purple-400 font-black mb-1 uppercase tracking-widest">Dinner</p>
+                                            {selectedDate.dinner || "—"}
+                                        </div>
                                     </div>
+                                    <p className="text-center text-[9px] text-slate-400 font-bold">{selectedDate.date}</p>
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-slate-200 font-black text-xs uppercase text-center">🗓️<br/>Select Date</div>
+                            )}
+                        </aside>
+                    </main>
+
+                    {activeModal && (
+                        <div className="modal-view">
+                            <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b-2 border-blue-600 pb-3 shrink-0">
+                                    <div className="flex items-center gap-
 
