@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MISOYON MMS v7.2</title>
+    <title>MISOYON MMS v7.3</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -60,15 +60,17 @@
                                 headers.forEach(d => { if(d) tempMenus.push({ date: d, staff: "", morning: "", lunch: "", dinner: "", recipeNote: "" }); });
                             } else if (headers.length > 0) {
                                 values.forEach((val, idx) => {
-                                    if (!headers[idx]) return;
+                                    if (!headers[idx] || !val) return;
                                     const target = tempMenus.find(m => m.date === headers[idx]);
                                     if (target) {
-                                        if (label.includes("근무")) target.staff = val;
-                                        else if (label.includes("아침")) target.morning = val;
-                                        else if (label.includes("점심")) target.lunch = val;
-                                        else if (label.includes("저녁")) target.dinner = val;
-                                        else if (label.includes("레시피") || label.includes("비고") || label.includes("메모")) {
-                                            target.recipeNote = (target.recipeNote ? target.recipeNote + "\n" : "") + val;
+                                        const cleanLabel = label.trim();
+                                        if (cleanLabel.includes("근무")) target.staff = val;
+                                        else if (cleanLabel.includes("아침")) target.morning = val;
+                                        else if (cleanLabel.includes("점심")) target.lunch = val;
+                                        else if (cleanLabel.includes("저녁")) target.dinner = val;
+                                        // 핵심 보정: 위 주요 항목이 아닌 모든 텍스트는 레시피/메모로 취급합니다.
+                                        else {
+                                            target.recipeNote = (target.recipeNote ? target.recipeNote + "\n" : "") + `[${cleanLabel}] ${val}`;
                                         }
                                     }
                                 });
@@ -107,11 +109,11 @@
             return (
                 <div className="max-w-7xl mx-auto p-4 md:p-8">
                     <header className="flex flex-col md:flex-row justify-between items-center mb-8 no-print gap-4">
-                        <h1 className="text-2xl font-black text-slate-800 italic">MISOYON <span className="text-blue-600">v7.2</span></h1>
+                        <h1 className="text-2xl font-black text-slate-800 italic uppercase">MISOYON <span className="text-blue-600">v7.3</span></h1>
                         <div className="flex gap-2">
                             <input 
                                 type="text" 
-                                placeholder="메뉴 또는 레시피 검색..." 
+                                placeholder="메뉴 또는 레시피 키워드..." 
                                 className="px-5 py-2.5 bg-white border-2 border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500 w-64 shadow-sm"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -164,7 +166,7 @@
                                 <div className="bg-white p-8 rounded-[3.5rem] border shadow-2xl sticky top-8">
                                     <div className="mb-8">
                                         <p className="text-blue-600 font-black text-sm mb-1">{selectedDate.date}</p>
-                                        <h2 className="text-5xl font-black text-slate-900 italic tracking-tighter">REPORT</h2>
+                                        <h2 className="text-5xl font-black text-slate-900 italic tracking-tighter uppercase">Report</h2>
                                     </div>
                                     <div className="space-y-4">
                                         <div className="p-5 bg-slate-900 text-white rounded-3xl flex justify-between items-center shadow-lg">
@@ -181,12 +183,12 @@
                                         ))}
                                         {selectedDate.recipeNote && (
                                             <div className="p-6 bg-red-50 rounded-[2.5rem] border-2 border-red-100 shadow-inner">
-                                                <p className="text-[10px] font-black text-red-400 mb-2 uppercase tracking-widest">Recipe / Memo</p>
-                                                <p className="text-red-900 font-bold text-sm whitespace-pre-wrap leading-relaxed">{selectedDate.recipeNote}</p>
+                                                <p className="text-[10px] font-black text-red-400 mb-2 uppercase tracking-widest">My Recipe / Note</p>
+                                                <p className="text-red-900 font-bold text-sm whitespace-pre-wrap leading-relaxed italic">{selectedDate.recipeNote}</p>
                                             </div>
                                         )}
                                     </div>
-                                    <button onClick={() => window.print()} className="no-print w-full mt-10 py-5 bg-slate-800 text-white rounded-[2rem] font-black shadow-xl hover:bg-black transition-all">PRINT REPORT</button>
+                                    <button onClick={() => window.print()} className="no-print w-full mt-10 py-5 bg-slate-800 text-white rounded-[2rem] font-black shadow-xl hover:bg-black transition-all uppercase">Print Report</button>
                                 </div>
                             ) : (
                                 <div className="h-[600px] flex items-center justify-center p-12 bg-white rounded-[3.5rem] border-4 border-dashed border-slate-100 text-slate-200 font-black text-2xl text-center leading-relaxed">SELECT<br/>DATE</div>
@@ -199,8 +201,8 @@
                             <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-[3rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-300">
                                 <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
                                     <div>
-                                        <h2 className="text-3xl font-black italic tracking-tighter uppercase">Integrated Search</h2>
-                                        <p className="opacity-60 font-bold">'{searchQuery}' 관련 시트 전체 분석 결과</p>
+                                        <h2 className="text-3xl font-black italic tracking-tighter uppercase font-black">Search Result</h2>
+                                        <p className="opacity-60 font-bold">'{searchQuery}' 관련 셰프님의 모든 기록입니다.</p>
                                     </div>
                                     <button onClick={() => setShowModal(false)} className="text-5xl font-thin hover:rotate-90 transition-all">&times;</button>
                                 </div>
@@ -218,18 +220,18 @@
                                             </div>
                                             {r.recipeNote && (
                                                 <div className="p-6 bg-red-50 rounded-3xl border-2 border-red-100">
-                                                    <p className="text-[10px] font-black text-red-400 mb-2 uppercase tracking-widest">My Recipe Note</p>
-                                                    <p className="text-red-900 font-bold leading-relaxed whitespace-pre-wrap">{r.recipeNote}</p>
+                                                    <p className="text-[10px] font-black text-red-400 mb-2 uppercase tracking-widest tracking-widest">My Recipe Note</p>
+                                                    <p className="text-red-900 font-bold leading-relaxed whitespace-pre-wrap italic">{r.recipeNote}</p>
                                                 </div>
                                             )}
                                         </div>
                                     )) : (
-                                        <div className="text-center py-20 text-slate-300 font-black text-2xl italic uppercase tracking-widest">No Data Found</div>
+                                        <div className="text-center py-20 text-slate-300 font-black text-2xl italic uppercase tracking-widest font-black">No Data Found</div>
                                     )}
                                 </div>
                                 <div className="p-6 bg-white border-t flex gap-4">
-                                    <button onClick={() => window.open(`https://www.youtube.com/results?search_query=${searchQuery}+레시피`)} className="flex-1 py-5 bg-red-600 text-white rounded-[1.5rem] font-black shadow-lg active:scale-95 transition-all">유튜브 레시피</button>
-                                    <button onClick={() => setShowModal(false)} className="flex-1 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black shadow-lg">창 닫기</button>
+                                    <button onClick={() => window.open(`https://www.youtube.com/results?search_query=${searchQuery}+레시피`)} className="flex-1 py-5 bg-red-600 text-white rounded-[1.5rem] font-black shadow-lg active:scale-95 transition-all">유튜브 레시피 보기</button>
+                                    <button onClick={() => setShowModal(false)} className="flex-1 py-5 bg-slate-900 text-white rounded-[1.5rem] font-black shadow-lg">닫기</button>
                                 </div>
                             </div>
                         </div>
