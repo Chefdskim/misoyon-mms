@@ -202,4 +202,74 @@
                     {activeModal && (
                         <div className="modal-view">
                             <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
-                                <div className="flex justify-between items-center mb-6 border-b-2 border-blue-60
+                                <div className="flex justify-between items-center mb-6 border-b-2 border-blue-600 pb-3">
+                                    <div className="flex items-center gap-6">
+                                        <h2 className="text-2xl font-black italic uppercase tracking-tighter">Search Analysis</h2>
+                                        <input className="bg-slate-100 px-6 py-2 rounded-xl text-sm font-black outline-none border focus:border-blue-500 w-80" placeholder="결과 내 재검색..." value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
+                                    </div>
+                                    <button onClick={()=>setActiveModal(false)} className="text-4xl font-thin hover:text-red-500 transition-colors">&times;</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto space-y-4 pb-12 pr-2">
+                                    {searchResults.length > 0 ? searchResults.map((m, i) => (
+                                        <div key={i} className="bg-white p-5 rounded-3xl border flex flex-col md:flex-row gap-6 hover:shadow-lg transition-all border-slate-200">
+                                            <div className="md:w-36 shrink-0 border-r pr-4">
+                                                <div className="font-black text-blue-600 text-xl">{m.date.replace(/-/g,'.')}</div>
+                                                <div className="text-[11px] text-slate-400 font-black uppercase tracking-widest">{new Date(m.date).toLocaleDateString('ko-KR',{weekday:'long'})}</div>
+                                            </div>
+                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <MenuCard text={m.morning} type="Morning" query={modalSearch} />
+                                                <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
+                                                <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
+                                            </div>
+                                        </div>
+                                    )) : <div className="h-full flex items-center justify-center text-slate-300 font-black italic uppercase">검색 결과가 없습니다</div>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {viewRecipeList.length > 0 && (
+                        <div className="recipe-popup" onClick={() => setViewRecipeList([])}>
+                            <div className="bg-white rounded-[40px] w-full max-w-2xl p-10 shadow-2xl overflow-y-auto max-h-[90vh] relative" onClick={e => e.stopPropagation()}>
+                                <button onClick={() => setViewRecipeList([])} className="absolute top-8 right-8 text-4xl font-light hover:text-blue-600 transition-colors">&times;</button>
+                                <div className="mb-8 border-b-2 border-slate-100 pb-4">
+                                    <h3 className="text-2xl font-black text-slate-900 italic tracking-tighter uppercase">Recipe Details</h3>
+                                </div>
+                                <div className="space-y-12">
+                                    {viewRecipeList.map((recipe, idx) => (
+                                        <div key={idx} className="border-b last:border-0 pb-10">
+                                            <div className="bg-blue-600 text-white px-6 py-2 rounded-full inline-block text-sm font-black mb-8 shadow-lg shadow-blue-100 italic uppercase">{recipe.name}</div>
+                                            <div className="grid gap-8">
+                                                <section>
+                                                    <div className="text-[10px] font-black text-blue-400 uppercase mb-3 tracking-[0.2em]">Ingredients / 식재료</div>
+                                                    <div className="recipe-content bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-sm">{recipe.ingredients}</div>
+                                                </section>
+                                                <section>
+                                                    <div className="text-[10px] font-black text-blue-400 uppercase mb-3 tracking-[0.2em]">Cooking Process / 조리법</div>
+                                                    <div className="recipe-content bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-sm">{recipe.process}</div>
+                                                </section>
+                                                {recipe.tip && (
+                                                    <section className="mt-4 p-6 bg-orange-50 rounded-[2rem] border border-orange-100 flex gap-4">
+                                                        <span className="text-3xl">👨‍🍳</span>
+                                                        <div>
+                                                            <div className="text-[10px] font-black text-orange-600 uppercase mb-1 tracking-widest">Chef's Secret Tip</div>
+                                                            <div className="recipe-content italic text-orange-950 font-bold leading-relaxed">{recipe.tip}</div>
+                                                        </div>
+                                                    </section>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MisoYonApp />);
+    </script>
+</body>
+</html>
