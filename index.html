@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v12.0</title>
+    <title>MISOYON MMS v12.1</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -15,12 +15,14 @@
         body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
         #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 25px repeat(6, 1fr); flex: 1; background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; min-height: 0; }
-        .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; position: relative; }
+        .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
-        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; }
+        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
+        .clickable-menu { cursor: pointer !important; transition: all 0.2s; border: 1px solid transparent; }
         .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
     </style>
 </head>
@@ -32,7 +34,7 @@
         const MisoYonApp = () => {
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             
-            // 셰프님이 승인하신 "읽기 좋은 레시피" 10종 데이터 (Syntax 무결성 확보)
+            // 셰프님의 읽기 좋은 레시피 (Backtick 사용으로 안전하게 보호)
             const RECIPE_STORE = {
                 "불고기": { name: "서울식 불고기", ingredients: `한우 불고기 1kg, 배 1개, 양파 1개, 팽이버섯, 느타리버섯, 당면, 대파\n양념: 진간장 100ml, 다진 마늘 30g, 설탕 45g, 참기름, 매실액, 후추`, process: `1. 배즙과 양념 재료를 섞어 양념장을 만듭니다.\n2. 고기를 양념에 재운 뒤 버섯, 채소와 함께 준비합니다.\n3. 육수를 붓고 자작하게 끓이다가 당면과 대파로 마무리합니다.`, tip: "배즙은 고기를 연하게 하고 천연의 단맛을 줍니다." },
                 "갈비탕": { name: "명품 갈비탕", ingredients: `한우 갈비 500g, 무 200g, 대파, 통마늘, 계란, 다시마\n양념: 국간장, 다진 마늘, 참기름, 후추, 소금`, process: `1. 갈비는 핏물을 충분히 빼고 한 번 데쳐 불순물을 제거합니다.\n2. 깨끗한 물에 갈비, 무, 마늘을 넣고 고기가 부드러워질 때까지 푹 끓입니다.\n3. 고기와 무를 건져 양념한 뒤 국물과 합쳐 한소끔 더 끓입니다.`, tip: "건져낸 고기에 밑간을 먼저 하면 국물맛이 겉돌지 않습니다." },
@@ -104,22 +106,32 @@
                 return days;
             }, [currentMonth, menus]);
 
+            // [v11.9 원형 검색 로직 완벽 복구]
             const currentSearchResults = useMemo(() => {
                 const q = (activeModal ? modalSearch : searchTerm).trim().toLowerCase();
                 if (!q) return [];
-                return menus.filter(m => (m.morning + m.lunch + m.dinner).toLowerCase().includes(q))
-                            .sort((a,b) => new Date(b.date) - new Date(a.date));
+                const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12 && q !== "");
+                return menus.filter(m => {
+                    if (isMonthSearch) return String(new Date(m.date).getMonth() + 1).padStart(2, '0') === q.replace("월","").padStart(2,'0');
+                    return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
+                }).sort((a,b) => new Date(b.date) - new Date(a.date));
             }, [modalSearch, searchTerm, activeModal, menus]);
+
+            const highlightText = (text, query) => {
+                if (!query || !text || !isNaN(query)) return text;
+                const parts = text.split(new RegExp(`(${query})`, 'gi'));
+                return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
+            };
 
             const MenuCard = ({text, type, query}) => {
                 const matched = findMatchedRecipes(text);
                 const hasRecipe = matched.length > 0;
                 return (
-                    <div className={`p-3 rounded-xl border mb-2 transition-all cursor-pointer ${hasRecipe ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}
+                    <div className={`p-3 rounded-xl border mb-2 transition-all clickable-menu ${hasRecipe ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}
                          onClick={() => hasRecipe && setViewRecipeList(matched)}>
                         <div className="text-[9px] font-black text-slate-400 uppercase mb-1">{type}</div>
                         <div className={`text-[12px] font-black ${hasRecipe ? 'text-blue-900' : 'text-slate-600'}`}>
-                            {text} {hasRecipe && "📋"}
+                            {highlightText(text, query)} {hasRecipe && "📋"}
                         </div>
                     </div>
                 );
@@ -127,10 +139,10 @@
 
             return (
                 <div className="flex flex-col h-screen w-full">
-                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 shadow-sm">
+                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v12.0</span></h1>
-                            <div className="flex bg-slate-100 px-3 py-1 rounded-xl border text-sm font-bold">
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v12.1</span></h1>
+                            <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
                                     {[2024,2025,2026].map(y => <option key={y} value={y}>{y}년</option>)}
                                 </select>
@@ -140,30 +152,32 @@
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-48 border outline-none" placeholder="검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
+                            <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-48 border outline-none" placeholder="메뉴 또는 'n월' 검색" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
                             <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
                         </div>
                     </header>
 
                     <main className="flex flex-1 min-height-0 overflow-hidden">
-                        <div className="flex-[3] calendar-grid">
-                            {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-1 text-center text-[9px] font-black text-slate-400 border-b">{d}</div>)}
-                            {calDays.map((d,i)=>(
-                                <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
-                                    {d && (
-                                        <>
-                                            <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
-                                            {d.data && (
-                                                <div className="mt-[1px]">
-                                                    <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>
-                                                    <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>
-                                                    <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            ))}
+                        <div className="flex-[3] flex flex-col h-full border-r">
+                            <div className="calendar-grid">
+                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-1 text-center text-[9px] font-black text-slate-400 border-b">{d}</div>)}
+                                {calDays.map((d,i)=>(
+                                    <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
+                                        {d && (
+                                            <>
+                                                <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
+                                                {d.data && (
+                                                    <div className="flex flex-col gap-[1px] mt-[1px]">
+                                                        <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>
+                                                        <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>
+                                                        <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                         <aside className="flex-1 bg-white p-4 overflow-y-auto min-w-[340px]">
                             {selectedDate ? (
@@ -173,7 +187,7 @@
                                     <MenuCard text={selectedDate.lunch} type="Lunch" />
                                     <MenuCard text={selectedDate.dinner} type="Dinner" />
                                 </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black">날짜를 선택하세요</div>}
+                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black">SELECT DATE</div>}
                         </aside>
                     </main>
 
@@ -181,17 +195,20 @@
                         <div className="modal-view">
                             <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
                                 <div className="flex justify-between items-center mb-6 border-b-2 border-blue-600 pb-3">
-                                    <h2 className="text-2xl font-black italic">ANALYSIS</h2>
+                                    <div className="flex items-center gap-6">
+                                        <h2 className="text-2xl font-black italic">ANALYSIS</h2>
+                                        <input className="bg-slate-100 px-6 py-2 rounded-2xl text-sm font-black border-2 border-blue-600 w-80" placeholder="검색어..." value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
+                                    </div>
                                     <button onClick={()=>setActiveModal(false)} className="text-4xl font-thin">&times;</button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto space-y-4 pb-10">
                                     {currentSearchResults.map((m, i) => (
-                                        <div key={i} className="bg-white p-5 rounded-3xl border flex gap-6">
-                                            <div className="w-36 font-black text-blue-600 text-xl">{m.date}</div>
-                                            <div className="flex-1 grid grid-cols-3 gap-4">
-                                                <MenuCard text={m.morning} type="Morning" />
-                                                <MenuCard text={m.lunch} type="Lunch" />
-                                                <MenuCard text={m.dinner} type="Dinner" />
+                                        <div key={i} className="bg-white p-5 rounded-3xl border flex gap-6 hover:shadow-lg transition-all">
+                                            <div className="w-36 shrink-0 border-r font-black text-blue-600 text-xl">{m.date.replace(/-/g,'.')}</div>
+                                            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <MenuCard text={m.morning} type="Morning" query={modalSearch} />
+                                                <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
+                                                <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
                                             </div>
                                         </div>
                                     ))}
@@ -202,17 +219,19 @@
 
                     {viewRecipeList.length > 0 && (
                         <div className="recipe-popup" onClick={() => setViewRecipeList([])}>
-                            <div className="bg-white rounded-3xl w-full max-w-2xl p-8 shadow-2xl" onClick={e => e.stopPropagation()}>
+                            <div className="bg-white rounded-3xl w-full max-w-2xl p-8 shadow-2xl overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
                                 <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                    <h3 className="text-2xl font-black uppercase">Recipe</h3>
+                                    <h3 className="text-2xl font-black uppercase tracking-tighter italic text-blue-600">Recipe Master</h3>
                                     <button onClick={() => setViewRecipeList([])} className="text-4xl font-thin">&times;</button>
                                 </div>
                                 {viewRecipeList.map((r, i) => (
-                                    <div key={i} className="space-y-4">
-                                        <div className="bg-blue-600 text-white px-4 py-1 rounded-full text-xs inline-block font-black">{r.name}</div>
-                                        <div><div className="text-[10px] font-black text-slate-400">재료</div><div className="recipe-content bg-slate-50 p-4 rounded-xl border">{r.ingredients}</div></div>
-                                        <div><div className="text-[10px] font-black text-slate-400">조리법</div><div className="recipe-content bg-slate-50 p-4 rounded-xl border">{r.process}</div></div>
-                                        {r.tip && <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 font-bold text-orange-800 text-sm italic">👨‍🍳 {r.tip}</div>}
+                                    <div key={i} className="mb-10 animate-in fade-in slide-in-from-bottom-4">
+                                        <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full inline-block text-xs font-black mb-4 uppercase">{r.name}</div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div><div className="text-[10px] font-black text-slate-400 uppercase mb-2">Ingredients</div><div className="recipe-content bg-slate-50 p-4 rounded-2xl border">{r.ingredients}</div></div>
+                                            <div><div className="text-[10px] font-black text-slate-400 uppercase mb-2">Instructions</div><div className="recipe-content bg-slate-50 p-4 rounded-2xl border">{r.process}</div></div>
+                                        </div>
+                                        {r.tip && <div className="mt-4 bg-orange-50 p-4 rounded-2xl border border-orange-100 font-bold text-orange-950 text-sm flex gap-3"><span className="text-xl">👨‍🍳</span>{r.tip}</div>}
                                     </div>
                                 ))}
                             </div>
