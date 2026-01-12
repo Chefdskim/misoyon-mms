@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>미소연 MMS v11.9 - 기능 복구 완료</title>
+    <title>미소연 MMS v11.9 - 최종 안정화 버전</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -19,7 +19,7 @@
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
         .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; }
-        .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+        .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
         .clickable-menu { cursor: pointer !important; transition: all 0.2s; }
         .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
@@ -43,12 +43,11 @@
             const [activeModal, setActiveModal] = useState(false);
             const [viewRecipeList, setViewRecipeList] = useState([]);
 
-            // 연도 선택 범위 확장 (2020 ~ 2030)
             const years = Array.from({length: 11}, (_, i) => 2020 + i);
             const months = Array.from({length: 12}, (_, i) => i + 1);
 
             useEffect(() => {
-                // 메뉴 로드
+                // 메뉴 데이터 로드
                 Papa.parse(MENU_URL, { download: true, complete: (res) => {
                     let temp = []; let headers = [];
                     res.data.forEach(row => {
@@ -75,25 +74,31 @@
                     setMenus(temp);
                 }});
 
-                // 레시피 로드
+                // 레시피 데이터 로드
                 Papa.parse(RECIPE_URL, { download: true, complete: (res) => {
                     const map = {};
                     res.data.slice(1).forEach(row => {
                         const name = (row[0] || "").trim();
-                        if (name) map[name] = { name, keywords: row[1]||"", ingredients: row[2]||"", process: row[3]||"", tip: row[4]||"" };
+                        if (name) map[name] = { 
+                            name, 
+                            keywords: row[1] || "", 
+                            ingredients: row[2] || "", 
+                            process: row[3] || "", 
+                            tip: row[4] || "" 
+                        };
                     });
                     setRecipes(map);
                 }});
             }, []);
 
-            // 레시피 검색 엔진
-            const findRecipes = (menuText) => {
+            // 레시피 검색 로직 (메뉴명 원본을 유지하면서 비교)
+            const findMatchedRecipes = (menuText) => {
                 if (!menuText || menuText === "일정없음") return [];
                 const target = menuText.replace(/\s/g, "").toLowerCase();
                 return Object.values(recipes).filter(r => {
                     const rName = r.name.replace(/\s/g, "").toLowerCase();
-                    const kws = r.keywords.split(',').map(k => k.trim().replace(/\s/g, "").toLowerCase());
-                    return target.includes(rName) || kws.some(k => k && target.includes(k));
+                    const keywords = r.keywords.split(',').map(k => k.trim().replace(/\s/g, "").toLowerCase());
+                    return target.includes(rName) || keywords.some(k => k && target.includes(k));
                 });
             };
 
@@ -118,16 +123,16 @@
             }, [modalSearch, searchTerm, activeModal, menus]);
 
             const highlightText = (text, query) => {
-                if (!query || !text || !isNaN(query)) return text;
+                if (!query || !text) return text;
                 const parts = text.split(new RegExp(`(${query})`, 'gi'));
                 return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
             };
 
             const MenuCard = ({text, type, query}) => {
-                const matched = findRecipes(text);
+                const matched = findMatchedRecipes(text);
                 const hasRecipe = matched.length > 0;
                 return (
-                    <div className={`p-3 rounded-xl border mb-2 clickable-menu ${hasRecipe ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}
+                    <div className={`p-3 rounded-xl border mb-2 transition-all clickable-menu ${hasRecipe ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}
                          onClick={() => hasRecipe && setViewRecipeList(matched)}>
                         <div className="text-[9px] font-black text-slate-400 uppercase mb-1">{type}</div>
                         <div className={`text-[12px] font-black ${hasRecipe ? 'text-blue-900' : 'text-slate-600'}`}>
@@ -141,124 +146,9 @@
                 <div className="flex flex-col h-screen w-full">
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter text-slate-800">미소연 <span className="text-blue-600 uppercase">MMS v11.9</span></h1>
-                            <div className="flex bg-slate-100 rounded-lg border p-1">
-                                <select className="bg-transparent font-bold text-sm" value={currentMonth.getFullYear()} onChange={e=>setCurrentMonth(new Date(parseInt(e.target.value), currentMonth.getMonth()))}>
-                                    {years.map(y=><option key={y} value={y}>{y}년</option>)}
+                            <h1 className="text-lg font-black italic tracking-tighter text-slate-800">미소연 <span className="text-blue-600">MMS v11.9</span></h1>
+                            <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border">
+                                <select className="bg-transparent font-bold outline-none" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(parseInt(e.target.value), currentMonth.getMonth()))}>
+                                    {years.map(y => <option key={y} value={y}>{y}년</option>)}
                                 </select>
-                                <select className="bg-transparent font-bold text-sm ml-2" value={currentMonth.getMonth()+1} onChange={e=>setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.target.value)-1))}>
-                                    {months.map(m=><option key={m} value={m}>{m}월</option>)}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <input className="bg-slate-50 px-3 py-1 rounded-lg text-xs font-bold border w-48 outline-none focus:border-blue-500" placeholder="메뉴 통합 검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
-                            <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px] shadow-sm">SEARCH</button>
-                        </div>
-                    </header>
-
-                    <main className="flex flex-1 min-h-0">
-                        <div className="flex-[3] calendar-grid">
-                            {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 flex items-center justify-center text-[9px] font-black text-slate-400 border-b">{d}</div>)}
-                            {calDays.map((d,i)=>(
-                                <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
-                                    {d && (
-                                        <>
-                                            <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
-                                            {d.data && (
-                                                <div className="mt-1">
-                                                    <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>
-                                                    <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>
-                                                    <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                        <aside className="flex-1 bg-white p-4 overflow-y-auto border-l min-w-[320px]">
-                            {selectedDate ? (
-                                <div className="animate-in fade-in duration-300">
-                                    <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1 mb-4">DAILY MENU</h2>
-                                    <div className="text-[10px] text-blue-600 font-bold mb-4">{selectedDate.date}</div>
-                                    <MenuCard text={selectedDate.morning} type="Morning" />
-                                    <MenuCard text={selectedDate.lunch} type="Lunch" />
-                                    <MenuCard text={selectedDate.dinner} type="Dinner" />
-                                </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-300 font-black text-xs">달력을 클릭하세요</div>}
-                        </aside>
-                    </main>
-
-                    {activeModal && (
-                        <div className="modal-view">
-                            <div className="max-w-4xl mx-auto w-full flex flex-col h-full">
-                                <div className="flex justify-between items-center mb-6 border-b-2 border-blue-600 pb-3">
-                                    <div className="flex items-center gap-4">
-                                        <h2 className="text-xl font-black italic">SEARCH ANALYSIS</h2>
-                                        <input className="bg-slate-100 px-4 py-2 rounded-xl text-sm font-black outline-none w-64 border focus:border-blue-500" placeholder="결과 내 검색..." value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
-                                    </div>
-                                    <button onClick={()=>setActiveModal(false)} className="text-4xl font-thin">&times;</button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto space-y-3">
-                                    {searchResults.length > 0 ? searchResults.map((m, i) => (
-                                        <div key={i} className="bg-white p-4 rounded-2xl border flex gap-4 hover:shadow-md transition-all">
-                                            <div className="w-24 shrink-0 text-center border-r">
-                                                <div className="font-black text-blue-600 text-sm">{m.date.split('-').slice(1).join('.')}</div>
-                                                <div className="text-[9px] text-slate-400 font-bold">{m.date.split('-')[0]}년</div>
-                                            </div>
-                                            <div className="flex-1 grid grid-cols-3 gap-2">
-                                                <MenuCard text={m.morning} type="Morning" query={modalSearch} />
-                                                <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
-                                                <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
-                                            </div>
-                                        </div>
-                                    )) : <div className="h-full flex items-center justify-center text-slate-300 font-black">검색 결과가 없습니다</div>}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {viewRecipeList.length > 0 && (
-                        <div className="recipe-popup" onClick={() => setViewRecipeList([])}>
-                            <div className="bg-white rounded-3xl w-full max-w-2xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                    <h3 className="text-xl font-black italic text-blue-600 tracking-tighter underline underline-offset-4 decoration-2">RECIPE DETAILS</h3>
-                                    <button onClick={() => setViewRecipeList([])} className="text-3xl font-thin">&times;</button>
-                                </div>
-                                {viewRecipeList.map((r, i) => (
-                                    <div key={i} className="mb-8 last:mb-0">
-                                        <div className="bg-slate-900 text-white px-4 py-1 rounded-full inline-block text-[10px] font-black mb-4 uppercase">{r.name}</div>
-                                        <div className="grid gap-4">
-                                            <div>
-                                                <div className="text-[9px] font-black text-blue-500 mb-1 tracking-widest uppercase">Ingredients</div>
-                                                <div className="recipe-content bg-slate-50 p-4 rounded-xl border">{r.ingredients}</div>
-                                            </div>
-                                            <div>
-                                                <div className="text-[9px] font-black text-blue-500 mb-1 tracking-widest uppercase">Method</div>
-                                                <div className="recipe-content bg-slate-50 p-4 rounded-xl border">{r.process}</div>
-                                            </div>
-                                            {r.tip && (
-                                                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex gap-3">
-                                                    <span className="text-lg">👨‍🍳</span>
-                                                    <div>
-                                                        <div className="text-[9px] font-black text-blue-600 mb-1">CHEF'S TIP</div>
-                                                        <div className="recipe-content italic font-bold">{r.tip}</div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MisoYonApp />);
-    </script>
-</body>
-</html>
+                                <select className="bg-transparent font-bold outline-none ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.target.value) - 1))}>
