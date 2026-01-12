@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MISOYON MMS v8.0</title>
+    <title>MISOYON MMS v8.1</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -11,14 +11,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
-        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; overflow: hidden; } /* 전체 스크롤 방지 */
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border-radius: 15px; overflow: hidden; }
-        .calendar-day { height: 12vh; min-height: 80px; background: white; padding: 6px; cursor: pointer; transition: 0.2s; overflow: hidden; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #f1f5f9; height: 100vh; overflow: hidden; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border-radius: 12px; overflow: hidden; }
+        .calendar-day { height: 11vh; background: white; padding: 4px; cursor: pointer; transition: 0.2s; }
         .calendar-day:hover { background: #f8fafc; }
-        .calendar-day.selected { background: #e0f2fe !important; box-shadow: inset 0 0 0 3px #0ea5e9; z-index: 10; }
-        .menu-item { font-size: 10px; font-weight: 800; padding: 1px 4px; border-radius: 4px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; padding: 1.5rem; display: flex; flex-direction: column; }
-        .popup-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .calendar-day.selected { background: #e0f2fe !important; box-shadow: inset 0 0 0 2px #0ea5e9; z-index: 10; }
+        .menu-item { font-size: 10px; font-weight: 800; padding: 1px 3px; border-radius: 3px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .modal-view { position: fixed; inset: 0; background: white; z-index: 200; padding: 1rem; display: flex; flex-direction: column; }
+        .popup-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 15px; }
     </style>
 </head>
 <body>
@@ -39,8 +39,8 @@
             const [activeModal, setActiveModal] = useState(null);
             const [detailView, setDetailView] = useState(null);
 
-            useEffect(() => {
-                // 식단표 데이터 로드
+            const loadData = () => {
+                // 식단표 데이터 로드 및 지능형 날짜 변환
                 Papa.parse(MENU_URL, {
                     download: true, header: false,
                     complete: (res) => {
@@ -50,6 +50,7 @@
                             const vals = row.slice(1);
                             if (label === "날짜") {
                                 headers = vals.map(v => {
+                                    if (!v) return null;
                                     const m = v.match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
                                     return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
                                 });
@@ -70,10 +71,20 @@
                         setMenus(temp);
                     }
                 });
-                // 레시피 데이터 로드
-                Papa.parse(RECIPE_URL, { download: true, header: true, complete: (res) => setRecipes(res.data) });
-            }, []);
 
+                // 레시피 데이터 로드
+                Papa.parse(RECIPE_URL, {
+                    download: true, header: true, skipEmptyLines: true,
+                    complete: (res) => {
+                        console.log("레시피 로드 완료:", res.data);
+                        setRecipes(res.data);
+                    }
+                });
+            };
+
+            useEffect(() => { loadData(); }, []);
+
+            // 달력 생성
             const calDays = useMemo(() => {
                 const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
                 const firstDay = new Date(year, month, 1).getDay();
@@ -88,48 +99,54 @@
                 return days;
             }, [currentMonth, menus]);
 
-            const recipeRes = useMemo(() => {
+            // 메뉴 검색 로직 강화
+            const menuRes = useMemo(() => {
+                if (!menuSearch) return [];
+                const q = menuSearch.toLowerCase();
+                return menus.filter(m => 
+                    (m.morning + m.lunch + m.dinner).toLowerCase().includes(q)
+                ).sort((a,b) => new Date(b.date) - new Date(a.date));
+            }, [menuSearch, menus]);
+
+            // 레시피 검색 로직 강화
+            const recipeFiltered = useMemo(() => {
                 if (!recipeSearch) return [];
                 const q = recipeSearch.toLowerCase();
-                return recipes.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+                return recipes.filter(r => 
+                    Object.values(r).some(v => String(v).toLowerCase().includes(q))
+                );
             }, [recipeSearch, recipes]);
 
-            // 메뉴명 추출 함수 (시트의 컬럼 중 '메뉴명' 혹은 '메뉴'가 포함된 값을 우선 찾음)
-            const getMenuName = (r) => {
-                const keys = Object.keys(r);
-                const nameKey = keys.find(k => k.includes("메뉴") || k.includes("이름")) || keys[0];
-                return r[nameKey] || "이름 없음";
-            };
-
             return (
-                <div className="h-screen flex flex-col p-4 md:p-6 overflow-hidden">
-                    <header className="flex justify-between items-center mb-4 bg-white p-4 rounded-3xl shadow-sm border">
-                        <h1 className="text-xl font-black italic">MISOYON <span className="text-blue-600">v8.0</span></h1>
+                <div className="flex flex-col h-screen p-2 md:p-4 bg-slate-100">
+                    <header className="flex justify-between items-center mb-2 bg-white p-3 rounded-2xl shadow-sm border">
+                        <h1 className="text-lg font-black italic">MISOYON <span className="text-blue-600">v8.1</span></h1>
                         <div className="flex gap-2">
-                            <input className="bg-slate-100 px-4 py-2 rounded-xl text-sm font-bold outline-none w-32 md:w-48" placeholder="메뉴 분석" value={menuSearch} onChange={e=>setMenuSearch(e.target.value)} onKeyDown={e=>e.key==='Enter' && setActiveModal('menu')}/>
-                            <input className="bg-slate-100 px-4 py-2 rounded-xl text-sm font-bold outline-none w-32 md:w-48" placeholder="레시피 검색" value={recipeSearch} onChange={e=>setRecipeSearch(e.target.value)} onKeyDown={e=>e.key==='Enter' && setActiveModal('recipe')}/>
+                            <input className="bg-slate-100 px-3 py-1.5 rounded-xl text-sm font-bold w-24 md:w-40 border focus:border-blue-500 outline-none" placeholder="메뉴 검색" value={menuSearch} onChange={e=>setMenuSearch(e.target.value)} onKeyDown={e=>e.key==='Enter' && setActiveModal('menu')}/>
+                            <input className="bg-slate-100 px-3 py-1.5 rounded-xl text-sm font-bold w-24 md:w-40 border focus:border-red-500 outline-none" placeholder="레시피 검색" value={recipeSearch} onChange={e=>setRecipeSearch(e.target.value)} onKeyDown={e=>e.key==='Enter' && setActiveModal('recipe')}/>
+                            <button onClick={loadData} className="p-1.5 bg-slate-800 text-white rounded-xl text-xs">🔄</button>
                         </div>
                     </header>
 
-                    <div className="flex-1 grid grid-cols-1 xl:grid-cols-4 gap-6 overflow-hidden">
-                        <div className="xl:col-span-3 bg-white p-4 rounded-[2rem] shadow-lg border flex flex-col h-full">
-                            <div className="flex justify-between items-center mb-4 px-4 font-black text-xl">
+                    <div className="flex-1 grid grid-cols-1 xl:grid-cols-4 gap-4 overflow-hidden">
+                        <div className="xl:col-span-3 bg-white p-3 rounded-2xl shadow border flex flex-col">
+                            <div className="flex justify-between items-center mb-2 px-2 font-black">
                                 <button onClick={()=>setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))}>◀</button>
-                                <div>{currentMonth.getFullYear()}년 {currentMonth.getMonth()+1}월</div>
+                                <div className="text-sm">{currentMonth.getFullYear()}년 {currentMonth.getMonth()+1}월</div>
                                 <button onClick={()=>setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))}>▶</button>
                             </div>
                             <div className="calendar-grid flex-1">
-                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-2 text-center text-[10px] font-black text-slate-400">{d}</div>)}
+                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-1 text-center text-[9px] font-black text-slate-400">{d}</div>)}
                                 {calDays.map((d,i)=>(
                                     <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
                                         {d && (
                                             <>
-                                                <span className={`text-xs font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
+                                                <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
                                                 {d.data && (
-                                                    <div className="mt-1">
+                                                    <div className="mt-0.5">
                                                         <div className="menu-item bg-orange-50 text-orange-600">조:{d.data.morning}</div>
                                                         <div className="menu-item bg-blue-50 text-blue-600">중:{d.data.lunch}</div>
-                                                        <div className="menu-item bg-purple-50 text-purple-600 text-[9px]">석:{d.data.dinner}</div>
+                                                        <div className="menu-item bg-purple-50 text-purple-600">석:{d.data.dinner}</div>
                                                     </div>
                                                 )}
                                             </>
@@ -139,63 +156,79 @@
                             </div>
                         </div>
 
-                        <div className="xl:col-span-1 bg-white p-6 rounded-[2rem] shadow-xl border overflow-y-auto">
+                        <div className="xl:col-span-1 bg-white p-4 rounded-2xl shadow border overflow-y-auto">
                             {selectedDate ? (
-                                <div className="space-y-4 font-bold">
-                                    <h2 className="text-2xl font-black border-b-4 border-blue-600 pb-2">{selectedDate.date}</h2>
-                                    <div className="bg-slate-900 text-white p-3 rounded-xl flex justify-between text-sm"><span>Chef</span><span>{selectedDate.staff || "Master"}</span></div>
-                                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 text-sm"><p className="text-orange-400 text-[10px] mb-1">Morning</p>{selectedDate.morning || "—"}</div>
-                                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm"><p className="text-blue-400 text-[10px] mb-1">Lunch</p>{selectedDate.lunch || "—"}</div>
-                                    <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 text-sm"><p className="text-purple-400 text-[10px] mb-1">Dinner</p>{selectedDate.dinner || "—"}</div>
+                                <div className="space-y-3 font-bold">
+                                    <h2 className="text-xl font-black border-b-2 border-blue-600 pb-1">{selectedDate.date}</h2>
+                                    <div className="bg-slate-900 text-white p-2 rounded-lg flex justify-between text-xs"><span>Chef</span><span>{selectedDate.staff || "Master"}</span></div>
+                                    <div className="bg-orange-50 p-3 rounded-lg text-xs"><p className="text-orange-400 font-bold mb-1 uppercase">Morning</p>{selectedDate.morning || "—"}</div>
+                                    <div className="bg-blue-50 p-3 rounded-lg text-xs"><p className="text-blue-400 font-bold mb-1 uppercase">Lunch</p>{selectedDate.lunch || "—"}</div>
+                                    <div className="bg-purple-50 p-3 rounded-lg text-xs"><p className="text-purple-400 font-bold mb-1 uppercase">Dinner</p>{selectedDate.dinner || "—"}</div>
                                 </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black text-center uppercase">날짜를<br/>선택하세요</div>}
+                            ) : <div className="h-full flex items-center justify-center text-slate-300 font-black text-sm text-center uppercase">날짜 선택</div>}
                         </div>
                     </div>
 
-                    {/* 레시피 검색 모달 */}
+                    {/* 레시피 모달 */}
                     {activeModal === 'recipe' && (
                         <div className="modal-view">
                             <div className="max-w-4xl mx-auto w-full flex flex-col h-full">
-                                <div className="flex justify-between items-center mb-6 border-b-4 border-red-500 pb-2">
-                                    <h2 className="text-2xl font-black">RECIPE SEARCH</h2>
-                                    <button onClick={()=>setActiveModal(null)} className="text-3xl">&times;</button>
+                                <div className="flex justify-between items-center mb-4 border-b-2 border-red-500">
+                                    <h2 className="text-xl font-black italic">RECIPE</h2>
+                                    <button onClick={()=>setActiveModal(null)} className="text-2xl">&times;</button>
                                 </div>
-                                <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-3">
-                                        <h3 className="font-black text-slate-400 text-xs tracking-widest uppercase">My Recipes</h3>
-                                        {recipeRes.map((r, i) => (
-                                            <div key={i} onClick={()=>setDetailView(r)} className="p-4 bg-slate-50 border rounded-2xl hover:border-red-500 cursor-pointer shadow-sm">
-                                                <p className="font-black text-slate-800">{getMenuName(r)}</p>
-                                                <p className="text-[10px] text-red-400 mt-1 uppercase font-bold tracking-tighter">Click for Detail</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="bg-slate-900 p-6 rounded-3xl h-fit text-center space-y-4 shadow-xl">
-                                        <button onClick={()=>window.open(`https://www.youtube.com/results?search_query=${recipeSearch}+레시피`)} className="w-full py-4 bg-red-600 text-white rounded-xl font-black">YOUTUBE</button>
-                                        <button onClick={()=>window.open(`https://www.google.com/search?q=${recipeSearch}+레시피`)} className="w-full py-4 bg-white text-slate-900 rounded-xl font-black">GOOGLE</button>
-                                    </div>
+                                <div className="flex-1 overflow-y-auto space-y-2">
+                                    {recipeFiltered.length > 0 ? recipeFiltered.map((r, i) => (
+                                        <div key={i} onClick={()=>setDetailView(r)} className="p-3 bg-slate-50 border rounded-xl hover:border-red-500 cursor-pointer">
+                                            <p className="font-black text-slate-800">{Object.values(r)[0] || "데이터 없음"}</p>
+                                            <p className="text-[10px] text-slate-400 mt-1 uppercase">상세보기 터치</p>
+                                        </div>
+                                    )) : <p className="text-center py-20 text-slate-400">검색 결과가 없습니다.</p>}
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* 레시피 상세 상세내용 팝업 */}
-                    {detailView && (
-                        <div className="popup-overlay" onClick={()=>setDetailView(null)}>
-                            <div className="bg-white w-full max-w-lg p-6 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[80vh]" onClick={e=>e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-xl font-black text-red-600 italic uppercase">Recipe Detail</h3>
-                                    <button onClick={()=>setDetailView(null)} className="text-3xl">&times;</button>
+                    {/* 메뉴 검색 모달 */}
+                    {activeModal === 'menu' && (
+                        <div className="modal-view">
+                            <div className="max-w-4xl mx-auto w-full flex flex-col h-full">
+                                <div className="flex justify-between items-center mb-4 border-b-2 border-blue-600">
+                                    <h2 className="text-xl font-black italic">SEARCH</h2>
+                                    <button onClick={()=>setActiveModal(null)} className="text-2xl">&times;</button>
                                 </div>
-                                <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-                                    {Object.entries(detailView).map(([k, v]) => (
-                                        <div key={k} className="border-b border-slate-100 pb-2">
-                                            <p className="text-[9px] text-slate-400 font-bold uppercase mb-1 tracking-widest">{k}</p>
-                                            <p className="text-slate-800 font-bold text-sm leading-relaxed whitespace-pre-wrap">{v || "—"}</p>
+                                <div className="flex-1 overflow-y-auto space-y-2">
+                                    {menuRes.map((m, i) => (
+                                        <div key={i} className="bg-slate-50 p-3 rounded-xl border flex gap-4 text-xs font-bold">
+                                            <div className="w-20 text-blue-600">{m.date}</div>
+                                            <div className="flex-1 grid grid-cols-3 gap-2">
+                                                <div>{m.morning}</div>
+                                                <div>{m.lunch}</div>
+                                                <div>{m.dinner}</div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
-                                <button onClick={()=>setDetailView(null)} className="w-full mt-6 py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest">Close Detail</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 레시피 상세 팝업 */}
+                    {detailView && (
+                        <div className="popup-overlay" onClick={()=>setDetailView(null)}>
+                            <div className="bg-white w-full max-w-lg p-5 rounded-2xl shadow-2xl flex flex-col max-h-[80vh]" onClick={e=>e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-lg font-black text-red-600 italic">DETAIL</h3>
+                                    <button onClick={()=>setDetailView(null)} className="text-2xl">&times;</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto space-y-3">
+                                    {Object.entries(detailView).map(([k, v]) => (
+                                        <div key={k} className="border-b pb-1">
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase">{k}</p>
+                                            <p className="text-slate-800 font-bold text-sm whitespace-pre-wrap">{v || "—"}</p>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}
