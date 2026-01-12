@@ -112,4 +112,103 @@
                                 <select className="bg-transparent px-2" value={currentMonth.getFullYear()} onChange={e=>setCurrentMonth(new Date(parseInt(e.target.value), currentMonth.getMonth()))}>
                                     {[2024,2025,2026].map(y=><option key={y} value={y}>{y}년</option>)}
                                 </select>
-                                <select className="bg-transparent px-2" value={currentMonth.getMonth()+1} onChange={e=>setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.
+                                <select className="bg-transparent px-2" value={currentMonth.getMonth()+1} onChange={e=>setCurrentMonth(new Date(currentMonth.getFullYear(), parseInt(e.target.value)-1))}>
+                                    {Array.from({length:12},(_,i)=>i+1).map(m=><option key={m} value={m}>{m}월</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <input className="bg-slate-50 px-4 py-1.5 rounded-lg text-xs font-bold border w-60 outline-none" placeholder="통합 검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && setActiveModal(true)}/>
+                            <button onClick={()=>setActiveModal(true)} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg font-black text-[11px]">SEARCH</button>
+                        </div>
+                    </header>
+
+                    <main className="flex flex-1 min-h-0">
+                        <div className="flex-[3] calendar-grid">
+                            {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400 border-b">{d}</div>)}
+                            {Array.from({length:42}).map((_,i)=>{
+                                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
+                                const firstDay = new Date(year, month, 1).getDay();
+                                const lastDate = new Date(year, month + 1, 0).getDate();
+                                const dayNum = i - firstDay + 1;
+                                const ds = (dayNum > 0 && dayNum <= lastDate) ? `${year}-${String(month+1).padStart(2,'0')}-${String(dayNum).padStart(2,'0')}` : null;
+                                const data = ds ? menus.find(m=>m.date===ds) : null;
+                                return (
+                                    <div key={i} className={`calendar-day ${ds === selectedDate?.date ? 'selected' : ''}`} onClick={()=>data && setSelectedDate(data)}>
+                                        {ds && (
+                                            <>
+                                                <span className="text-[11px] font-black">{dayNum}</span>
+                                                {data && (
+                                                    <div className="mt-1 flex flex-col gap-[1px]">
+                                                        <div className="menu-text bg-orange-50 text-orange-600">조:{data.morning}</div>
+                                                        <div className="menu-text bg-blue-50 text-blue-600">중:{data.lunch}</div>
+                                                        <div className="menu-text bg-purple-50 text-purple-600">석:{data.dinner}</div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <aside className="flex-1 bg-white p-6 overflow-y-auto border-l min-w-[360px]">
+                            {selectedDate ? (
+                                <div>
+                                    <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter italic">Daily Menu</h2>
+                                    <MenuCard text={selectedDate.morning} type="Morning" />
+                                    <MenuCard text={selectedDate.lunch} type="Lunch" />
+                                    <MenuCard text={selectedDate.dinner} type="Dinner" />
+                                </div>
+                            ) : <div className="h-full flex items-center justify-center text-slate-300 font-black">날짜를 선택하세요</div>}
+                        </aside>
+                    </main>
+
+                    {activeModal && (
+                        <div className="modal-view">
+                            <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
+                                <div className="flex justify-between items-center mb-8 border-b-2 border-blue-600 pb-4">
+                                    <h2 className="text-2xl font-black italic">SEARCH RESULTS</h2>
+                                    <button onClick={()=>setActiveModal(false)} className="text-5xl font-thin">&times;</button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto space-y-4">
+                                    {searchResults.map((m, i) => (
+                                        <div key={i} className="bg-white p-6 rounded-3xl border flex gap-6 shadow-sm">
+                                            <div className="w-36 shrink-0 border-r pr-4 font-black text-blue-600 text-xl">{m.date}</div>
+                                            <div className="flex-1 grid grid-cols-3 gap-4">
+                                                <MenuCard text={m.morning} type="Morning" />
+                                                <MenuCard text={m.lunch} type="Lunch" />
+                                                <MenuCard text={m.dinner} type="Dinner" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {viewRecipe && (
+                        <div className="recipe-popup" onClick={()=>setViewRecipe(null)}>
+                            <div className="bg-white rounded-[40px] w-full max-w-2xl p-10 shadow-2xl" onClick={e=>e.stopPropagation()}>
+                                <h3 className="text-2xl font-black text-blue-600 mb-8 border-b pb-4 uppercase italic">{viewRecipe.name}</h3>
+                                <div className="space-y-6">
+                                    <section>
+                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-2">Ingredients</div>
+                                        <div className="recipe-content bg-slate-50 p-6 rounded-3xl border">{viewRecipe.ingredients}</div>
+                                    </section>
+                                    <section>
+                                        <div className="text-[10px] font-black text-slate-400 uppercase mb-2">Process</div>
+                                        <div className="recipe-content bg-slate-50 p-6 rounded-3xl border whitespace-pre-wrap">{viewRecipe.process}</div>
+                                    </section>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MisoYonApp />);
+    </script>
+</body>
+</html>
