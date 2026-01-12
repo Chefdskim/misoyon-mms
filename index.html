@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v12.2</title>
+    <title>MISOYON MMS v12.3</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -53,7 +53,6 @@
             const [activeModal, setActiveModal] = useState(false);
             const [viewRecipeList, setViewRecipeList] = useState([]);
 
-            // 연도 선택 범위 생성 (2020 ~ 2035)
             const yearOptions = useMemo(() => {
                 const years = [];
                 for (let y = 2020; y <= 2035; y++) years.push(y);
@@ -120,15 +119,21 @@
                 }).sort((a,b) => new Date(b.date) - new Date(a.date));
             }, [modalSearch, searchTerm, activeModal, menus]);
 
-            const MenuCard = ({text, type}) => {
+            const highlightText = (text, query) => {
+                if (!query || !text || !isNaN(query)) return text;
+                const parts = text.split(new RegExp(`(${query})`, 'gi'));
+                return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
+            };
+
+            const MenuCard = ({text, type, query}) => {
                 const matched = findMatchedRecipes(text);
                 const hasRecipe = matched.length > 0;
                 return (
-                    <div className={`p-3 rounded-xl border mb-2 cursor-pointer ${hasRecipe ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}
+                    <div className={`p-3 rounded-xl border mb-2 cursor-pointer transition-all ${hasRecipe ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}
                          onClick={() => hasRecipe && setViewRecipeList(matched)}>
                         <div className="text-[9px] font-black text-slate-400 uppercase mb-1">{type}</div>
                         <div className={`text-[12px] font-black ${hasRecipe ? 'text-blue-900' : 'text-slate-600'}`}>
-                            {text} {hasRecipe && "📋"}
+                            {highlightText(text, query)} {hasRecipe && "📋"}
                         </div>
                     </div>
                 );
@@ -138,7 +143,7 @@
                 <div className="flex flex-col h-screen w-full">
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v12.2</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v12.3</span></h1>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
                                     {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
@@ -149,7 +154,7 @@
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-48 border outline-none" placeholder="검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
+                            <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-48 border outline-none focus:border-blue-500" placeholder="메뉴 검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
                             <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
                         </div>
                     </header>
@@ -177,12 +182,12 @@
                         <aside className="flex-1 bg-white p-4 overflow-y-auto min-w-[340px]">
                             {selectedDate ? (
                                 <div className="space-y-4">
-                                    <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1">DAILY MENU</h2>
+                                    <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1 uppercase">Daily Menu</h2>
                                     <MenuCard text={selectedDate.morning} type="Morning" />
                                     <MenuCard text={selectedDate.lunch} type="Lunch" />
                                     <MenuCard text={selectedDate.dinner} type="Dinner" />
                                 </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black">SELECT DATE</div>}
+                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black italic">SELECT DATE</div>}
                         </aside>
                     </main>
 
@@ -190,20 +195,30 @@
                         <div className="modal-view">
                             <div className="max-w-5xl mx-auto w-full flex flex-col h-full">
                                 <div className="flex justify-between items-center mb-6 border-b-2 border-blue-600 pb-3">
-                                    <h2 className="text-2xl font-black italic">ANALYSIS</h2>
-                                    <button onClick={()=>setActiveModal(false)} className="text-4xl font-thin">&times;</button>
+                                    <div className="flex items-center gap-6 flex-1">
+                                        <h2 className="text-2xl font-black italic uppercase tracking-tighter">Analysis</h2>
+                                        {/* 셰프님이 요청하신 분석 모달 내 검색창 추가 */}
+                                        <input 
+                                            className="bg-slate-100 px-6 py-2 rounded-2xl text-sm font-black border-2 border-blue-600 w-full max-w-xl outline-none" 
+                                            placeholder="분석 결과 내 재검색 (예: 불고기, 5월...)" 
+                                            value={modalSearch} 
+                                            onChange={e=>setModalSearch(e.target.value)}
+                                        />
+                                    </div>
+                                    <button onClick={()=>setActiveModal(false)} className="text-4xl font-thin ml-4">&times;</button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto space-y-4 pb-10">
                                     {currentSearchResults.map((m, i) => (
-                                        <div key={i} className="bg-white p-5 rounded-3xl border flex gap-6">
-                                            <div className="w-36 font-black text-blue-600 text-xl">{m.date}</div>
+                                        <div key={i} className="bg-white p-5 rounded-3xl border flex gap-6 hover:shadow-lg transition-all">
+                                            <div className="w-36 shrink-0 border-r font-black text-blue-600 text-xl">{m.date.replace(/-/g,'.')}</div>
                                             <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <MenuCard text={m.morning} type="Morning" />
-                                                <MenuCard text={m.lunch} type="Lunch" />
-                                                <MenuCard text={m.dinner} type="Dinner" />
+                                                <MenuCard text={m.morning} type="Morning" query={modalSearch} />
+                                                <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
+                                                <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
                                             </div>
                                         </div>
                                     ))}
+                                    {currentSearchResults.length === 0 && <div className="text-center py-20 text-slate-300 font-black italic text-2xl uppercase">No Results Found</div>}
                                 </div>
                             </div>
                         </div>
@@ -213,16 +228,16 @@
                         <div className="recipe-popup" onClick={() => setViewRecipeList([])}>
                             <div className="bg-white rounded-3xl w-full max-w-2xl p-8 shadow-2xl overflow-y-auto max-h-[90vh]" onClick={e => e.stopPropagation()}>
                                 <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                    <h3 className="text-2xl font-black uppercase italic text-blue-600">Recipe</h3>
+                                    <h3 className="text-2xl font-black uppercase italic text-blue-600 tracking-tighter">Recipe Master</h3>
                                     <button onClick={() => setViewRecipeList([])} className="text-4xl font-thin">&times;</button>
                                 </div>
                                 {viewRecipeList.map((r, i) => (
-                                    <div key={i} className="mb-10">
+                                    <div key={i} className="mb-10 animate-in fade-in slide-in-from-bottom-4">
                                         <div className="bg-blue-600 text-white px-4 py-1.5 rounded-full inline-block text-xs font-black mb-4 uppercase">{r.name}</div>
                                         <div className="grid grid-cols-1 gap-6">
-                                            <div><div className="text-[10px] font-black text-slate-400 uppercase">Ingredients</div><div className="recipe-content bg-slate-50 p-4 rounded-xl border">{r.ingredients}</div></div>
-                                            <div><div className="text-[10px] font-black text-slate-400 uppercase">Instructions</div><div className="recipe-content bg-slate-50 p-4 rounded-xl border">{r.process}</div></div>
-                                            {r.tip && <div className="bg-orange-50 p-4 rounded-xl border border-orange-100 font-bold text-orange-950 text-sm italic">👨‍🍳 {r.tip}</div>}
+                                            <div><div className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Ingredients</div><div className="recipe-content bg-slate-50 p-4 rounded-2xl border">{r.ingredients}</div></div>
+                                            <div><div className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Instructions</div><div className="recipe-content bg-slate-50 p-4 rounded-2xl border">{r.process}</div></div>
+                                            {r.tip && <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 font-bold text-orange-950 text-sm flex gap-3"><span className="text-xl">👨‍🍳</span>{r.tip}</div>}
                                         </div>
                                     </div>
                                 ))}
