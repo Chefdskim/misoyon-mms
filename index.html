@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v13.0</title>
+    <title>MISOYON MMS v13.1</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -11,34 +11,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; -webkit-tap-highlight-color: transparent; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
         #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
         
-        /* 셰프님 지시사항 반영: 모바일은 세로(Column), PC는 가로(Row) 배치 */
-        .responsive-layout { display: flex; flex: 1; flex-direction: column; overflow: hidden; }
-        @media (min-width: 1024px) { 
-            .responsive-layout { flex-direction: row; } 
-        }
-
-        .calendar-section { flex: 2; display: flex; flex-direction: column; min-height: 50%; overflow-y: auto; }
-        .menu-section { flex: 1; background: white; padding: 1rem; overflow-y: auto; border-top: 1px solid #e2e8f0; min-height: 40%; }
-        
-        @media (min-width: 1024px) {
-            .calendar-section { flex: 3; border-right: 1px solid #e2e8f0; min-height: auto; overflow: hidden; }
-            .menu-section { flex: 1; border-top: none; min-height: auto; }
-        }
-
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(60px, 1fr); background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; height: 100%; }
-        /* PC에서는 달력 행 높이를 균등하게 */
+        /* 안전한 그리드 설정 */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; height: 100%; }
+        /* 모바일에서는 행 높이 자동, PC에서는 균등 분할 */
+        .calendar-grid { grid-auto-rows: minmax(60px, 1fr); } 
         @media (min-width: 1024px) {
             .calendar-grid { grid-template-rows: 25px repeat(6, 1fr); grid-auto-rows: auto; }
         }
 
-        .calendar-header { background: #f8fafc; text-align: center; font-size: 9px; font-weight: 900; color: #94a3b8; padding: 4px 0; border-bottom: 1px solid #cbd5e1; }
+        .calendar-header { background: #f8fafc; text-align: center; font-size: 9px; font-weight: 900; color: #94a3b8; padding: 4px 0; }
         .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
-        
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
         
         .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
@@ -71,4 +58,214 @@
                 "주꾸미맑은탕": { name: "주꾸미 맑은탕", ingredients: `주꾸미 1kg, 미나리, 바지락 육수 1.6L, 새우젓`, process: `1. 손질한 주꾸미를 끓는 육수에 살짝 익힘\n2. 주꾸미가 익으면 미나리와 대파를 넣어 향을 더함\n3. 새우젓으로 깔끔하게 간을 하여 시원한 맛을 냄` },
                 "영광굴비": { name: "영광굴비 구이", ingredients: `영광굴비, 쌀뜨물, 참기름, 생강술`, process: `1. 쌀뜨물 전처리로 비린내 완벽 제거\n2. 참기름을 골고루 바른 뒤 오븐 조리\n3. 180도에서 앞뒤로 노릇하게 구워 완성` },
                 "주꾸미전복": { name: "주꾸미 전복볶음", ingredients: `주꾸미, 전복, 굴소스, 버터, 마늘, 생강`, process: `1. 해산물을 살짝 데쳐 수분 발생 억제\n2. 마늘, 생강 기름에 향을 낸 뒤 빠르게 볶음\n3. 마지막에 버터를 넣어 고소한 풍미를 입힘` },
-                "박대구이
+                "박대구이": { name: "박대구이", ingredients: `박대, 식용유, 겨자장`, process: `1. 박대를 팬에서 바삭하게 굽기\n2. 톡 쏘는 겨자장을 곁들여 감칠맛 극대화` },
+                "보리굴비": { name: "보리굴비", ingredients: `보리굴비, 쌀뜨물, 생강술`, process: `1. 쌀뜨물에 하루 이상 담가 짠기 제거\n2. 찜기에서 찌고 오븐에서 다시 구워 겉바속촉 완성` }
+            };
+
+            const [menus, setMenus] = useState([]);
+            const [selectedDate, setSelectedDate] = useState(null);
+            const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
+            const [searchTerm, setSearchTerm] = useState("");
+            const [modalSearch, setModalSearch] = useState("");
+            const [activeModal, setActiveModal] = useState(false);
+            const [viewRecipeList, setViewRecipeList] = useState([]);
+
+            const yearOptions = useMemo(() => {
+                const years = [];
+                for (let y = 2020; y <= 2035; y++) years.push(y);
+                return years;
+            }, []);
+
+            useEffect(() => {
+                Papa.parse(MENU_URL, { download: true, complete: (res) => {
+                    let temp = []; let headers = [];
+                    res.data.forEach(row => {
+                        const label = (row[0] || "").replace(/\s/g, "");
+                        const vals = row.slice(1);
+                        if (label === "날짜") {
+                            headers = vals.map(v => {
+                                const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
+                                return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
+                            });
+                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "" }); });
+                        } else if (headers.length > 0) {
+                            vals.forEach((v, i) => {
+                                if (!headers[i]) return;
+                                const t = temp.find(m => m.date === headers[i]);
+                                if (t) {
+                                    if (label.includes("아침")) t.morning = v;
+                                    else if (label.includes("점심")) t.lunch = v;
+                                    else if (label.includes("저녁")) t.dinner = v;
+                                }
+                            });
+                        }
+                    });
+                    setMenus(temp);
+                }});
+            }, []);
+
+            const findMatchedRecipes = (menuName) => {
+                if (!menuName || menuName === "일정없음") return [];
+                const target = menuName.replace(/\s/g, "");
+                return Object.keys(RECIPE_STORE).filter(k => target.includes(k)).map(k => RECIPE_STORE[k]);
+            };
+
+            const calDays = useMemo(() => {
+                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
+                const firstDay = new Date(year, month, 1).getDay();
+                const lastDate = new Date(year, month + 1, 0).getDate();
+                const days = [];
+                for (let i = 0; i < firstDay; i++) days.push(null);
+                for (let i = 1; i <= lastDate; i++) {
+                    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    days.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
+                }
+                while (days.length < 42) days.push(null);
+                return days;
+            }, [currentMonth, menus]);
+
+            const currentSearchResults = useMemo(() => {
+                const q = (activeModal ? modalSearch : searchTerm).trim().toLowerCase();
+                if (!q) return [];
+                const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12 && q !== "");
+                return menus.filter(m => {
+                    if (isMonthSearch) return String(new Date(m.date).getMonth() + 1).padStart(2, '0') === q.replace("월","").padStart(2,'0');
+                    return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
+                }).sort((a,b) => new Date(b.date) - new Date(a.date));
+            }, [modalSearch, searchTerm, activeModal, menus]);
+
+            const highlightText = (text, query) => {
+                if (!query || !text || !isNaN(query)) return text;
+                const parts = text.split(new RegExp(`(${query})`, 'gi'));
+                return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
+            };
+
+            const MenuCard = ({text, type, query}) => {
+                const matched = findMatchedRecipes(text);
+                const hasRecipe = matched.length > 0;
+                return (
+                    <div className={`p-3 rounded-xl border mb-2 transition-all clickable-menu ${hasRecipe ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}
+                         onClick={() => hasRecipe && setViewRecipeList(matched)}>
+                        <div className="text-[9px] font-black text-slate-400 uppercase mb-1">{type}</div>
+                        <div className={`text-[12px] font-black ${hasRecipe ? 'text-blue-900' : 'text-slate-600'}`}>
+                            {highlightText(text, query)} {hasRecipe && "📋"}
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div className="flex flex-col h-full w-full">
+                    {/* Header: Fixed Height */}
+                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v13.1</span></h1>
+                            <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm hidden md:flex">
+                                <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
+                                    {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
+                                </select>
+                                <select className="bg-transparent ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
+                                    {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        {/* Mobile Month Selector */}
+                        <div className="md:hidden font-bold text-sm bg-slate-100 px-2 py-1 rounded-lg">
+                             <select className="bg-transparent" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
+                                {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}
+                            </select>
+                        </div>
+                        <div className="flex gap-2">
+                             <button onClick={()=>{setModalSearch(""); setActiveModal(true);}} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
+                        </div>
+                    </header>
+
+                    {/* Main Content: Flexible */}
+                    <main className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                        {/* Calendar Section */}
+                        <div className="flex-[2] flex flex-col min-h-[50%] lg:min-h-full border-b lg:border-b-0 lg:border-r overflow-hidden">
+                            <div className="calendar-grid">
+                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="calendar-header">{d}</div>)}
+                                {calDays.map((d,i)=>(
+                                    <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
+                                        {d && (
+                                            <>
+                                                <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
+                                                {d.data && (
+                                                    <div className="flex flex-col gap-[1px] mt-[1px]">
+                                                        <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>
+                                                        <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>
+                                                        <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        {/* Menu Detail Section */}
+                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-h-[40%]">
+                            {selectedDate ? (
+                                <div className="space-y-4">
+                                    <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1">DAILY MENU</h2>
+                                    <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
+                                    <MenuCard text={selectedDate.morning} type="Morning" />
+                                    <MenuCard text={selectedDate.lunch} type="Lunch" />
+                                    <MenuCard text={selectedDate.dinner} type="Dinner" />
+                                </div>
+                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black">SELECT DATE</div>}
+                        </aside>
+                    </main>
+
+                    {activeModal && (
+                        <div className="modal-view">
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h2 className="text-xl font-black italic">SEARCH</h2>
+                                <button onClick={()=>setActiveModal(false)} className="text-3xl">&times;</button>
+                            </div>
+                            <input className="bg-slate-100 px-4 py-3 rounded-xl w-full font-bold mb-4 border-2 border-blue-500 outline-none" placeholder="검색어 입력..." autoFocus value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
+                            <div className="flex-1 overflow-y-auto space-y-4 pb-10">
+                                {currentSearchResults.map((m, i) => (
+                                    <div key={i} className="bg-slate-50 p-4 rounded-xl border">
+                                        <div className="font-black text-blue-600 mb-2">{m.date}</div>
+                                        <MenuCard text={m.morning} type="Morning" query={modalSearch} />
+                                        <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
+                                        <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
+                                    </div>
+                                ))}
+                                {currentSearchResults.length === 0 && modalSearch && <div className="text-center py-10 text-slate-400 font-bold">결과가 없습니다.</div>}
+                            </div>
+                        </div>
+                    )}
+
+                    {viewRecipeList.length > 0 && (
+                        <div className="recipe-popup" onClick={() => setViewRecipeList([])}>
+                            <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-6 border-b pb-4">
+                                    <h3 className="text-xl font-black uppercase italic text-blue-600">Recipe</h3>
+                                    <button onClick={() => setViewRecipeList([])} className="text-4xl font-thin">&times;</button>
+                                </div>
+                                {viewRecipeList.map((r, i) => (
+                                    <div key={i} className="mb-8">
+                                        <div className="bg-blue-600 text-white px-3 py-1 rounded-full inline-block text-xs font-black mb-3 uppercase">{r.name}</div>
+                                        <div className="space-y-4">
+                                            <div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Ingredients</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{r.ingredients}</div></div>
+                                            <div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Instructions</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{r.process}</div></div>
+                                            {r.tip && <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 font-bold text-orange-950 text-xs">👨‍🍳 {r.tip}</div>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MisoYonApp />);
+    </script>
+</body>
+</html>
