@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v8.6 - 안정화 버전</title>
+    <title>MISOYON MMS v8.7 - 드롭다운 복구</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -19,8 +19,9 @@
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
         .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; }
-        /* 강조 스타일: 붉은색 글씨 + 밑줄 */
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
+        /* 드롭다운 스타일 */
+        select { border: none; background: transparent; font-weight: 900; cursor: pointer; outline: none; color: #334155; }
     </style>
 </head>
 <body>
@@ -35,6 +36,9 @@
             const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
             const [searchTerm, setSearchTerm] = useState("");
             const [activeModal, setActiveModal] = useState(false);
+
+            const years = Array.from({length: 9}, (_, i) => 2022 + i);
+            const months = Array.from({length: 12}, (_, i) => i + 1);
 
             const loadData = () => {
                 Papa.parse(MENU_URL, {
@@ -100,7 +104,6 @@
                 }).sort((a,b) => new Date(b.date) - new Date(a.date));
             }, [searchTerm, menus]);
 
-            // [안정화] 검색어 강조 로직 (단순 문자열 치환)
             const getHighlightedMenu = (text, query) => {
                 if (!query || query.endsWith("월") || !isNaN(query)) return text;
                 const parts = text.split(new RegExp(`(${query})`, 'gi'));
@@ -111,15 +114,25 @@
                 );
             };
 
+            const handleDateChange = (type, val) => {
+                const newDate = new Date(currentMonth);
+                if (type === 'year') newDate.setFullYear(val);
+                else newDate.setMonth(val - 1);
+                setCurrentMonth(newDate);
+            };
+
             return (
                 <div className="flex flex-col h-screen w-full">
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v8.6</span></h1>
-                            <div className="flex items-center gap-2 font-black text-sm text-slate-700">
-                                <button onClick={()=>setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))}>◀</button>
-                                <span className="w-24 text-center">{currentMonth.getFullYear()}년 {currentMonth.getMonth()+1}월</span>
-                                <button onClick={()=>setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))}>▶</button>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v8.7</span></h1>
+                            <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl gap-1 border">
+                                <select value={currentMonth.getFullYear()} onChange={(e)=>handleDateChange('year', e.target.value)}>
+                                    {years.map(y => <option key={y} value={y}>{y}년</option>)}
+                                </select>
+                                <select value={currentMonth.getMonth() + 1} onChange={(e)=>handleDateChange('month', e.target.value)}>
+                                    {months.map(m => <option key={m} value={m}>{m}월</option>)}
+                                </select>
                             </div>
                         </div>
                         <div className="flex gap-2">
@@ -132,7 +145,7 @@
                     <main className="flex flex-1 min-height-0 w-full overflow-hidden">
                         <div className="flex-[3] flex flex-col h-full border-r min-width-0">
                             <div className="calendar-grid">
-                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-1 text-center text-[9px] font-black text-slate-400 border-b">{d}</div>)}
+                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="bg-slate-50 py-1 text-center text-[9px] font-black text-slate-400 border-b uppercase">{d}</div>)}
                                 {calDays.map((d,i)=>(
                                     <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
                                         {d && (
@@ -152,19 +165,20 @@
                             </div>
                         </div>
 
-                        <aside className="flex-1 bg-white p-4 overflow-y-auto">
+                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-width-[250px]">
                             {selectedDate ? (
                                 <div className="space-y-4">
-                                    <h2 className="text-xl font-black text-slate-900 border-b-2 border-blue-600 pb-1 italic uppercase tracking-tighter">Daily Report</h2>
+                                    <h2 className="text-xl font-black text-slate-900 border-b-2 border-blue-600 pb-1 italic uppercase tracking-tighter italic">Daily Report</h2>
                                     <div className="space-y-3 font-bold text-xs">
-                                        <div className="bg-slate-100 p-2 rounded flex justify-between uppercase"><span>Chef</span><span>{selectedDate.staff || "Master"}</span></div>
+                                        <div className="bg-slate-100 p-2 rounded flex justify-between uppercase font-black"><span>Chef</span><span>{selectedDate.staff || "Master"}</span></div>
                                         <div className="bg-orange-50 p-3 rounded-lg border border-orange-100"><p className="text-[8px] text-orange-400 font-black mb-1 uppercase">Morning</p>{selectedDate.morning || "—"}</div>
                                         <div className="bg-blue-50 p-3 rounded-lg border border-blue-100"><p className="text-[8px] text-blue-400 font-black mb-1 uppercase">Lunch</p>{selectedDate.lunch || "—"}</div>
                                         <div className="bg-purple-50 p-3 rounded-lg border border-purple-100"><p className="text-[8px] text-purple-400 font-black mb-1 uppercase">Dinner</p>{selectedDate.dinner || "—"}</div>
                                     </div>
+                                    <div className="text-[9px] text-slate-400 font-bold text-center mt-4 tracking-widest">{selectedDate.date}</div>
                                 </div>
                             ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-slate-200 font-black text-xs uppercase leading-relaxed">🗓️<br/>Select Date</div>
+                                <div className="h-full flex flex-col items-center justify-center text-slate-200 font-black text-xs uppercase leading-relaxed text-center">🗓️<br/>Select Date</div>
                             )}
                         </aside>
                     </main>
@@ -173,20 +187,23 @@
                         <div className="modal-view">
                             <div className="max-w-4xl mx-auto w-full flex flex-col h-full">
                                 <div className="flex justify-between items-center mb-4 border-b-2 border-blue-600 pb-1 shrink-0">
-                                    <h2 className="text-xl font-black italic uppercase italic">Analysis: {searchTerm}</h2>
+                                    <h2 className="text-xl font-black italic uppercase">5-Year Analysis: {searchTerm}</h2>
                                     <button onClick={()=>setActiveModal(false)} className="text-3xl font-thin">&times;</button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto space-y-2 pb-6">
                                     {searchResults.length > 0 ? searchResults.map((m, i) => (
                                         <div key={i} className="bg-slate-50 p-3 rounded-xl border flex flex-col md:flex-row gap-4">
-                                            <div className="md:w-32 font-black text-blue-600 text-sm shrink-0">{m.date.replace(/-/g,'.')}</div>
+                                            <div className="md:w-32 font-black text-blue-600 text-sm shrink-0">
+                                                {m.date.replace(/-/g,'.')}
+                                                <div className="text-[8px] text-slate-400 font-bold uppercase">{new Date(m.date).toLocaleDateString('ko-KR', {weekday: 'short'})}</div>
+                                            </div>
                                             <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2 font-bold text-[11px] leading-snug">
                                                 <div className="bg-white p-2 rounded-lg shadow-sm border-l-2 border-orange-400">{getHighlightedMenu(m.morning, searchTerm)}</div>
                                                 <div className="bg-white p-2 rounded-lg shadow-sm border-l-2 border-blue-400">{getHighlightedMenu(m.lunch, searchTerm)}</div>
                                                 <div className="bg-white p-2 rounded-lg shadow-sm border-l-2 border-purple-400">{getHighlightedMenu(m.dinner, searchTerm)}</div>
                                             </div>
                                         </div>
-                                    )) : <p className="text-center py-20 text-slate-400 text-sm font-bold uppercase tracking-widest uppercase">No Records Found</p>}
+                                    )) : <p className="text-center py-20 text-slate-400 text-sm font-bold uppercase tracking-widest">No Results Found</p>}
                                 </div>
                             </div>
                         </div>
@@ -200,3 +217,4 @@
     </script>
 </body>
 </html>
+
