@@ -111,4 +111,249 @@
                                 const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
                                 return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
                             });
-                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "",
+                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "" }); });
+                        } else if (headers.length > 0) {
+                            vals.forEach((v, i) => {
+                                if (!headers[i]) return;
+                                const t = temp.find(m => m.date === headers[i]);
+                                if (t) {
+                                    if (label.includes("아침")) t.morning = v;
+                                    else if (label.includes("점심")) t.lunch = v;
+                                    else if (label.includes("저녁")) t.dinner = v;
+                                }
+                            });
+                        }
+                    });
+                    if (temp.length > 0) setMenus(temp);
+                }});
+
+                // 레시피 데이터 로딩 (백그라운드 업데이트)
+                Papa.parse(RECIPE_URL, { download: true, complete: (res) => {
+                    const newRecipes = {};
+                    res.data.forEach(row => {
+                        if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
+                        const key = row[0].trim();
+                        
+                        // 자동 영양성분 매칭 로직
+                        let nutritionData = row[5] || "";
+                        if (!nutritionData && BUILT_IN_NUTRITION[key]) {
+                            nutritionData = BUILT_IN_NUTRITION[key];
+                        }
+
+                        newRecipes[key] = {
+                            key: key,
+                            name: row[1] || key,
+                            ingredients: row[2] || "",
+                            process: row[3] || "",
+                            tip: row[4] || "",
+                            nutrition: nutritionData
+                        };
+                    });
+                    if (Object.keys(newRecipes).length > 0) {
+                        setRecipeMap(newRecipes); // 성공 시 업데이트
+                    }
+                }});
+            }, []);
+
+            const findMatchedRecipes = (menuName) => {
+                if (!menuName || menuName === "일정없음") return [];
+                const cleanMenu = menuName.replace(/\s/g, "");
+                return Object.values(recipeMap).filter(recipe => {
+                    if (!recipe.key) return false;
+                    const cleanKey = recipe.key.replace(/\s/g, "");
+                    return cleanMenu.includes(cleanKey);
+                });
+            };
+
+            const calDays = useMemo(() => {
+                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
+                const firstDay = new Date(year, month, 1).getDay();
+                const lastDate = new Date(year, month + 1, 0).getDate();
+                const days = [];
+                for (let i = 0; i < firstDay; i++) days.push(null);
+                for (let i = 1; i <= lastDate; i++) {
+                    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    days.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
+                }
+                while (days.length < 42) days.push(null);
+                return days;
+            }, [currentMonth, menus]);
+
+            const currentSearchResults = useMemo(() => {
+                const q = (activeModal ? modalSearch : searchTerm).trim().toLowerCase();
+                if (!q) return [];
+                const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12 && q !== "");
+                return menus.filter(m => {
+                    if (isMonthSearch) return String(new Date(m.date).getMonth() + 1).padStart(2, '0') === q.replace("월","").padStart(2,'0');
+                    return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
+                }).sort((a,b) => new Date(b.date) - new Date(a.date));
+            }, [modalSearch, searchTerm, activeModal, menus]);
+
+            const highlightText = (text, query) => {
+                if (!query || !text || !isNaN(query)) return text;
+                const parts = text.split(new RegExp(`(${query})`, 'gi'));
+                return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
+            };
+
+            const openRecipe = (recipes, index = 0) => {
+                setPopupRecipes(recipes);
+                setActiveRecipeIndex(index);
+            };
+
+            const MenuCard = ({text, type, query}) => {
+                const matched = findMatchedRecipes(text);
+                return (
+                    <div className={`p-4 rounded-xl border mb-3 transition-all ${matched.length > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
+                        <div className="text-[10px] font-black text-slate-400 uppercase mb-1 flex justify-between">
+                            <span>{type}</span>
+                            {matched.length > 0 && <span className="text-blue-500">Found: {matched.length}</span>}
+                        </div>
+                        <div className="text-sm font-black text-slate-700 mb-2 leading-relaxed">
+                            {highlightText(text, query)}
+                        </div>
+                        {matched.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-blue-100">
+                                {matched.map((r, idx) => (
+                                    <span key={idx} 
+                                          className="recipe-tag" 
+                                          onClick={(e) => { e.stopPropagation(); openRecipe(matched, idx); }}>
+                                        📖 {r.name}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            const handleSearch = () => {
+                setModalSearch(searchTerm);
+                setActiveModal(true);
+            };
+
+            const currentRecipe = popupRecipes[activeRecipeIndex];
+
+            return (
+                <div className="flex flex-col h-full w-full">
+                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v15.7</span></h1>
+                            <div className="hidden md:flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
+                                <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
+                                    {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
+                                </select>
+                                <select className="bg-transparent ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
+                                    {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="md:hidden flex items-center font-bold text-xs bg-slate-100 px-2 py-1 rounded-lg gap-1">
+                             <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
+                                {yearOptions.map(y => <option key={y} value={y}>{String(y).slice(2)}년</option>)}
+                            </select>
+                            <span>/</span>
+                             <select className="bg-transparent" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
+                                {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}
+                            </select>
+                        </div>
+                        <div className="flex gap-2">
+                             <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-24 md:w-40 border outline-none" placeholder="메뉴/날짜" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleSearch()}/>
+                             <button onClick={handleSearch} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
+                        </div>
+                    </header>
+
+                    <main className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+                        <div className="flex-[2] flex flex-col min-h-[50%] lg:min-h-full border-b lg:border-b-0 lg:border-r overflow-hidden">
+                            <div className="calendar-grid">
+                                {['일','월','화','수','목','금','토'].map(d=><div key={d} className="calendar-header">{d}</div>)}
+                                {calDays.map((d,i)=>(
+                                    <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
+                                        {d && (
+                                            <>
+                                                <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
+                                                {d.data && (
+                                                    <div className="flex flex-col gap-[1px] mt-[1px]">
+                                                        {d.data.morning && <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>}
+                                                        {d.data.lunch && <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>}
+                                                        {d.data.dinner && <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-h-[40%]">
+                            {selectedDate ? (
+                                <div className="space-y-4">
+                                    <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1">DAILY MENU</h2>
+                                    <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
+                                    <MenuCard text={selectedDate.morning} type="Morning" />
+                                    <MenuCard text={selectedDate.lunch} type="Lunch" />
+                                    <MenuCard text={selectedDate.dinner} type="Dinner" />
+                                </div>
+                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black">SELECT DATE</div>}
+                        </aside>
+                    </main>
+
+                    {activeModal && (
+                        <div className="modal-view">
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h2 className="text-xl font-black italic">SEARCH</h2>
+                                <button onClick={()=>setActiveModal(false)} className="text-3xl">&times;</button>
+                            </div>
+                            <input className="bg-slate-100 px-4 py-3 rounded-xl w-full font-bold mb-4 border-2 border-blue-500 outline-none" placeholder="검색어 입력..." autoFocus value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
+                            <div className="flex-1 overflow-y-auto space-y-4 pb-10">
+                                {currentSearchResults.map((m, i) => (
+                                    <div key={i} className="bg-slate-50 p-4 rounded-xl border">
+                                        <div className="font-black text-blue-600 mb-2">{m.date}</div>
+                                        <MenuCard text={m.morning} type="Morning" query={modalSearch} />
+                                        <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
+                                        <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
+                                    </div>
+                                ))}
+                                {currentSearchResults.length === 0 && modalSearch && <div className="text-center py-10 text-slate-400 font-bold">결과가 없습니다.</div>}
+                            </div>
+                        </div>
+                    )}
+
+                    {popupRecipes.length > 0 && currentRecipe && (
+                        <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
+                            <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                    <h3 className="text-xl font-black uppercase italic text-blue-600">Recipe Master</h3>
+                                    <button onClick={() => setPopupRecipes([])} className="text-4xl font-thin">&times;</button>
+                                </div>
+                                {popupRecipes.length > 1 && (
+                                    <div className="flex overflow-x-auto border-b mb-4 no-scrollbar">
+                                        {popupRecipes.map((r, i) => (
+                                            <div key={i} onClick={() => setActiveRecipeIndex(i)} className={`tab-btn whitespace-nowrap ${i === activeRecipeIndex ? 'active' : ''}`}>{r.name}</div>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="bg-blue-600 text-white px-3 py-1 rounded-full inline-block text-xs font-black mb-3 uppercase">{currentRecipe.name}</div>
+                                    <div className="space-y-4">
+                                        <div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Ingredients</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.ingredients}</div></div>
+                                        <div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Instructions</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.process}</div></div>
+                                        {currentRecipe.tip && <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 font-bold text-orange-950 text-xs">👨‍🍳 {currentRecipe.tip}</div>}
+                                        {currentRecipe.nutrition && (
+                                            <div className="bg-teal-50 p-3 rounded-xl border border-teal-100 font-bold text-teal-900 text-xs animate-pulse-once">
+                                                📊 {currentRecipe.nutrition}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MisoYonApp />);
+    </script>
+</body>
+</html>
