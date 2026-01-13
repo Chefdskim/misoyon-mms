@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v15.6 (Auto Nutrition)</title>
+    <title>MISOYON MMS v15.7 (Instant)</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,7 +13,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; -webkit-tap-highlight-color: transparent; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
-        #root { width: 100%; height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+        #root { width: 100%; height: 100vh; display: flex; flex-direction: column; }
         
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; height: 100%; }
         .calendar-grid { grid-auto-rows: minmax(60px, 1fr); } 
@@ -47,8 +47,7 @@
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
 
-            // ★ 제미가 분석한 영양성분 DB (코드 내장) ★
-            // 셰프님이 시트에 입력하지 않아도 자동으로 이 데이터를 가져다 씁니다.
+            // 내장 영양성분 데이터
             const BUILT_IN_NUTRITION = {
                 "영광굴비": "1인분 180kcal | 단백질 22g | 지방 9g | 나트륨 450mg",
                 "주꾸미전복": "1인분 280kcal | 단백질 28g | 타우린 풍부 | 콜레스테롤 150mg",
@@ -66,8 +65,26 @@
                 "보리굴비": "1인분 220kcal | 단백질 24g | 비타민A/B 풍부 | 녹차물과 찰떡궁합"
             };
 
+            // 기본 레시피 (화면 즉시 로딩 보장용)
+            const DEFAULT_RECIPES = {
+                "영광굴비": { key: "영광굴비", name: "영광굴비 구이", ingredients: "영광굴비, 쌀뜨물, 참기름, 생강술", process: "1. 쌀뜨물 전처리\n2. 참기름 바르고 오븐 180도 15분", tip: "쌀뜨물이 핵심", nutrition: BUILT_IN_NUTRITION["영광굴비"] },
+                "주꾸미전복": { key: "주꾸미전복", name: "주꾸미 전복볶음", ingredients: "주꾸미, 전복, 굴소스, 버터", process: "1. 해산물 데치기\n2. 센불 볶기\n3. 버터 마무리", tip: "버터 풍미 중요", nutrition: BUILT_IN_NUTRITION["주꾸미전복"] },
+                "다슬기": { key: "다슬기", name: "다슬기국", ingredients: "다슬기, 얼갈이, 부추, 된장", process: "1. 다슬기 삶기\n2. 육수에 나물 끓이기", tip: "삶은 물 활용", nutrition: BUILT_IN_NUTRITION["다슬기"] },
+                "복어매운탕": { key: "복어매운탕", name: "복어 매운탕", ingredients: "복어, 콩나물, 미나리", process: "1. 핏물 제거\n2. 다데기 육수 끓이기", tip: "핏물 제거 필수", nutrition: BUILT_IN_NUTRITION["복어매운탕"] },
+                "북어국": { key: "북어국", name: "전통 북어국", ingredients: "북어, 무, 계란", process: "1. 볶기\n2. 끓이기", tip: "뽀얀 국물", nutrition: BUILT_IN_NUTRITION["북어국"] },
+                "사골우거지": { key: "사골우거지", name: "사골 우거지", ingredients: "사골, 우거지, 된장", process: "1. 끓이기", tip: "푹 고기", nutrition: BUILT_IN_NUTRITION["사골우거지"] },
+                "선지해장국": { key: "선지해장국", name: "선지 해장국", ingredients: "선지, 우거지", process: "1. 데치기\n2. 끓이기", tip: "신선한 선지", nutrition: BUILT_IN_NUTRITION["선지해장국"] },
+                "소고기무국": { key: "소고기무국", name: "소고기 무국", ingredients: "소고기, 무", process: "1. 볶기\n2. 끓이기", tip: "거품 제거", nutrition: BUILT_IN_NUTRITION["소고기무국"] },
+                "시래기": { key: "시래기", name: "시래기 된장국", ingredients: "시래기, 된장", process: "1. 삶기\n2. 끓이기", tip: "약불 조리", nutrition: BUILT_IN_NUTRITION["시래기"] },
+                "오징어무국": { key: "오징어무국", name: "오징어 무국", ingredients: "오징어, 무", process: "1. 끓이기", tip: "새우젓 간", nutrition: BUILT_IN_NUTRITION["오징어무국"] },
+                "육개장": { key: "육개장", name: "전통 육개장", ingredients: "양지, 고사리", process: "1. 삶기\n2. 끓이기", tip: "고추기름", nutrition: BUILT_IN_NUTRITION["육개장"] },
+                "주꾸미맑은탕": { key: "주꾸미맑은탕", name: "주꾸미 맑은탕", ingredients: "주꾸미, 미나리", process: "1. 데치기", tip: "살짝 익히기", nutrition: BUILT_IN_NUTRITION["주꾸미맑은탕"] },
+                "박대구이": { key: "박대구이", name: "박대구이", ingredients: "박대, 식용유", process: "1. 굽기", tip: "노릇하게", nutrition: BUILT_IN_NUTRITION["박대구이"] },
+                "보리굴비": { key: "보리굴비", name: "보리굴비", ingredients: "보리굴비, 녹차물", process: "1. 찌기\n2. 굽기", tip: "녹차물", nutrition: BUILT_IN_NUTRITION["보리굴비"] }
+            };
+
             const [menus, setMenus] = useState([]);
-            const [recipeMap, setRecipeMap] = useState({});
+            const [recipeMap, setRecipeMap] = useState(DEFAULT_RECIPES);
             const [selectedDate, setSelectedDate] = useState(null);
             const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
             const [searchTerm, setSearchTerm] = useState("");
@@ -75,7 +92,6 @@
             const [activeModal, setActiveModal] = useState(false);
             const [popupRecipes, setPopupRecipes] = useState([]);
             const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
-            const [isLoading, setIsLoading] = useState(true);
 
             const yearOptions = useMemo(() => {
                 const years = [];
@@ -84,6 +100,7 @@
             }, []);
 
             useEffect(() => {
+                // 식단 데이터 로딩 (에러나도 화면은 유지)
                 Papa.parse(MENU_URL, { download: true, complete: (res) => {
                     let temp = []; let headers = [];
                     res.data.forEach(row => {
@@ -94,150 +111,4 @@
                                 const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
                                 return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
                             });
-                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "" }); });
-                        } else if (headers.length > 0) {
-                            vals.forEach((v, i) => {
-                                if (!headers[i]) return;
-                                const t = temp.find(m => m.date === headers[i]);
-                                if (t) {
-                                    if (label.includes("아침")) t.morning = v;
-                                    else if (label.includes("점심")) t.lunch = v;
-                                    else if (label.includes("저녁")) t.dinner = v;
-                                }
-                            });
-                        }
-                    });
-                    setMenus(temp);
-                    setIsLoading(false);
-                }});
-
-                Papa.parse(RECIPE_URL, { download: true, complete: (res) => {
-                    const newRecipes = {};
-                    res.data.forEach(row => {
-                        if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
-                        const key = row[0].trim();
-                        
-                        // ★ 자동 영양성분 매칭 로직 ★
-                        // 1. 시트에 있는 영양성분(row[5])을 먼저 확인
-                        // 2. 시트에 없으면, BUILT_IN_NUTRITION에서 찾아서 넣음
-                        let nutritionData = row[5] || "";
-                        if (!nutritionData && BUILT_IN_NUTRITION[key]) {
-                            nutritionData = BUILT_IN_NUTRITION[key];
-                        }
-
-                        newRecipes[key] = {
-                            key: key,
-                            name: row[1] || key,
-                            ingredients: row[2] || "",
-                            process: row[3] || "",
-                            tip: row[4] || "",
-                            nutrition: nutritionData
-                        };
-                    });
-                    if (Object.keys(newRecipes).length > 0) {
-                        setRecipeMap(newRecipes);
-                    }
-                }});
-            }, []);
-
-            const findMatchedRecipes = (menuName) => {
-                if (!menuName || menuName === "일정없음") return [];
-                const cleanMenu = menuName.replace(/\s/g, "");
-                return Object.values(recipeMap).filter(recipe => {
-                    if (!recipe.key) return false;
-                    const cleanKey = recipe.key.replace(/\s/g, "");
-                    return cleanMenu.includes(cleanKey);
-                });
-            };
-
-            const calDays = useMemo(() => {
-                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
-                const firstDay = new Date(year, month, 1).getDay();
-                const lastDate = new Date(year, month + 1, 0).getDate();
-                const days = [];
-                for (let i = 0; i < firstDay; i++) days.push(null);
-                for (let i = 1; i <= lastDate; i++) {
-                    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-                    days.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
-                }
-                while (days.length < 42) days.push(null);
-                return days;
-            }, [currentMonth, menus]);
-
-            const currentSearchResults = useMemo(() => {
-                const q = (activeModal ? modalSearch : searchTerm).trim().toLowerCase();
-                if (!q) return [];
-                const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12 && q !== "");
-                return menus.filter(m => {
-                    if (isMonthSearch) return String(new Date(m.date).getMonth() + 1).padStart(2, '0') === q.replace("월","").padStart(2,'0');
-                    return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
-                }).sort((a,b) => new Date(b.date) - new Date(a.date));
-            }, [modalSearch, searchTerm, activeModal, menus]);
-
-            const highlightText = (text, query) => {
-                if (!query || !text || !isNaN(query)) return text;
-                const parts = text.split(new RegExp(`(${query})`, 'gi'));
-                return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
-            };
-
-            const openRecipe = (recipes, index = 0) => {
-                setPopupRecipes(recipes);
-                setActiveRecipeIndex(index);
-            };
-
-            const MenuCard = ({text, type, query}) => {
-                const matched = findMatchedRecipes(text);
-                return (
-                    <div className={`p-4 rounded-xl border mb-3 transition-all ${matched.length > 0 ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-100'}`}>
-                        <div className="text-[10px] font-black text-slate-400 uppercase mb-1 flex justify-between">
-                            <span>{type}</span>
-                            {matched.length > 0 && <span className="text-blue-500">Found: {matched.length}</span>}
-                        </div>
-                        <div className="text-sm font-black text-slate-700 mb-2 leading-relaxed">
-                            {highlightText(text, query)}
-                        </div>
-                        {matched.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-blue-100">
-                                {matched.map((r, idx) => (
-                                    <span key={idx} 
-                                          className="recipe-tag" 
-                                          onClick={(e) => { e.stopPropagation(); openRecipe(matched, idx); }}>
-                                        📖 {r.name}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                );
-            };
-
-            const handleSearch = () => {
-                setModalSearch(searchTerm);
-                setActiveModal(true);
-            };
-
-            const currentRecipe = popupRecipes[activeRecipeIndex];
-
-            if (isLoading) return <div className="h-screen w-full flex items-center justify-center bg-slate-50 font-black text-slate-300 text-xl">MISOYON LOADING...</div>;
-
-            return (
-                <div className="flex flex-col h-full w-full">
-                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
-                        <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v15.6</span></h1>
-                            <div className="hidden md:flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
-                                <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
-                                    {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
-                                </select>
-                                <select className="bg-transparent ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
-                                    {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}
-                                </select>
-                            </div>
-                        </div>
-                        <div className="md:hidden flex items-center font-bold text-xs bg-slate-100 px-2 py-1 rounded-lg gap-1">
-                             <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
-                                {yearOptions.map(y => <option key={y} value={y}>{String(y).slice(2)}년</option>)}
-                            </select>
-                            <span>/</span>
-                             <select className="bg-transparent" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>
-                                {Array.from({
+                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "",
