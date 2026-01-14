@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v15.9 (Full Nutrition)</title>
+    <title>MISOYON MMS v16.1 (Smart Match)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -41,7 +41,7 @@
 <body>
     <div id="root">
         <div style="display:flex;justify-content:center;align-items:center;height:100vh;font-weight:900;color:#ccc;">
-            MISOYON SYSTEM INITIALIZING...
+            MISOYON v16.1 INITIALIZING...
         </div>
     </div>
     
@@ -52,9 +52,8 @@
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
 
-            // ★ 셰프님이 주신 43종 메뉴 영양성분 완벽 분석 탑재 ★
+            // 내장 영양성분 DB
             const BUILT_IN_NUTRITION = {
-                // [기존 14종]
                 "영광굴비": "1인분 180kcal | 단백질 22g | 지방 9g | 나트륨 450mg",
                 "주꾸미전복": "1인분 280kcal | 단백질 28g | 타우린 풍부 | 콜레스테롤 150mg",
                 "다슬기": "1인분 95kcal | 단백질 12g | 엽록소 풍부 | 저지방 고단백",
@@ -69,7 +68,7 @@
                 "주꾸미맑은탕": "1인분 130kcal | 타우린 1300mg | 단백질 18g | 피로회복",
                 "박대구이": "1인분 140kcal | 단백질 19g | 칼륨 350mg | 반건조 생선 특유의 식감",
                 "보리굴비": "1인분 220kcal | 단백질 24g | 비타민A/B 풍부 | 녹차물과 찰떡궁합",
-                // [신규 추가 29종]
+                "버섯불고기": "1인분 300kcal | 단백질 22g | 식이섬유(버섯) 풍부 | 면역력 강화",
                 "요취나물": "1인분 70kcal | 비타민C | 불포화지방산(호두) | 유채나물 기준",
                 "오징어 도라지": "1인분 150kcal | 사포닌(기관지) | 타우린 | 새콤달콤 입맛 회복",
                 "방풍나물": "1인분 60kcal | 쿠마린(중풍예방) | 베타카로틴 | 해독작용",
@@ -102,10 +101,7 @@
             };
 
             const DEFAULT_RECIPES = {
-                // 기존 14종은 하드코딩 유지하여 안전장치 마련
-                "영광굴비": { key: "영광굴비", name: "영광굴비 구이", ingredients: "영광굴비, 쌀뜨물, 참기름, 생강술", process: "1. 쌀뜨물 전처리\n2. 오븐 180도 15분", tip: "쌀뜨물이 핵심", nutrition: BUILT_IN_NUTRITION["영광굴비"] },
-                "다슬기": { key: "다슬기", name: "다슬기국", ingredients: "다슬기, 얼갈이, 부추, 된장", process: "1. 다슬기 삶기\n2. 육수에 끓이기", tip: "삶은 물 활용", nutrition: BUILT_IN_NUTRITION["다슬기"] },
-                "소고기무국": { key: "소고기무국", name: "소고기 무국", ingredients: "소고기, 무, 대파", process: "1. 볶기\n2. 끓이기", tip: "거품 제거", nutrition: BUILT_IN_NUTRITION["소고기무국"] }
+                "영광굴비": { key: "영광굴비", name: "영광굴비 구이", ingredients: "영광굴비, 쌀뜨물, 참기름, 생강술", process: "1. 쌀뜨물 전처리\n2. 오븐 180도 15분", tip: "쌀뜨물이 핵심", nutrition: BUILT_IN_NUTRITION["영광굴비"] }
             };
 
             const [menus, setMenus] = useState([]);
@@ -144,6 +140,7 @@
                                     if (label.includes("아침")) t.morning = v;
                                     else if (label.includes("점심")) t.lunch = v;
                                     else if (label.includes("저녁")) t.dinner = v;
+                                    else if (label.includes("근무") || label.includes("당직")) t.duty = v;
                                 }
                             });
                         }
@@ -157,10 +154,8 @@
                         if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
                         const key = row[0].trim();
                         
-                        // ★ 자동 영양성분 매칭 (업그레이드) ★
                         let nutritionData = row[5] || "";
                         if (!nutritionData) {
-                            // 메뉴명에 포함된 키워드로 영양성분 찾기 (유연한 검색)
                             const foundKey = Object.keys(BUILT_IN_NUTRITION).find(k => key.includes(k) || k.includes(key));
                             if (foundKey) nutritionData = BUILT_IN_NUTRITION[foundKey];
                         }
@@ -180,13 +175,33 @@
                 }});
             }, []);
 
+            // ★ 스마트 매칭 엔진 (양방향 + 특수문자 무시 + 단어 분할) ★
             const findMatchedRecipes = (menuName) => {
                 if (!menuName || menuName === "일정없음") return [];
-                const cleanMenu = menuName.replace(/\s/g, "");
+                
+                // 1. 특수문자 제거 후 순수 글자만 남김
+                const cleanMenu = menuName.replace(/[^가-힣a-zA-Z0-9]/g, "");
+                // 2. 메뉴를 단어 단위로 쪼갬 (쉼표, 띄어쓰기 등 기준)
+                const menuWords = menuName.split(/[\s,/]+/).filter(w => w.length > 1);
+
                 return Object.values(recipeMap).filter(recipe => {
                     if (!recipe.key) return false;
-                    const cleanKey = recipe.key.replace(/\s/g, "");
-                    return cleanMenu.includes(cleanKey);
+                    const cleanKey = recipe.key.replace(/[^가-힣a-zA-Z0-9]/g, "");
+                    
+                    // 매칭 로직 1: 메뉴 안에 레시피 키가 있는가? (기본)
+                    // 예: "버섯불고기" 메뉴에 "불고기" 레시피 -> OK
+                    const match1 = cleanMenu.includes(cleanKey);
+
+                    // 매칭 로직 2: 레시피 키 안에 메뉴 단어가 있는가? (역방향)
+                    // 예: "불고기" 메뉴에 "소고기버섯불고기" 레시피 -> OK
+                    // 단, 너무 짧은 단어는 제외 (최소 2글자 이상)
+                    const match2 = cleanKey.length > 1 && cleanMenu.length > 1 && cleanKey.includes(cleanMenu);
+
+                    // 매칭 로직 3: 단어 단위 매칭 (정밀)
+                    // 예: "밥, 국, 불고기" 메뉴 -> "불고기" 단어 추출 -> "소고기불고기" 키와 비교
+                    const match3 = menuWords.some(word => cleanKey.includes(word) || word.includes(cleanKey));
+
+                    return match1 || match2 || match3;
                 });
             };
 
@@ -210,7 +225,8 @@
                 const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12 && q !== "");
                 return menus.filter(m => {
                     if (isMonthSearch) return String(new Date(m.date).getMonth() + 1).padStart(2, '0') === q.replace("월","").padStart(2,'0');
-                    return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
+                    const duty = m.duty || "";
+                    return (m.morning + m.lunch + m.dinner + duty).toLowerCase().includes(q);
                 }).sort((a,b) => new Date(b.date) - new Date(a.date));
             }, [modalSearch, searchTerm, activeModal, menus]);
 
@@ -262,7 +278,7 @@
                 <div className="flex flex-col h-full w-full">
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v15.9</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v16.1</span></h1>
                             <div className="hidden md:flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
                                     {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
@@ -282,7 +298,7 @@
                             </select>
                         </div>
                         <div className="flex gap-2">
-                             <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-24 md:w-40 border outline-none" placeholder="메뉴/날짜" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleSearch()}/>
+                             <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-24 md:w-40 border outline-none" placeholder="메뉴/날짜/근무" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleSearch()}/>
                              <button onClick={handleSearch} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
                         </div>
                     </header>
@@ -301,6 +317,7 @@
                                                         {d.data.morning && <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>}
                                                         {d.data.lunch && <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>}
                                                         {d.data.dinner && <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>}
+                                                        {d.data.duty && <div className="menu-text bg-slate-100 text-slate-500 font-normal">근:{d.data.duty}</div>}
                                                     </div>
                                                 )}
                                             </>
@@ -314,6 +331,16 @@
                                 <div className="space-y-4">
                                     <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1">DAILY MENU</h2>
                                     <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
+                                    
+                                    {selectedDate.duty && (
+                                        <div className="p-4 rounded-xl border mb-3 bg-slate-50 border-slate-200">
+                                            <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Shift Schedule</div>
+                                            <div className="text-sm font-black text-slate-800">
+                                                👨‍🍳 {selectedDate.duty}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <MenuCard text={selectedDate.morning} type="Morning" />
                                     <MenuCard text={selectedDate.lunch} type="Lunch" />
                                     <MenuCard text={selectedDate.dinner} type="Dinner" />
@@ -333,6 +360,7 @@
                                 {currentSearchResults.map((m, i) => (
                                     <div key={i} className="bg-slate-50 p-4 rounded-xl border">
                                         <div className="font-black text-blue-600 mb-2">{m.date}</div>
+                                        {m.duty && <div className="text-xs font-bold text-slate-500 mb-2">근무: {m.duty}</div>}
                                         <MenuCard text={m.morning} type="Morning" query={modalSearch} />
                                         <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
                                         <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
