@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v16.1 (Smart Match)</title>
+    <title>MISOYON MMS v16.2 (Detail Shift)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -36,12 +36,18 @@
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
         .tab-btn { padding: 8px 16px; font-size: 12px; font-weight: 900; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; }
         .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
+        
+        /* 근무표 스타일 */
+        .duty-row { display: flex; font-size: 11px; padding: 4px 0; border-bottom: 1px dashed #e2e8f0; }
+        .duty-row:last-child { border-bottom: none; }
+        .duty-time { font-weight: 900; color: #d97706; width: 85px; flex-shrink: 0; }
+        .duty-name { font-weight: 600; color: #1e293b; }
     </style>
 </head>
 <body>
     <div id="root">
         <div style="display:flex;justify-content:center;align-items:center;height:100vh;font-weight:900;color:#ccc;">
-            MISOYON v16.1 INITIALIZING...
+            MISOYON v16.2 INITIALIZING...
         </div>
     </div>
     
@@ -52,7 +58,7 @@
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
 
-            // 내장 영양성분 DB
+            // ★ 영양성분 DB ★
             const BUILT_IN_NUTRITION = {
                 "영광굴비": "1인분 180kcal | 단백질 22g | 지방 9g | 나트륨 450mg",
                 "주꾸미전복": "1인분 280kcal | 단백질 28g | 타우린 풍부 | 콜레스테롤 150mg",
@@ -131,16 +137,24 @@
                                 const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
                                 return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
                             });
-                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "" }); });
+                            // 날짜 객체 초기화 (duty 배열 추가)
+                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "", duty: [] }); });
                         } else if (headers.length > 0) {
                             vals.forEach((v, i) => {
                                 if (!headers[i]) return;
                                 const t = temp.find(m => m.date === headers[i]);
-                                if (t) {
+                                if (t && v && v.trim() !== "") { // 값이 있는 경우만 처리
                                     if (label.includes("아침")) t.morning = v;
                                     else if (label.includes("점심")) t.lunch = v;
                                     else if (label.includes("저녁")) t.dinner = v;
-                                    else if (label.includes("근무") || label.includes("당직")) t.duty = v;
+                                    
+                                    // ★ 근무현황 파싱 업그레이드 ★
+                                    // 1. 시간 패턴 (숫자:숫자)이 있거나
+                                    // 2. '휴가', '연차', '근무', '당직' 단어가 있거나
+                                    // 3. 물결표시(~)가 있으면 근무표로 인식하여 배열에 추가
+                                    else if (label.match(/\d/)|| label.includes("휴가") || label.includes("근무") || label.includes("당직") || label.includes("~")) {
+                                        t.duty.push({ label: label, value: v });
+                                    }
                                 }
                             });
                         }
@@ -175,32 +189,17 @@
                 }});
             }, []);
 
-            // ★ 스마트 매칭 엔진 (양방향 + 특수문자 무시 + 단어 분할) ★
             const findMatchedRecipes = (menuName) => {
                 if (!menuName || menuName === "일정없음") return [];
-                
-                // 1. 특수문자 제거 후 순수 글자만 남김
                 const cleanMenu = menuName.replace(/[^가-힣a-zA-Z0-9]/g, "");
-                // 2. 메뉴를 단어 단위로 쪼갬 (쉼표, 띄어쓰기 등 기준)
                 const menuWords = menuName.split(/[\s,/]+/).filter(w => w.length > 1);
 
                 return Object.values(recipeMap).filter(recipe => {
                     if (!recipe.key) return false;
                     const cleanKey = recipe.key.replace(/[^가-힣a-zA-Z0-9]/g, "");
-                    
-                    // 매칭 로직 1: 메뉴 안에 레시피 키가 있는가? (기본)
-                    // 예: "버섯불고기" 메뉴에 "불고기" 레시피 -> OK
                     const match1 = cleanMenu.includes(cleanKey);
-
-                    // 매칭 로직 2: 레시피 키 안에 메뉴 단어가 있는가? (역방향)
-                    // 예: "불고기" 메뉴에 "소고기버섯불고기" 레시피 -> OK
-                    // 단, 너무 짧은 단어는 제외 (최소 2글자 이상)
                     const match2 = cleanKey.length > 1 && cleanMenu.length > 1 && cleanKey.includes(cleanMenu);
-
-                    // 매칭 로직 3: 단어 단위 매칭 (정밀)
-                    // 예: "밥, 국, 불고기" 메뉴 -> "불고기" 단어 추출 -> "소고기불고기" 키와 비교
                     const match3 = menuWords.some(word => cleanKey.includes(word) || word.includes(cleanKey));
-
                     return match1 || match2 || match3;
                 });
             };
@@ -225,8 +224,7 @@
                 const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12 && q !== "");
                 return menus.filter(m => {
                     if (isMonthSearch) return String(new Date(m.date).getMonth() + 1).padStart(2, '0') === q.replace("월","").padStart(2,'0');
-                    const duty = m.duty || "";
-                    return (m.morning + m.lunch + m.dinner + duty).toLowerCase().includes(q);
+                    return (m.morning + m.lunch + m.dinner).toLowerCase().includes(q);
                 }).sort((a,b) => new Date(b.date) - new Date(a.date));
             }, [modalSearch, searchTerm, activeModal, menus]);
 
@@ -278,7 +276,7 @@
                 <div className="flex flex-col h-full w-full">
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v16.1</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v16.2</span></h1>
                             <div className="hidden md:flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>
                                     {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
@@ -317,7 +315,6 @@
                                                         {d.data.morning && <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>}
                                                         {d.data.lunch && <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>}
                                                         {d.data.dinner && <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>}
-                                                        {d.data.duty && <div className="menu-text bg-slate-100 text-slate-500 font-normal">근:{d.data.duty}</div>}
                                                     </div>
                                                 )}
                                             </>
@@ -332,11 +329,20 @@
                                     <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1">DAILY MENU</h2>
                                     <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
                                     
-                                    {selectedDate.duty && (
-                                        <div className="p-4 rounded-xl border mb-3 bg-slate-50 border-slate-200">
-                                            <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Shift Schedule</div>
-                                            <div className="text-sm font-black text-slate-800">
-                                                👨‍🍳 {selectedDate.duty}
+                                    {/* ★ v16.2 근무현황 카드 (여러 줄 표시) ★ */}
+                                    {selectedDate.duty && selectedDate.duty.length > 0 && (
+                                        <div className="p-4 rounded-xl border mb-4 bg-orange-50 border-orange-200">
+                                            <div className="text-[10px] font-black text-orange-800 uppercase mb-2 border-b border-orange-200 pb-1 flex justify-between items-center">
+                                                <span>Shift Schedule</span>
+                                                <span>👨‍🍳</span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                {selectedDate.duty.map((item, idx) => (
+                                                    <div key={idx} className="duty-row">
+                                                        <span className="duty-time">{item.label}</span>
+                                                        <span className="duty-name">{item.value}</span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     )}
@@ -360,7 +366,6 @@
                                 {currentSearchResults.map((m, i) => (
                                     <div key={i} className="bg-slate-50 p-4 rounded-xl border">
                                         <div className="font-black text-blue-600 mb-2">{m.date}</div>
-                                        {m.duty && <div className="text-xs font-bold text-slate-500 mb-2">근무: {m.duty}</div>}
                                         <MenuCard text={m.morning} type="Morning" query={modalSearch} />
                                         <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
                                         <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
