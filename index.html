@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v17.4 (Weekly)</title>
+    <title>MISOYON MMS v17.5</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -15,7 +15,6 @@
         body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
         #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
         
-        /* 캘린더 스타일 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; height: 100%; }
         .calendar-grid { grid-auto-rows: minmax(60px, 1fr); } 
         @media (min-width: 1024px) { .calendar-grid { grid-template-rows: 25px repeat(6, 1fr); grid-auto-rows: auto; } }
@@ -24,7 +23,6 @@
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
         
-        /* 모달 및 팝업 */
         .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
         .recipe-tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; margin-right: 4px; margin-top: 4px; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; }
@@ -33,7 +31,6 @@
         .tab-btn { padding: 8px 16px; font-size: 12px; font-weight: 900; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; }
         .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
         
-        /* 로그인 화면 */
         .login-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .login-box { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 100%; max-width: 320px; text-align: center; }
         .login-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; text-align: center; margin-bottom: 12px; outline: none; transition: all 0.2s; font-weight: 700; }
@@ -70,15 +67,13 @@
             const [currentMonth, setCurrentMonth] = useState(new Date()); 
             const [selectedDate, setSelectedDate] = useState(null);
             
-            // 검색, 모달, 주간보기 상태
             const [searchTerm, setSearchTerm] = useState("");
             const [modalSearch, setModalSearch] = useState("");
             const [activeModal, setActiveModal] = useState(false);
-            const [weeklyModal, setWeeklyModal] = useState(false); // 주간보기 모달
+            const [weeklyModal, setWeeklyModal] = useState(false);
             const [popupRecipes, setPopupRecipes] = useState([]);
             const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
 
-            // 데이터 로딩
             useEffect(() => {
                 Papa.parse(USER_URL, { 
                     download: true, header: false,
@@ -143,7 +138,6 @@
                 });
             }, [isAuthenticated]);
 
-            // 로그인 유지 로직 (원하시면 삭제 가능)
             useEffect(() => {
                 const savedUser = localStorage.getItem("misoyon_user");
                 if (savedUser) { setIsAuthenticated(true); setCurrentUser(savedUser); }
@@ -185,18 +179,23 @@
                 });
             };
 
-            // 주간 데이터 계산 함수
+            // ★ [수정] 날짜 계산 정밀도 향상 버전
             const getWeeklyData = () => {
                 if (!selectedDate) return [];
-                const targetDate = new Date(selectedDate.dateStr);
-                const day = targetDate.getDay(); // 0(일) ~ 6(토)
-                const diff = targetDate.getDate() - day; 
+                
+                // 1. 날짜 문자열을 직접 분해해서 생성 (시차 오류 방지)
+                const [y, m, d] = selectedDate.dateStr.split('-').map(Number);
+                
+                // 2. 해당 날짜 객체 생성
+                const target = new Date(y, m - 1, d);
+                const day = target.getDay(); // 0(일) ~ 6(토)
                 
                 const weekData = [];
                 for(let i=0; i<7; i++) {
-                    const d = new Date(targetDate);
-                    d.setDate(diff + i);
-                    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    // 3. 일요일 기준으로 i일씩 더해서 계산
+                    const tempDate = new Date(y, m - 1, d - day + i);
+                    const dateStr = `${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}-${String(tempDate.getDate()).padStart(2, '0')}`;
+                    
                     const menu = menus.find(m => m.date === dateStr);
                     weekData.push({ date: dateStr, dayIdx: i, menu: menu });
                 }
@@ -283,7 +282,7 @@
                     {/* 상단 헤더 */}
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.4</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.5</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{String(y).slice(2)}년</option>)}</select>
@@ -298,9 +297,7 @@
                         </div>
                     </header>
 
-                    {/* 메인 컨텐츠 */}
                     <main className="flex flex-col lg:flex-row flex-1 overflow-hidden">
-                        {/* 달력 영역 */}
                         <div className="flex-[2] flex flex-col min-h-[55%] lg:min-h-full border-b lg:border-b-0 lg:border-r overflow-hidden">
                             <div className="calendar-grid">
                                 {weekDays.map(d=><div key={d} className="calendar-header">{d}</div>)}
@@ -323,13 +320,11 @@
                             </div>
                         </div>
 
-                        {/* 상세 보기 영역 (우측/하단) */}
                         <aside className="flex-1 bg-white p-4 overflow-y-auto min-h-[45%]">
                             {selectedDate ? (
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center border-b-2 border-blue-600 pb-1">
                                         <h2 className="text-xl font-black italic">DAILY MENU</h2>
-                                        {/* ★ 주간 메뉴 보기 버튼 추가 ★ */}
                                         <button onClick={()=>setWeeklyModal(true)} className="bg-slate-800 text-white px-3 py-1 rounded-lg text-xs font-bold shadow-lg hover:bg-slate-700 transition-all">📅 주간표 보기</button>
                                     </div>
                                     <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
@@ -343,7 +338,6 @@
                         </aside>
                     </main>
 
-                    {/* 주간 메뉴 모달 (Weekly View) */}
                     {weeklyModal && selectedDate && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -370,7 +364,6 @@
                         </div>
                     )}
 
-                    {/* 검색 모달 */}
                     {activeModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -391,7 +384,6 @@
                         </div>
                     )}
 
-                    {/* 레시피 팝업 */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
