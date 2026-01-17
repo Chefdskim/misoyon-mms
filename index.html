@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v17.5</title>
+    <title>MISOYON MMS v17.6</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -45,7 +45,7 @@
 
         const MisoYonApp = () => {
             // =========================================================================
-            // 셰프님의 링크 설정 (수정 금지)
+            // 링크 설정 (수정 금지)
             // =========================================================================
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
@@ -179,27 +179,30 @@
                 });
             };
 
-            // ★ [수정] 날짜 계산 정밀도 향상 버전
+            // ★ [수정 완료] 오류 원인이었던 변수명 수정 (dateStr -> date)
             const getWeeklyData = () => {
-                if (!selectedDate) return [];
+                if (!selectedDate || !selectedDate.date) return []; // 안전장치 추가
                 
-                // 1. 날짜 문자열을 직접 분해해서 생성 (시차 오류 방지)
-                const [y, m, d] = selectedDate.dateStr.split('-').map(Number);
-                
-                // 2. 해당 날짜 객체 생성
-                const target = new Date(y, m - 1, d);
-                const day = target.getDay(); // 0(일) ~ 6(토)
-                
-                const weekData = [];
-                for(let i=0; i<7; i++) {
-                    // 3. 일요일 기준으로 i일씩 더해서 계산
-                    const tempDate = new Date(y, m - 1, d - day + i);
-                    const dateStr = `${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}-${String(tempDate.getDate()).padStart(2, '0')}`;
+                try {
+                    // 1. 여기서 에러가 났었습니다. 이제 'date'를 정확히 찾아옵니다.
+                    const [y, m, d] = selectedDate.date.split('-').map(Number);
                     
-                    const menu = menus.find(m => m.date === dateStr);
-                    weekData.push({ date: dateStr, dayIdx: i, menu: menu });
+                    const target = new Date(y, m - 1, d);
+                    const day = target.getDay(); 
+                    
+                    const weekData = [];
+                    for(let i=0; i<7; i++) {
+                        const tempDate = new Date(y, m - 1, d - day + i);
+                        const dateStr = `${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}-${String(tempDate.getDate()).padStart(2, '0')}`;
+                        
+                        const menu = menus.find(m => m.date === dateStr);
+                        weekData.push({ date: dateStr, dayIdx: i, menu: menu });
+                    }
+                    return weekData;
+                } catch (e) {
+                    console.error("Weekly data error:", e);
+                    return [];
                 }
-                return weekData;
             };
 
             const calDays = useMemo(() => {
@@ -282,7 +285,7 @@
                     {/* 상단 헤더 */}
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.5</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.6</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{String(y).slice(2)}년</option>)}</select>
