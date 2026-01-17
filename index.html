@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v17.2 (ID/PW)</title>
+    <title>MISOYON MMS v17.2</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -15,7 +15,6 @@
         body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
         #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
         
-        /* 기존 스타일 유지 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; height: 100%; }
         .calendar-grid { grid-auto-rows: minmax(60px, 1fr); } 
         @media (min-width: 1024px) { .calendar-grid { grid-template-rows: 25px repeat(6, 1fr); grid-auto-rows: auto; } }
@@ -31,7 +30,6 @@
         .tab-btn { padding: 8px 16px; font-size: 12px; font-weight: 900; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; }
         .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
         
-        /* 로그인 화면 스타일 (업데이트) */
         .login-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .login-box { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 100%; max-width: 320px; text-align: center; }
         .login-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; text-align: center; margin-bottom: 12px; outline: none; transition: all 0.2s; font-weight: 700; }
@@ -46,17 +44,16 @@
         const { useState, useEffect, useMemo } = React;
 
         const MisoYonApp = () => {
-            // ★ 여기에 '사용자' 시트의 CSV 주소를 다시 넣어주세요! ★
-            const USER_URL = "여기에_새로운_사용자_시트_URL을_넣어주세요"; 
+            // ★ 셰프님이 주신 링크를 적용했습니다! ★
+            const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             
-            // 비상용 관리자 계정 (이름: 관리자 / 비번: 2026)
+            // 비상용 계정 (관리자/2026)
             const ADMIN_NAME = "관리자";
             const ADMIN_CODE = "2026";
 
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [currentUser, setCurrentUser] = useState("");
             
-            // ★ 입력 상태: 이름과 코드 2가지 관리 ★
             const [inputName, setInputName] = useState("");
             const [inputCode, setInputCode] = useState("");
             const [loginError, setLoginError] = useState("");
@@ -64,22 +61,34 @@
 
             // 사용자 목록 로딩
             useEffect(() => {
-                if (!USER_URL || USER_URL.includes("여기에")) return;
-                Papa.parse(USER_URL, { download: true, complete: (res) => {
-                    const users = [];
-                    res.data.forEach(row => {
-                        // row[0]: 이름, row[1]: 코드
-                        if (row.length >= 2 && row[1]) {
-                            const name = (row[0] || "").trim();
-                            const code = (row[1] || "").trim();
-                            if(name && code) users.push({ name, code });
-                        }
-                    });
-                    setUserList(users);
-                }});
+                Papa.parse(USER_URL, { 
+                    download: true,
+                    header: false, // 헤더 없이 읽어서 2번째 줄부터 처리
+                    complete: (res) => {
+                        console.log("시트 데이터 로딩 성공:", res.data);
+                        const users = [];
+                        res.data.forEach((row, index) => {
+                            // 첫 줄(index 0)은 제목일 수 있으니 건너뜀 (단, 제목이 아닐 수도 있으니 내용 체크)
+                            // 이름(row[0])과 코드(row[1])가 둘 다 있어야 함
+                            if (row.length >= 2 && row[1]) {
+                                const name = (row[0] || "").trim();
+                                const code = (row[1] || "").trim();
+                                // "이름"이나 "코드"라는 글자가 아닌 실제 데이터만 저장
+                                if(name && code && name !== "이름" && code !== "코드") {
+                                    users.push({ name, code });
+                                }
+                            }
+                        });
+                        setUserList(users);
+                    },
+                    error: (err) => {
+                        console.error("시트 로딩 실패:", err);
+                        // 에러가 나도 화면을 멈추지 않음 (비상용 계정 로그인을 위해)
+                    }
+                });
             }, []);
 
-            // 자동 로그인 체크
+            // 자동 로그인
             useEffect(() => {
                 const savedUser = localStorage.getItem("misoyon_user");
                 if (savedUser) {
@@ -92,7 +101,6 @@
                 const iName = inputName.trim();
                 const iCode = inputCode.trim();
 
-                // 1. 시트에서 일치하는 사용자 찾기 (이름 && 코드)
                 const foundUser = userList.find(u => u.name === iName && u.code === iCode);
                 
                 if (foundUser) {
@@ -100,15 +108,16 @@
                     setCurrentUser(foundUser.name);
                     localStorage.setItem("misoyon_user", foundUser.name);
                 } 
-                // 2. 비상용 관리자 계정 체크
                 else if (iName === ADMIN_NAME && iCode === ADMIN_CODE) {
                     setIsAuthenticated(true);
                     setCurrentUser("관리자");
                     localStorage.setItem("misoyon_user", "관리자");
                 } 
                 else {
-                    setLoginError("이름 또는 비밀번호가 올바르지 않습니다.");
-                    setInputCode(""); // 코드는 지워줌
+                    // ★ 디버깅용 힌트 (실패 시에만 콘솔에 명단 출력)
+                    console.log("현재 로딩된 명단:", userList);
+                    setLoginError("이름 또는 비밀번호가 일치하지 않습니다.");
+                    setInputCode("");
                 }
             };
 
@@ -119,7 +128,7 @@
                 window.location.reload();
             };
 
-            // ---- 기존 App 로직 (v16.7 동일) ----
+            // ---- 기존 메뉴/레시피 로직 ----
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
             const DEFAULT_RECIPES = {};
@@ -249,7 +258,6 @@
 
             const handleSearch = () => { setModalSearch(searchTerm); setActiveModal(true); };
 
-            // ★ 로그인 화면 (ID/PW 방식) ★
             if (!isAuthenticated) {
                 return (
                     <div className="login-screen">
@@ -257,26 +265,13 @@
                             <h1 className="text-2xl font-black italic tracking-tighter mb-2">MISOYON <span className="text-blue-600">MMS</span></h1>
                             <p className="text-xs text-slate-400 font-bold mb-6">AUTHORIZED ACCESS ONLY</p>
                             
-                            {/* 이름 입력 */}
-                            <input 
-                                type="text" 
-                                className={`login-input ${loginError ? 'border-red-500 bg-red-50' : ''}`}
-                                placeholder="이름 (Name)" 
-                                value={inputName} 
-                                onChange={e => { setInputName(e.target.value); setLoginError(""); }}
-                                onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                            />
+                            <input type="text" className={`login-input ${loginError ? 'border-red-500 bg-red-50' : ''}`}
+                                placeholder="이름 (Name)" value={inputName} onChange={e => { setInputName(e.target.value); setLoginError(""); }}
+                                onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                             
-                            {/* 비밀번호 입력 */}
-                            <input 
-                                type="password" 
-                                inputMode="numeric" 
-                                className={`login-input ${loginError ? 'border-red-500 bg-red-50' : ''}`}
-                                placeholder="비밀번호 (Code)" 
-                                value={inputCode} 
-                                onChange={e => { setInputCode(e.target.value); setLoginError(""); }}
-                                onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                            />
+                            <input type="password" inputMode="numeric" className={`login-input ${loginError ? 'border-red-500 bg-red-50' : ''}`}
+                                placeholder="비밀번호 (Code)" value={inputCode} onChange={e => { setInputCode(e.target.value); setLoginError(""); }}
+                                onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                             
                             <button onClick={handleLogin} className="login-btn">LOGIN</button>
                             {loginError && <p className="text-red-500 text-xs font-bold mt-3 animate-bounce">{loginError}</p>}
@@ -286,16 +281,13 @@
                 );
             }
 
-            // ★ 메인 화면 (변경 없음) ★
             const currentRecipe = popupRecipes[activeRecipeIndex];
             return (
                 <div className="flex flex-col h-full w-full">
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
                             <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.2</span></h1>
-                            <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">
-                                👨‍🍳 {currentUser}님
-                            </div>
+                            <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}님</div>
                             <div className="hidden md:flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
                                 <select className="bg-transparent ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>{Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}</select>
