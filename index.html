@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v17.6</title>
+    <title>MISOYON MMS v17.7</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -179,22 +179,16 @@
                 });
             };
 
-            // ★ [수정 완료] 오류 원인이었던 변수명 수정 (dateStr -> date)
             const getWeeklyData = () => {
-                if (!selectedDate || !selectedDate.date) return []; // 안전장치 추가
-                
+                if (!selectedDate || !selectedDate.date) return [];
                 try {
-                    // 1. 여기서 에러가 났었습니다. 이제 'date'를 정확히 찾아옵니다.
                     const [y, m, d] = selectedDate.date.split('-').map(Number);
-                    
                     const target = new Date(y, m - 1, d);
                     const day = target.getDay(); 
-                    
                     const weekData = [];
                     for(let i=0; i<7; i++) {
                         const tempDate = new Date(y, m - 1, d - day + i);
                         const dateStr = `${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}-${String(tempDate.getDate()).padStart(2, '0')}`;
-                        
                         const menu = menus.find(m => m.date === dateStr);
                         weekData.push({ date: dateStr, dayIdx: i, menu: menu });
                     }
@@ -259,7 +253,8 @@
                 );
             };
 
-            const yearOptions = Array.from({length: 10}, (_, i) => 2024 + i);
+            // ★ 2020년 ~ 2035년까지로 범위 확장
+            const yearOptions = Array.from({length: 16}, (_, i) => 2020 + i);
             const weekDays = ['일','월','화','수','목','금','토'];
 
             if (!isAuthenticated) {
@@ -285,10 +280,10 @@
                     {/* 상단 헤더 */}
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.6</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.7</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
-                                <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{String(y).slice(2)}년</option>)}</select>
+                                <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
                                 <span className="mx-1">/</span>
                                 <select className="bg-transparent" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>{Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}</select>
                             </div>
