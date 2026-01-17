@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v17.1 (Final)</title>
+    <title>MISOYON MMS v17.2 (ID/PW)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -15,11 +15,10 @@
         body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
         #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
         
+        /* 기존 스타일 유지 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; height: 100%; }
         .calendar-grid { grid-auto-rows: minmax(60px, 1fr); } 
-        @media (min-width: 1024px) {
-            .calendar-grid { grid-template-rows: 25px repeat(6, 1fr); grid-auto-rows: auto; }
-        }
+        @media (min-width: 1024px) { .calendar-grid { grid-template-rows: 25px repeat(6, 1fr); grid-auto-rows: auto; } }
         .calendar-header { background: #f8fafc; text-align: center; font-size: 9px; font-weight: 900; color: #94a3b8; padding: 4px 0; }
         .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
@@ -31,16 +30,13 @@
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
         .tab-btn { padding: 8px 16px; font-size: 12px; font-weight: 900; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; }
         .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
-        .duty-row { display: flex; font-size: 12px; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; align-items: center; }
-        .duty-row:last-child { border-bottom: none; }
-        .duty-content { font-weight: 700; color: #334155; margin-left: 8px; }
-        .duty-icon { width: 6px; height: 6px; background: #fbbf24; border-radius: 50%; display: inline-block; flex-shrink: 0; }
         
+        /* 로그인 화면 스타일 (업데이트) */
         .login-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .login-box { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 100%; max-width: 320px; text-align: center; }
-        .login-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; text-align: center; margin-bottom: 16px; outline: none; transition: all 0.2s; font-weight: 800; letter-spacing: 2px; }
+        .login-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; text-align: center; margin-bottom: 12px; outline: none; transition: all 0.2s; font-weight: 700; }
         .login-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-        .login-btn { width: 100%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 14px; transition: all 0.2s; }
+        .login-btn { width: 100%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 14px; transition: all 0.2s; margin-top: 4px; }
         .login-btn:active { transform: scale(0.98); }
     </style>
 </head>
@@ -50,33 +46,40 @@
         const { useState, useEffect, useMemo } = React;
 
         const MisoYonApp = () => {
-            // ★ 셰프님이 주신 사용자 시트 URL 연동 완료 ★
-            const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
+            // ★ 여기에 '사용자' 시트의 CSV 주소를 다시 넣어주세요! ★
+            const USER_URL = "여기에_새로운_사용자_시트_URL을_넣어주세요"; 
             
-            // 비상용 백도어 (시트 오류 시 사용)
-            const ADMIN_BACKDOOR = "2026"; 
+            // 비상용 관리자 계정 (이름: 관리자 / 비번: 2026)
+            const ADMIN_NAME = "관리자";
+            const ADMIN_CODE = "2026";
 
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [currentUser, setCurrentUser] = useState("");
+            
+            // ★ 입력 상태: 이름과 코드 2가지 관리 ★
+            const [inputName, setInputName] = useState("");
             const [inputCode, setInputCode] = useState("");
             const [loginError, setLoginError] = useState("");
             const [userList, setUserList] = useState([]);
 
+            // 사용자 목록 로딩
             useEffect(() => {
-                if (!USER_URL) return;
+                if (!USER_URL || USER_URL.includes("여기에")) return;
                 Papa.parse(USER_URL, { download: true, complete: (res) => {
                     const users = [];
                     res.data.forEach(row => {
+                        // row[0]: 이름, row[1]: 코드
                         if (row.length >= 2 && row[1]) {
-                            const name = row[0].trim();
-                            const code = row[1].trim();
-                            if(code) users.push({ name, code });
+                            const name = (row[0] || "").trim();
+                            const code = (row[1] || "").trim();
+                            if(name && code) users.push({ name, code });
                         }
                     });
                     setUserList(users);
                 }});
             }, []);
 
+            // 자동 로그인 체크
             useEffect(() => {
                 const savedUser = localStorage.getItem("misoyon_user");
                 if (savedUser) {
@@ -86,21 +89,26 @@
             }, []);
 
             const handleLogin = () => {
-                const foundUser = userList.find(u => u.code === inputCode);
+                const iName = inputName.trim();
+                const iCode = inputCode.trim();
+
+                // 1. 시트에서 일치하는 사용자 찾기 (이름 && 코드)
+                const foundUser = userList.find(u => u.name === iName && u.code === iCode);
                 
                 if (foundUser) {
                     setIsAuthenticated(true);
                     setCurrentUser(foundUser.name);
                     localStorage.setItem("misoyon_user", foundUser.name);
                 } 
-                else if (inputCode === ADMIN_BACKDOOR) {
+                // 2. 비상용 관리자 계정 체크
+                else if (iName === ADMIN_NAME && iCode === ADMIN_CODE) {
                     setIsAuthenticated(true);
                     setCurrentUser("관리자");
                     localStorage.setItem("misoyon_user", "관리자");
                 } 
                 else {
-                    setLoginError("등록되지 않은 코드입니다.");
-                    setInputCode("");
+                    setLoginError("이름 또는 비밀번호가 올바르지 않습니다.");
+                    setInputCode(""); // 코드는 지워줌
                 }
             };
 
@@ -111,6 +119,7 @@
                 window.location.reload();
             };
 
+            // ---- 기존 App 로직 (v16.7 동일) ----
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
             const DEFAULT_RECIPES = {};
@@ -240,13 +249,35 @@
 
             const handleSearch = () => { setModalSearch(searchTerm); setActiveModal(true); };
 
+            // ★ 로그인 화면 (ID/PW 방식) ★
             if (!isAuthenticated) {
                 return (
                     <div className="login-screen">
                         <div className="login-box">
                             <h1 className="text-2xl font-black italic tracking-tighter mb-2">MISOYON <span className="text-blue-600">MMS</span></h1>
-                            <p className="text-xs text-slate-400 font-bold mb-6">AUTHORIZED PERSONNEL ONLY</p>
-                            <input type="password" inputMode="numeric" className={`login-input ${loginError ? 'border-red-500 bg-red-50' : ''}`} placeholder="ACCESS CODE" value={inputCode} onChange={e => { setInputCode(e.target.value); setLoginError(""); }} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+                            <p className="text-xs text-slate-400 font-bold mb-6">AUTHORIZED ACCESS ONLY</p>
+                            
+                            {/* 이름 입력 */}
+                            <input 
+                                type="text" 
+                                className={`login-input ${loginError ? 'border-red-500 bg-red-50' : ''}`}
+                                placeholder="이름 (Name)" 
+                                value={inputName} 
+                                onChange={e => { setInputName(e.target.value); setLoginError(""); }}
+                                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                            />
+                            
+                            {/* 비밀번호 입력 */}
+                            <input 
+                                type="password" 
+                                inputMode="numeric" 
+                                className={`login-input ${loginError ? 'border-red-500 bg-red-50' : ''}`}
+                                placeholder="비밀번호 (Code)" 
+                                value={inputCode} 
+                                onChange={e => { setInputCode(e.target.value); setLoginError(""); }}
+                                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                            />
+                            
                             <button onClick={handleLogin} className="login-btn">LOGIN</button>
                             {loginError && <p className="text-red-500 text-xs font-bold mt-3 animate-bounce">{loginError}</p>}
                             <p className="text-[10px] text-slate-300 font-bold mt-6">System by Chef_dskim Lab.</p>
@@ -255,13 +286,16 @@
                 );
             }
 
+            // ★ 메인 화면 (변경 없음) ★
             const currentRecipe = popupRecipes[activeRecipeIndex];
             return (
                 <div className="flex flex-col h-full w-full">
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.1</span></h1>
-                            <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}님</div>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.2</span></h1>
+                            <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">
+                                👨‍🍳 {currentUser}님
+                            </div>
                             <div className="hidden md:flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
                                 <select className="bg-transparent ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>{Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}</select>
@@ -368,4 +402,3 @@
     </script>
 </body>
 </html>
-
