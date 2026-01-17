@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v17.2</title>
+    <title>MISOYON MMS Final</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -15,13 +15,16 @@
         body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
         #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
         
+        /* 캘린더 스타일 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; height: 100%; }
         .calendar-grid { grid-auto-rows: minmax(60px, 1fr); } 
         @media (min-width: 1024px) { .calendar-grid { grid-template-rows: 25px repeat(6, 1fr); grid-auto-rows: auto; } }
         .calendar-header { background: #f8fafc; text-align: center; font-size: 9px; font-weight: 900; color: #94a3b8; padding: 4px 0; }
-        .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+        .calendar-day { background: white; padding: 2px 4px; cursor: pointer; display: flex; flex-direction: column; overflow: hidden; min-height: 0; position: relative; }
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
+        
+        /* 모달 및 팝업 */
         .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
         .recipe-tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; margin-right: 4px; margin-top: 4px; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; }
@@ -30,12 +33,12 @@
         .tab-btn { padding: 8px 16px; font-size: 12px; font-weight: 900; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; }
         .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
         
+        /* 로그인 화면 */
         .login-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .login-box { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 100%; max-width: 320px; text-align: center; }
         .login-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; text-align: center; margin-bottom: 12px; outline: none; transition: all 0.2s; font-weight: 700; }
         .login-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
         .login-btn { width: 100%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 14px; transition: all 0.2s; margin-top: 4px; }
-        .login-btn:active { transform: scale(0.98); }
     </style>
 </head>
 <body>
@@ -44,80 +47,153 @@
         const { useState, useEffect, useMemo } = React;
 
         const MisoYonApp = () => {
-            // ★ 셰프님이 주신 링크를 적용했습니다! ★
+            // =========================================================================
+            // 셰프님이 주신 3개의 핵심 링크 (절대 수정 금지)
+            // =========================================================================
+            
+            // 1. 사용자 명단 (로그인용)
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             
-            // 비상용 계정 (관리자/2026)
+            // 2. 메뉴판 (달력 표시용 - gid=0)
+            const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
+            
+            // 3. 레시피북 (검색 및 팝업용 - gid=9498...)
+            const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
+
+            // =========================================================================
+
+            // 관리자 비상 로그인
             const ADMIN_NAME = "관리자";
             const ADMIN_CODE = "2026";
 
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [currentUser, setCurrentUser] = useState("");
-            
             const [inputName, setInputName] = useState("");
             const [inputCode, setInputCode] = useState("");
             const [loginError, setLoginError] = useState("");
             const [userList, setUserList] = useState([]);
+            
+            const [menus, setMenus] = useState([]);
+            const [recipeMap, setRecipeMap] = useState({});
+            
+            // 달력 상태
+            const [currentMonth, setCurrentMonth] = useState(new Date()); // 오늘 날짜 기준
+            const [selectedDate, setSelectedDate] = useState(null);
+            
+            // 검색 및 팝업 상태
+            const [searchTerm, setSearchTerm] = useState("");
+            const [modalSearch, setModalSearch] = useState("");
+            const [activeModal, setActiveModal] = useState(false);
+            const [popupRecipes, setPopupRecipes] = useState([]);
+            const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
 
-            // 사용자 목록 로딩
+            // 1. 사용자 데이터 로딩
             useEffect(() => {
                 Papa.parse(USER_URL, { 
                     download: true,
-                    header: false, // 헤더 없이 읽어서 2번째 줄부터 처리
+                    header: false,
                     complete: (res) => {
-                        console.log("시트 데이터 로딩 성공:", res.data);
                         const users = [];
-                        res.data.forEach((row, index) => {
-                            // 첫 줄(index 0)은 제목일 수 있으니 건너뜀 (단, 제목이 아닐 수도 있으니 내용 체크)
-                            // 이름(row[0])과 코드(row[1])가 둘 다 있어야 함
+                        res.data.forEach(row => {
                             if (row.length >= 2 && row[1]) {
                                 const name = (row[0] || "").trim();
                                 const code = (row[1] || "").trim();
-                                // "이름"이나 "코드"라는 글자가 아닌 실제 데이터만 저장
                                 if(name && code && name !== "이름" && code !== "코드") {
                                     users.push({ name, code });
                                 }
                             }
                         });
                         setUserList(users);
-                    },
-                    error: (err) => {
-                        console.error("시트 로딩 실패:", err);
-                        // 에러가 나도 화면을 멈추지 않음 (비상용 계정 로그인을 위해)
                     }
                 });
             }, []);
 
-            // 자동 로그인
+            // 2. 메뉴 데이터 로딩
+            useEffect(() => {
+                if (!isAuthenticated) return;
+                Papa.parse(MENU_URL, { 
+                    download: true, 
+                    complete: (res) => {
+                        let temp = []; let headers = [];
+                        res.data.forEach(row => {
+                            const label = (row[0] || "").replace(/\s/g, "");
+                            const vals = row.slice(1);
+                            
+                            // "날짜" 행 찾기 (헤더 파싱)
+                            if (label === "날짜") {
+                                headers = vals.map(v => {
+                                    const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
+                                    return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
+                                });
+                                // 날짜 틀 미리 만들기
+                                headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "", duty: "", packing: "" }); });
+                            } 
+                            // 메뉴 데이터 매핑
+                            else if (headers.length > 0) {
+                                vals.forEach((v, i) => {
+                                    if (!headers[i]) return;
+                                    const t = temp.find(m => m.date === headers[i]);
+                                    if (t && v && v.trim() !== "") {
+                                        if (label.includes("아침")) t.morning = v;
+                                        else if (label.includes("점심")) t.lunch = v;
+                                        else if (label.includes("저녁")) t.dinner = v;
+                                        else if (label.includes("근무") || label.includes("당직") || label.match(/\d/)) t.duty = t.duty ? t.duty + " / " + v : v;
+                                        else if (label.includes("포장") || label.includes("Takeout")) t.packing = v;
+                                    }
+                                });
+                            }
+                        });
+                        console.log("메뉴 로딩 완료:", temp.length);
+                        setMenus(temp);
+                    },
+                    error: (err) => console.log("메뉴 로딩 실패:", err)
+                });
+
+                // 레시피 로딩
+                Papa.parse(RECIPE_URL, { 
+                    download: true, 
+                    complete: (res) => {
+                        const newRecipes = {};
+                        res.data.forEach(row => {
+                            // 시트 구조: Key(0), 메뉴명(1), 재료(2), 공정(3), 팁(4), 영양(5)
+                            if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
+                            const key = row[0].trim();
+                            newRecipes[key] = { 
+                                key: key, 
+                                name: row[1] || key, 
+                                ingredients: row[2] || "", 
+                                process: row[3] || "", 
+                                tip: row[4] || "", 
+                                nutrition: row[5] || "" 
+                            };
+                        });
+                        console.log("레시피 로딩 완료:", Object.keys(newRecipes).length);
+                        setRecipeMap(newRecipes);
+                    }
+                });
+            }, [isAuthenticated]);
+
+            // 로그인 처리
             useEffect(() => {
                 const savedUser = localStorage.getItem("misoyon_user");
-                if (savedUser) {
-                    setIsAuthenticated(true);
-                    setCurrentUser(savedUser);
-                }
+                if (savedUser) { setIsAuthenticated(true); setCurrentUser(savedUser); }
             }, []);
 
             const handleLogin = () => {
                 const iName = inputName.trim();
                 const iCode = inputCode.trim();
-
                 const foundUser = userList.find(u => u.name === iName && u.code === iCode);
                 
                 if (foundUser) {
                     setIsAuthenticated(true);
                     setCurrentUser(foundUser.name);
                     localStorage.setItem("misoyon_user", foundUser.name);
-                } 
-                else if (iName === ADMIN_NAME && iCode === ADMIN_CODE) {
+                } else if (iName === ADMIN_NAME && iCode === ADMIN_CODE) {
                     setIsAuthenticated(true);
                     setCurrentUser("관리자");
                     localStorage.setItem("misoyon_user", "관리자");
-                } 
-                else {
-                    // ★ 디버깅용 힌트 (실패 시에만 콘솔에 명단 출력)
-                    console.log("현재 로딩된 명단:", userList);
-                    setLoginError("이름 또는 비밀번호가 일치하지 않습니다.");
-                    setInputCode("");
+                } else {
+                    setLoginError("이름 또는 코드를 확인하세요.");
                 }
             };
 
@@ -128,69 +204,7 @@
                 window.location.reload();
             };
 
-            // ---- 기존 메뉴/레시피 로직 ----
-            const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?output=csv";
-            const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
-            const DEFAULT_RECIPES = {};
-            
-            const [menus, setMenus] = useState([]);
-            const [recipeMap, setRecipeMap] = useState(DEFAULT_RECIPES);
-            const [selectedDate, setSelectedDate] = useState(null);
-            const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
-            const [searchTerm, setSearchTerm] = useState("");
-            const [modalSearch, setModalSearch] = useState("");
-            const [activeModal, setActiveModal] = useState(false);
-            const [popupRecipes, setPopupRecipes] = useState([]);
-            const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
-
-            const yearOptions = useMemo(() => {
-                const years = [];
-                for (let y = 2020; y <= 2035; y++) years.push(y);
-                return years;
-            }, []);
-
-            useEffect(() => {
-                if (!isAuthenticated) return;
-                Papa.parse(MENU_URL, { download: true, complete: (res) => {
-                    let temp = []; let headers = [];
-                    res.data.forEach(row => {
-                        const label = (row[0] || "").replace(/\s/g, "");
-                        const vals = row.slice(1);
-                        if (label === "날짜") {
-                            headers = vals.map(v => {
-                                const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
-                                return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
-                            });
-                            headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "", duty: "", packing: "" }); });
-                        } else if (headers.length > 0) {
-                            vals.forEach((v, i) => {
-                                if (!headers[i]) return;
-                                const t = temp.find(m => m.date === headers[i]);
-                                if (t && v && v.trim() !== "") {
-                                    if (label.includes("아침")) t.morning = v;
-                                    else if (label.includes("점심")) t.lunch = v;
-                                    else if (label.includes("저녁")) t.dinner = v;
-                                    else if (label.includes("근무") || label.includes("당직") || label.match(/\d/)) t.duty = t.duty ? t.duty + " / " + v : v;
-                                    else if (label.includes("포장") || label.includes("Takeout")) t.packing = v;
-                                }
-                            });
-                        }
-                    });
-                    if(temp.length > 0) setMenus(temp);
-                }});
-
-                Papa.parse(RECIPE_URL, { download: true, complete: (res) => {
-                    const newRecipes = {};
-                    res.data.forEach(row => {
-                        if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
-                        const key = row[0].trim();
-                        let nutritionData = row[5] || ""; 
-                        newRecipes[key] = { key: key, name: row[1] || key, ingredients: row[2] || "", process: row[3] || "", tip: row[4] || "", nutrition: nutritionData };
-                    });
-                    if (Object.keys(newRecipes).length > 0) setRecipeMap(newRecipes);
-                }});
-            }, [isAuthenticated]);
-
+            // 검색 및 매칭 로직
             const findMatchedRecipes = (menuName) => {
                 if (!menuName || menuName === "일정없음") return [];
                 const cleanMenu = menuName.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
@@ -202,18 +216,7 @@
                 });
             };
 
-            const currentSearchResults = useMemo(() => {
-                const q = (activeModal ? modalSearch : searchTerm).trim();
-                if (!q || q === "") return [];
-                const query = q.toLowerCase().replace(/\s+/g, "");
-                const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12);
-                return menus.filter(m => {
-                    if (isMonthSearch) return String(new Date(m.date).getMonth() + 1).padStart(2, '0') === q.replace("월","").padStart(2,'0');
-                    const content = (m.morning + m.lunch + m.dinner + (m.duty||"") + (m.packing||"")).toLowerCase().replace(/\s+/g, "");
-                    return content.includes(query);
-                }).sort((a,b) => new Date(b.date) - new Date(a.date));
-            }, [modalSearch, searchTerm, activeModal, menus]);
-
+            // 달력 생성
             const calDays = useMemo(() => {
                 const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
                 const firstDay = new Date(year, month, 1).getDay();
@@ -228,6 +231,20 @@
                 return days;
             }, [currentMonth, menus]);
 
+            // 검색 결과
+            const currentSearchResults = useMemo(() => {
+                const q = (activeModal ? modalSearch : searchTerm).trim();
+                if (!q) return [];
+                const query = q.toLowerCase().replace(/\s+/g, "");
+                const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12);
+                return menus.filter(m => {
+                    if (isMonthSearch) return String(new Date(m.date).getMonth() + 1).padStart(2, '0') === q.replace("월","").padStart(2,'0');
+                    const content = (m.morning + m.lunch + m.dinner + (m.duty||"") + (m.packing||"")).toLowerCase().replace(/\s+/g, "");
+                    return content.includes(query);
+                }).sort((a,b) => new Date(b.date) - new Date(a.date));
+            }, [modalSearch, searchTerm, activeModal, menus]);
+
+            // 하이라이트 & 카드 컴포넌트
             const highlightText = (text, query) => {
                 if (!query || !text || !isNaN(query)) return text;
                 const parts = text.split(new RegExp(`(${query})`, 'gi'));
@@ -256,7 +273,7 @@
                 );
             };
 
-            const handleSearch = () => { setModalSearch(searchTerm); setActiveModal(true); };
+            const yearOptions = Array.from({length: 10}, (_, i) => 2024 + i);
 
             if (!isAuthenticated) {
                 return (
@@ -264,61 +281,53 @@
                         <div className="login-box">
                             <h1 className="text-2xl font-black italic tracking-tighter mb-2">MISOYON <span className="text-blue-600">MMS</span></h1>
                             <p className="text-xs text-slate-400 font-bold mb-6">AUTHORIZED ACCESS ONLY</p>
-                            
-                            <input type="text" className={`login-input ${loginError ? 'border-red-500 bg-red-50' : ''}`}
-                                placeholder="이름 (Name)" value={inputName} onChange={e => { setInputName(e.target.value); setLoginError(""); }}
-                                onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-                            
-                            <input type="password" inputMode="numeric" className={`login-input ${loginError ? 'border-red-500 bg-red-50' : ''}`}
-                                placeholder="비밀번호 (Code)" value={inputCode} onChange={e => { setInputCode(e.target.value); setLoginError(""); }}
-                                onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-                            
+                            <input type="text" className="login-input" placeholder="이름 (Name)" value={inputName} onChange={e => setInputName(e.target.value)} />
+                            <input type="password" inputMode="numeric" className="login-input" placeholder="비밀번호 (Code)" value={inputCode} onChange={e => setInputCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                             <button onClick={handleLogin} className="login-btn">LOGIN</button>
-                            {loginError && <p className="text-red-500 text-xs font-bold mt-3 animate-bounce">{loginError}</p>}
-                            <p className="text-[10px] text-slate-300 font-bold mt-6">System by Chef_dskim Lab.</p>
+                            {loginError && <p className="text-red-500 text-xs font-bold mt-3">{loginError}</p>}
                         </div>
                     </div>
                 );
             }
 
             const currentRecipe = popupRecipes[activeRecipeIndex];
+
             return (
                 <div className="flex flex-col h-full w-full">
+                    {/* 상단 헤더 */}
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.2</span></h1>
-                            <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}님</div>
-                            <div className="hidden md:flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
-                                <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
-                                <select className="bg-transparent ml-2" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>{Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}</select>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.3</span></h1>
+                            <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
+                            <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
+                                <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{String(y).slice(2)}년</option>)}</select>
+                                <span className="mx-1">/</span>
+                                <select className="bg-transparent" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>{Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}</select>
                             </div>
                         </div>
-                        <div className="md:hidden flex items-center font-bold text-xs bg-slate-100 px-2 py-1 rounded-lg gap-1">
-                             <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{String(y).slice(2)}년</option>)}</select>
-                             <span>/</span>
-                             <select className="bg-transparent" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>{Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}</select>
-                        </div>
                         <div className="flex gap-2">
-                             <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-24 md:w-40 border outline-none" placeholder="메뉴/날짜" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleSearch()}/>
-                             <button onClick={handleSearch} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">SEARCH</button>
-                             <button onClick={handleLogout} className="bg-slate-800 text-white px-3 py-1 rounded-lg font-black text-[10px]">LOGOUT</button>
+                             <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-20 md:w-32 border outline-none" placeholder="검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
+                             <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">GO</button>
+                             <button onClick={handleLogout} className="bg-slate-800 text-white px-3 py-1 rounded-lg font-black text-[10px]">OUT</button>
                         </div>
                     </header>
+
+                    {/* 메인 컨텐츠 */}
                     <main className="flex flex-col lg:flex-row flex-1 overflow-hidden">
-                        <div className="flex-[2] flex flex-col min-h-[50%] lg:min-h-full border-b lg:border-b-0 lg:border-r overflow-hidden">
+                        {/* 달력 영역 */}
+                        <div className="flex-[2] flex flex-col min-h-[55%] lg:min-h-full border-b lg:border-b-0 lg:border-r overflow-hidden">
                             <div className="calendar-grid">
                                 {['일','월','화','수','목','금','토'].map(d=><div key={d} className="calendar-header">{d}</div>)}
                                 {calDays.map((d,i)=>(
                                     <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
                                         {d && (
                                             <>
-                                                <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-200'}`}>{d.day}</span>
+                                                <span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-300'}`}>{d.day}</span>
                                                 {d.data && (
                                                     <div className="flex flex-col gap-[1px] mt-[1px]">
                                                         {d.data.morning && <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>}
                                                         {d.data.lunch && <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>}
                                                         {d.data.dinner && <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>}
-                                                        {d.data.duty && <div className="menu-text bg-slate-100 text-slate-500 font-normal">근무</div>}
                                                     </div>
                                                 )}
                                             </>
@@ -327,40 +336,45 @@
                                 ))}
                             </div>
                         </div>
-                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-h-[40%]">
+
+                        {/* 상세 보기 영역 (우측/하단) */}
+                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-h-[45%]">
                             {selectedDate ? (
                                 <div className="space-y-4">
                                     <h2 className="text-xl font-black italic border-b-2 border-blue-600 pb-1">DAILY MENU</h2>
                                     <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
-                                    {selectedDate.duty && <div className="p-4 rounded-xl border mb-3 bg-slate-50 border-slate-200"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Shift Schedule</div><div className="text-sm font-black text-slate-800 whitespace-pre-wrap">👨‍🍳 {selectedDate.duty}</div></div>}
+                                    {selectedDate.duty && <div className="p-4 rounded-xl border mb-3 bg-slate-50 border-slate-200"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Schedule</div><div className="text-sm font-black text-slate-800">👨‍🍳 {selectedDate.duty}</div></div>}
                                     <MenuCard text={selectedDate.morning} type="Morning" />
                                     <MenuCard text={selectedDate.lunch} type="Lunch" />
                                     <MenuCard text={selectedDate.dinner} type="Dinner" />
-                                    {selectedDate.packing && <div className="p-4 rounded-xl border mb-3 bg-green-50 border-green-200"><div className="text-[10px] font-black text-green-700 uppercase mb-1">Takeout / Packing</div><div className="text-sm font-black text-green-900">🎁 {selectedDate.packing}</div></div>}
+                                    {selectedDate.packing && <div className="p-4 rounded-xl border mb-3 bg-green-50 border-green-200"><div className="text-[10px] font-black text-green-700 uppercase mb-1">Takeout</div><div className="text-sm font-black text-green-900">🎁 {selectedDate.packing}</div></div>}
                                 </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-200 font-black">SELECT DATE</div>}
+                            ) : <div className="h-full flex items-center justify-center text-slate-300 font-black">SELECT DATE</div>}
                         </aside>
                     </main>
+
+                    {/* 검색 모달 */}
                     {activeModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h2 className="text-xl font-black italic">SEARCH</h2>
+                                <h2 className="text-xl font-black italic">SEARCH RESULT</h2>
                                 <button onClick={()=>setActiveModal(false)} className="text-3xl">&times;</button>
                             </div>
-                            <input className="bg-slate-100 px-4 py-3 rounded-xl w-full font-bold mb-4 border-2 border-blue-500 outline-none" placeholder="검색어 입력..." autoFocus value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
+                            <input className="bg-slate-100 px-4 py-3 rounded-xl w-full font-bold mb-4 border-2 border-blue-500 outline-none" placeholder="검색어..." autoFocus value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
                             <div className="flex-1 overflow-y-auto space-y-4 pb-10">
-                                {currentSearchResults.map((m, i) => (
+                                {currentSearchResults.length > 0 ? currentSearchResults.map((m, i) => (
                                     <div key={i} className="bg-slate-50 p-4 rounded-xl border">
                                         <div className="font-black text-blue-600 mb-2">{m.date}</div>
                                         <MenuCard text={m.morning} type="Morning" query={modalSearch} />
                                         <MenuCard text={m.lunch} type="Lunch" query={modalSearch} />
                                         <MenuCard text={m.dinner} type="Dinner" query={modalSearch} />
                                     </div>
-                                ))}
-                                {currentSearchResults.length === 0 && modalSearch && <div className="text-center py-10 text-slate-400 font-bold">결과가 없습니다.</div>}
+                                )) : <div className="text-center py-10 text-slate-400 font-bold">결과 없음</div>}
                             </div>
                         </div>
                     )}
+
+                    {/* 레시피 팝업 */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
@@ -378,8 +392,8 @@
                                     <div className="space-y-4">
                                         <div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Ingredients</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.ingredients}</div></div>
                                         <div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Instructions</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.process}</div></div>
-                                        {currentRecipe.tip && <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 font-bold text-orange-950 text-xs">👨‍🍳 {currentRecipe.tip}</div>}
-                                        {currentRecipe.nutrition && <div className="bg-teal-50 p-3 rounded-xl border border-teal-100 font-bold text-teal-900 text-xs animate-pulse-once">📊 {currentRecipe.nutrition}</div>}
+                                        {currentRecipe.tip && <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 font-bold text-orange-950 text-xs">💡 {currentRecipe.tip}</div>}
+                                        {currentRecipe.nutrition && <div className="bg-teal-50 p-3 rounded-xl border border-teal-100 font-bold text-teal-900 text-xs">📊 {currentRecipe.nutrition}</div>}
                                     </div>
                                 </div>
                             </div>
@@ -388,9 +402,7 @@
                 </div>
             );
         };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<MisoYonApp />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<MisoYonApp />);
     </script>
 </body>
 </html>
