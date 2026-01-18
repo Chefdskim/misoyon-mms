@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v17.7</title>
+    <title>MISOYON MMS v18.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -253,7 +253,28 @@
                 );
             };
 
-            // ★ 2020년 ~ 2035년까지로 범위 확장
+            // ★ 주간표용 미니 메뉴 카드 (레시피 기능 포함)
+            const WeeklyMenuRow = ({ label, colorClass, text }) => {
+                if(!text) return <div className="flex gap-2 text-sm"><span className={`w-8 font-bold ${colorClass}`}>{label}</span><span className="text-slate-300">-</span></div>;
+                
+                const matched = findMatchedRecipes(text);
+                return (
+                    <div className="flex gap-2 text-sm items-start">
+                        <span className={`w-8 font-bold ${colorClass} shrink-0`}>{label}</span>
+                        <div className="flex-1">
+                            <span className="font-bold text-slate-700">{text}</span>
+                            {matched.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                    {matched.map((r, idx) => (
+                                        <span key={idx} className="recipe-tag" onClick={(e) => { e.stopPropagation(); setPopupRecipes(matched); setActiveRecipeIndex(idx); }}>📖 {r.name}</span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            };
+
             const yearOptions = Array.from({length: 16}, (_, i) => 2020 + i);
             const weekDays = ['일','월','화','수','목','금','토'];
 
@@ -280,7 +301,7 @@
                     {/* 상단 헤더 */}
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v17.7</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v18.0</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
@@ -336,6 +357,7 @@
                         </aside>
                     </main>
 
+                    {/* 주간 메뉴 모달 (레시피 연동 추가) */}
                     {weeklyModal && selectedDate && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -350,10 +372,10 @@
                                             {d.date === selectedDate.date && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">선택됨</span>}
                                         </div>
                                         {d.menu ? (
-                                            <div className="grid grid-cols-1 gap-2 text-sm">
-                                                <div className="flex gap-2"><span className="w-8 font-bold text-orange-500">아침</span> <span className="flex-1 font-bold text-slate-700">{d.menu.morning || "-"}</span></div>
-                                                <div className="flex gap-2"><span className="w-8 font-bold text-blue-500">점심</span> <span className="flex-1 font-bold text-slate-700">{d.menu.lunch || "-"}</span></div>
-                                                <div className="flex gap-2"><span className="w-8 font-bold text-purple-500">저녁</span> <span className="flex-1 font-bold text-slate-700">{d.menu.dinner || "-"}</span></div>
+                                            <div className="grid grid-cols-1 gap-3">
+                                                <WeeklyMenuRow label="아침" colorClass="text-orange-500" text={d.menu.morning} />
+                                                <WeeklyMenuRow label="점심" colorClass="text-blue-500" text={d.menu.lunch} />
+                                                <WeeklyMenuRow label="저녁" colorClass="text-purple-500" text={d.menu.dinner} />
                                             </div>
                                         ) : <div className="text-slate-400 text-xs font-bold">등록된 메뉴 없음</div>}
                                     </div>
