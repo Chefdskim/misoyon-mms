@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v31.0</title>
+    <title>MISOYON MMS v32.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -233,7 +233,6 @@
                     }
                 });
 
-                // ★ 공지사항 멀티 표시 수정 (배너 배열로 수집)
                 Papa.parse(getUrl(NOTICE_URL), {
                     download: true,
                     complete: (res) => {
@@ -241,7 +240,7 @@
                         const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
                         const hiddenDate = localStorage.getItem("misoyon_notice_hidden");
                         
-                        let banners = []; // 여러 개 담을 바구니
+                        let banners = [];
                         let popup = null;
                         
                         res.data.forEach(row => {
@@ -256,12 +255,10 @@
                             if (now >= start && now <= end) {
                                 const type = row[0].trim();
                                 const content = row[3].trim();
-                                if (type === "배너") banners.push(content); // 바구니에 추가
+                                if (type === "배너") banners.push(content);
                                 else if (type === "팝업" && hiddenDate !== todayStr) popup = content;
                             }
                         });
-                        
-                        // 바구니에 담긴 게 있으면 " / "로 연결해서 보여줌
                         setActiveBanner(banners.length > 0 ? banners.join("   /   ") : null);
                         setActivePopup(popup);
                     }
@@ -371,6 +368,13 @@
                             <input type="text" className="login-input" placeholder="이름 (Name)" value={inputName} onChange={e => setInputName(e.target.value)} />
                             <input type="password" inputMode="numeric" className="login-input" placeholder="비밀번호 (Code)" value={inputCode} onChange={e => setInputCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                             <button onClick={handleLogin} className="login-btn">LOGIN</button>
+                            {/* ★ 로그인 화면 갱신 버튼 추가 (범인 체포!) */}
+                            <div className="mt-4 pt-4 border-t border-slate-100">
+                                <button onClick={() => fetchData(true)} className="text-xs text-slate-400 font-bold flex items-center justify-center gap-1 w-full hover:text-blue-500">
+                                    <span className={isRefreshing ? "spin-anim" : ""}>🔄</span> 
+                                    {isRefreshing ? "명단 업데이트 중..." : "로그인이 안 되나요? (최신 명단 가져오기)"}
+                                </button>
+                            </div>
                             {loginError && <p className="text-red-500 text-xs font-bold mt-3">{loginError}</p>}
                         </div>
                     </div>
@@ -379,12 +383,11 @@
 
             return (
                 <div className="flex flex-col h-full w-full">
-                    {/* ★ 배너 영역 (여러 개 있으면 길게 표시) */}
                     {activeBanner && <div className="top-banner"><span className="banner-icon">NOTICE</span><span>{activeBanner}</span></div>}
 
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v31.0</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v32.0</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
