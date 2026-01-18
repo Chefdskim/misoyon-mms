@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v20.0</title>
+    <title>MISOYON MMS v21.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -30,8 +30,6 @@
         .recipe-tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; margin-right: 4px; margin-top: 4px; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; }
         .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
-        .tab-btn { padding: 8px 16px; font-size: 12px; font-weight: 900; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; }
-        .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
         
         .top-banner { background: #4f46e5; color: white; padding: 8px 16px; font-size: 12px; font-weight: 700; text-align: center; animation: slideDown 0.5s; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 10px rgba(79, 70, 229, 0.2); }
         .banner-icon { background: white; color: #4f46e5; border-radius: 4px; padding: 0 4px; font-size: 10px; font-weight: 900; }
@@ -41,6 +39,10 @@
         .login-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; text-align: center; margin-bottom: 12px; outline: none; transition: all 0.2s; font-weight: 700; }
         .login-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
         .login-btn { width: 100%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 14px; transition: all 0.2s; margin-top: 4px; }
+        
+        /* 토글 스위치 스타일 */
+        .toggle-checkbox:checked { right: 0; border-color: #3b82f6; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #3b82f6; }
         
         @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
     </style>
@@ -52,7 +54,7 @@
 
         const MisoYonApp = () => {
             // =========================================================================
-            // MISOYON INTEGRATED SYSTEM LINKS
+            // LINKS (수정 금지)
             // =========================================================================
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
@@ -75,14 +77,15 @@
             const [menus, setMenus] = useState([]);
             const [recipeMap, setRecipeMap] = useState({});
             
-            // 공지사항
+            // 공지
             const [activeBanner, setActiveBanner] = useState(null);
             const [activePopup, setActivePopup] = useState(null);
             
-            // 댓글
+            // 댓글 & 필터
             const [comments, setComments] = useState([]);
             const [newComment, setNewComment] = useState("");
             const [isSubmitting, setIsSubmitting] = useState(false);
+            const [showImportantOnly, setShowImportantOnly] = useState(false); // ★ 중요 필터 상태
 
             const [currentMonth, setCurrentMonth] = useState(new Date()); 
             const [selectedDate, setSelectedDate] = useState(null);
@@ -93,7 +96,6 @@
             const [popupRecipes, setPopupRecipes] = useState([]);
             const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
 
-            // 초기 로딩 (사용자)
             useEffect(() => {
                 Papa.parse(USER_URL, { 
                     download: true, header: false,
@@ -111,11 +113,9 @@
                 });
             }, []);
 
-            // 메인 데이터 로딩
             useEffect(() => {
                 if (!isAuthenticated) return;
                 
-                // 1. 메뉴
                 Papa.parse(MENU_URL, { 
                     download: true, 
                     complete: (res) => {
@@ -148,7 +148,6 @@
                     }
                 });
 
-                // 2. 레시피
                 Papa.parse(RECIPE_URL, { 
                     download: true, 
                     complete: (res) => {
@@ -162,7 +161,6 @@
                     }
                 });
 
-                // 3. 공지사항 (05:00 ~ 19:00)
                 Papa.parse(NOTICE_URL, {
                     download: true,
                     complete: (res) => {
@@ -192,14 +190,15 @@
                     }
                 });
                 
-                // 4. 댓글 불러오기
                 Papa.parse(COMMENT_READ_URL, {
                     download: true,
                     complete: (res) => {
                         const loadedComments = [];
                         res.data.forEach(row => {
+                            // 날짜, 이름, 내용, 시간, [중요(4)]
                             if(row.length >= 4 && row[0] !== "날짜") {
-                                loadedComments.push({ date: row[0], name: row[1], content: row[2], time: row[3] });
+                                const isImportant = row[4] && row[4].trim() !== ""; // 5번째 칸(E열)에 뭐가 있으면 중요
+                                loadedComments.push({ date: row[0], name: row[1], content: row[2], time: row[3], important: isImportant });
                             }
                         });
                         setComments(loadedComments);
@@ -247,7 +246,6 @@
                 setActivePopup(null);
             };
 
-            // ★ 댓글 전송 로직
             const handleCommentSubmit = () => {
                 if (!newComment.trim() || !selectedDate) return;
                 setIsSubmitting(true);
@@ -258,15 +256,14 @@
                     content: newComment.trim()
                 };
 
-                // 1. 서버 전송 (no-cors)
                 fetch(COMMENT_WRITE_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(commentData)
                 }).then(() => {
-                    // 2. 화면 즉시 반영 (낙관적 업데이트)
-                    setComments([...comments, { ...commentData, time: new Date().toLocaleString("ko-KR") }]);
+                    // 낙관적 업데이트 (중요 표시는 처음에 없음)
+                    setComments([...comments, { ...commentData, time: new Date().toLocaleString("ko-KR"), important: false }]);
                     setNewComment("");
                     setIsSubmitting(false);
                 }).catch(err => {
@@ -397,7 +394,15 @@
 
             const currentRecipe = popupRecipes[activeRecipeIndex];
             const weeklyData = getWeeklyData();
-            const todayComments = selectedDate ? comments.filter(c => c.date === selectedDate.date) : [];
+            
+            // ★ 댓글 필터링 로직
+            const filteredComments = selectedDate 
+                ? comments.filter(c => {
+                    const dateMatch = c.date === selectedDate.date;
+                    if (!dateMatch) return false;
+                    return showImportantOnly ? c.important : true;
+                })
+                : [];
 
             return (
                 <div className="flex flex-col h-full w-full">
@@ -410,7 +415,7 @@
 
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v20.0</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v21.0</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
@@ -462,19 +467,31 @@
                                     <MenuCard text={selectedDate.dinner} type="Dinner" />
                                     {selectedDate.packing && <div className="p-4 rounded-xl border mb-3 bg-green-50 border-green-200"><div className="text-[10px] font-black text-green-700 uppercase mb-1">Takeout</div><div className="text-sm font-black text-green-900">🎁 {selectedDate.packing}</div></div>}
                                     
-                                    {/* ★ 댓글 게시판 영역 */}
+                                    {/* ★ 댓글 게시판 & 중요 필터 */}
                                     <div className="mt-8 pt-4 border-t-2 border-slate-100">
-                                        <h3 className="text-sm font-black text-slate-400 uppercase mb-3">💬 오늘의 한마디</h3>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h3 className="text-sm font-black text-slate-400 uppercase">💬 오늘의 한마디</h3>
+                                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setShowImportantOnly(!showImportantOnly)}>
+                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${showImportantOnly ? 'bg-yellow-400 border-yellow-500' : 'bg-white border-slate-300'}`}>
+                                                    {showImportantOnly && <span className="text-[10px]">✔</span>}
+                                                </div>
+                                                <span className="text-xs font-bold text-slate-500">⭐ 중요만 보기</span>
+                                            </div>
+                                        </div>
+
                                         <div className="space-y-3 mb-4">
-                                            {todayComments.length > 0 ? todayComments.map((c, i) => (
-                                                <div key={i} className="bg-slate-50 p-3 rounded-xl border">
+                                            {filteredComments.length > 0 ? filteredComments.map((c, i) => (
+                                                <div key={i} className={`p-3 rounded-xl border transition-all ${c.important ? 'bg-yellow-50 border-yellow-200 ring-2 ring-yellow-100' : 'bg-slate-50'}`}>
                                                     <div className="flex justify-between items-center mb-1">
-                                                        <span className="text-xs font-black text-blue-600">{c.name}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            {c.important && <span className="text-xs">⭐</span>}
+                                                            <span className={`text-xs font-black ${c.important ? 'text-yellow-700' : 'text-blue-600'}`}>{c.name}</span>
+                                                        </div>
                                                         <span className="text-[10px] text-slate-400">{c.time}</span>
                                                     </div>
-                                                    <div className="text-xs font-bold text-slate-700 whitespace-pre-wrap">{c.content}</div>
+                                                    <div className={`text-xs font-bold whitespace-pre-wrap ${c.important ? 'text-slate-800' : 'text-slate-700'}`}>{c.content}</div>
                                                 </div>
-                                            )) : <div className="text-center text-xs text-slate-300 py-2">아직 댓글이 없습니다.</div>}
+                                            )) : <div className="text-center text-xs text-slate-300 py-2">{showImportantOnly ? "중요한 댓글이 없습니다." : "아직 댓글이 없습니다."}</div>}
                                         </div>
                                         <div className="flex gap-2">
                                             <input className="flex-1 bg-slate-100 px-3 py-2 rounded-xl text-xs font-bold outline-none border focus:border-blue-500" placeholder="메세지를 입력하세요..." value={newComment} onChange={e=>setNewComment(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleCommentSubmit()} disabled={isSubmitting}/>
@@ -483,7 +500,6 @@
                                             </button>
                                         </div>
                                     </div>
-
                                 </div>
                             ) : <div className="h-full flex items-center justify-center text-slate-300 font-black">SELECT DATE</div>}
                         </aside>
