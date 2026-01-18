@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v18.0</title>
+    <title>MISOYON MMS v19.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -15,6 +15,7 @@
         body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
         #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
         
+        /* 캘린더 스타일 */
         .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: #cbd5e1; gap: 1px; border: 1px solid #cbd5e1; height: 100%; }
         .calendar-grid { grid-auto-rows: minmax(60px, 1fr); } 
         @media (min-width: 1024px) { .calendar-grid { grid-template-rows: 25px repeat(6, 1fr); grid-auto-rows: auto; } }
@@ -23,19 +24,30 @@
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
         
+        /* 모달 및 팝업 공통 */
         .modal-view { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+        .notice-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 900; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(2px); }
+        
+        /* 컴포넌트 스타일 */
         .recipe-tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; margin-right: 4px; margin-top: 4px; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; }
         .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
         .tab-btn { padding: 8px 16px; font-size: 12px; font-weight: 900; color: #64748b; border-bottom: 2px solid transparent; cursor: pointer; }
         .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
         
+        /* 배너 스타일 */
+        .top-banner { background: #4f46e5; color: white; padding: 8px 16px; font-size: 12px; font-weight: 700; text-align: center; animation: slideDown 0.5s; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 10px rgba(79, 70, 229, 0.2); }
+        .banner-icon { background: white; color: #4f46e5; border-radius: 4px; padding: 0 4px; font-size: 10px; font-weight: 900; }
+
+        /* 로그인 화면 */
         .login-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 999; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .login-box { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 100%; max-width: 320px; text-align: center; }
         .login-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; text-align: center; margin-bottom: 12px; outline: none; transition: all 0.2s; font-weight: 700; }
         .login-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
         .login-btn { width: 100%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 14px; transition: all 0.2s; margin-top: 4px; }
+        
+        @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -45,11 +57,12 @@
 
         const MisoYonApp = () => {
             // =========================================================================
-            // 링크 설정 (수정 금지)
+            // 셰프님의 링크 (사용자 / 메뉴 / 레시피 / 공지사항)
             // =========================================================================
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
+            const NOTICE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=489171005&single=true&output=csv";
             // =========================================================================
 
             const ADMIN_NAME = "관리자";
@@ -64,9 +77,14 @@
             
             const [menus, setMenus] = useState([]);
             const [recipeMap, setRecipeMap] = useState({});
+            
+            // 공지사항 상태
+            const [activeBanner, setActiveBanner] = useState(null);
+            const [activePopup, setActivePopup] = useState(null);
+            const [hidePopupToday, setHidePopupToday] = useState(false);
+
             const [currentMonth, setCurrentMonth] = useState(new Date()); 
             const [selectedDate, setSelectedDate] = useState(null);
-            
             const [searchTerm, setSearchTerm] = useState("");
             const [modalSearch, setModalSearch] = useState("");
             const [activeModal, setActiveModal] = useState(false);
@@ -74,6 +92,7 @@
             const [popupRecipes, setPopupRecipes] = useState([]);
             const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
 
+            // 초기 데이터 로딩 (사용자)
             useEffect(() => {
                 Papa.parse(USER_URL, { 
                     download: true, header: false,
@@ -91,8 +110,11 @@
                 });
             }, []);
 
+            // 메인 데이터 로딩 (메뉴, 레시피, 공지)
             useEffect(() => {
                 if (!isAuthenticated) return;
+                
+                // 1. 메뉴
                 Papa.parse(MENU_URL, { 
                     download: true, 
                     complete: (res) => {
@@ -124,6 +146,8 @@
                         setMenus(temp);
                     }
                 });
+
+                // 2. 레시피
                 Papa.parse(RECIPE_URL, { 
                     download: true, 
                     complete: (res) => {
@@ -136,6 +160,51 @@
                         setRecipeMap(newRecipes);
                     }
                 });
+
+                // 3. ★ 공지사항 로직 (시간 체크: 05:00 ~ 19:00)
+                Papa.parse(NOTICE_URL, {
+                    download: true,
+                    complete: (res) => {
+                        const now = new Date();
+                        // 오늘 날짜 문자열 (하루 그만보기 체크용)
+                        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+                        const hiddenDate = localStorage.getItem("misoyon_notice_hidden");
+
+                        let banner = null;
+                        let popup = null;
+
+                        res.data.forEach(row => {
+                            if(row.length < 4 || row[0] === "구분") return;
+                            
+                            const type = row[0].trim(); // 배너 or 팝업
+                            const sDateStr = row[1].trim(); // 시작일
+                            const eDateStr = row[2].trim(); // 종료일
+                            const content = row[3].trim(); // 내용
+
+                            if(!sDateStr || !eDateStr) return;
+
+                            // 시간 설정: 시작일 05:00 ~ 종료일 19:00
+                            const start = new Date(sDateStr + "T05:00:00");
+                            const end = new Date(eDateStr + "T19:00:00");
+
+                            // 현재 시간이 범위 안에 있는지 체크
+                            if (now >= start && now <= end) {
+                                if (type === "배너") {
+                                    banner = content;
+                                } else if (type === "팝업") {
+                                    // 오늘 그만보기를 안 눌렀거나, 날짜가 지났으면 팝업 표시
+                                    if (hiddenDate !== todayStr) {
+                                        popup = content;
+                                    }
+                                }
+                            }
+                        });
+
+                        setActiveBanner(banner);
+                        setActivePopup(popup);
+                    }
+                });
+
             }, [isAuthenticated]);
 
             useEffect(() => {
@@ -168,6 +237,15 @@
                 window.location.reload();
             };
 
+            const handleClosePopup = (hideToday) => {
+                if (hideToday) {
+                    const now = new Date();
+                    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+                    localStorage.setItem("misoyon_notice_hidden", todayStr);
+                }
+                setActivePopup(null);
+            };
+
             const findMatchedRecipes = (menuName) => {
                 if (!menuName || menuName === "일정없음") return [];
                 const cleanMenu = menuName.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
@@ -193,10 +271,7 @@
                         weekData.push({ date: dateStr, dayIdx: i, menu: menu });
                     }
                     return weekData;
-                } catch (e) {
-                    console.error("Weekly data error:", e);
-                    return [];
-                }
+                } catch (e) { return []; }
             };
 
             const calDays = useMemo(() => {
@@ -253,10 +328,8 @@
                 );
             };
 
-            // ★ 주간표용 미니 메뉴 카드 (레시피 기능 포함)
             const WeeklyMenuRow = ({ label, colorClass, text }) => {
                 if(!text) return <div className="flex gap-2 text-sm"><span className={`w-8 font-bold ${colorClass}`}>{label}</span><span className="text-slate-300">-</span></div>;
-                
                 const matched = findMatchedRecipes(text);
                 return (
                     <div className="flex gap-2 text-sm items-start">
@@ -298,10 +371,17 @@
 
             return (
                 <div className="flex flex-col h-full w-full">
-                    {/* 상단 헤더 */}
+                    {/* ★ 배너 영역 (활성화 시에만 표시) */}
+                    {activeBanner && (
+                        <div className="top-banner">
+                            <span className="banner-icon">NOTICE</span>
+                            <span>{activeBanner}</span>
+                        </div>
+                    )}
+
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v18.0</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v19.0</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
@@ -357,7 +437,24 @@
                         </aside>
                     </main>
 
-                    {/* 주간 메뉴 모달 (레시피 연동 추가) */}
+                    {/* ★ 공지사항 팝업 (중요 공지) */}
+                    {activePopup && (
+                        <div className="notice-popup">
+                            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95">
+                                <div className="flex justify-center mb-4">
+                                    <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest">NOTICE</span>
+                                </div>
+                                <div className="text-center font-bold text-slate-800 text-lg mb-6 whitespace-pre-wrap leading-relaxed border-y py-4">
+                                    {activePopup}
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => handleClosePopup(true)} className="flex-1 bg-slate-100 text-slate-500 py-3 rounded-xl text-xs font-bold hover:bg-slate-200">오늘 하루 그만 보기</button>
+                                    <button onClick={() => handleClosePopup(false)} className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-xs font-bold hover:bg-blue-700">확인</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {weeklyModal && selectedDate && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
