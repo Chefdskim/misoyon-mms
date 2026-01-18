@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v26.0</title>
+    <title>MISOYON MMS v27.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -213,7 +213,7 @@
                         const loadedComments = [];
                         res.data.forEach(row => {
                             if(row.length >= 4 && row[0] !== "날짜") {
-                                const isImportant = row[4] && row[4].trim() !== ""; 
+                                const isImportant = row[4] && row[4].trim() !== ""; // E열 확인
                                 loadedComments.push({ date: row[0], name: row[1], content: row[2], time: row[3], important: isImportant });
                             }
                         });
@@ -289,9 +289,10 @@
             };
 
             const handleToggleImportant = (targetComment) => {
-                // 관리자(셰프님)만 체크 가능
+                // 관리자만 가능
                 if (currentUser !== ADMIN_NAME) return;
 
+                // 1. 낙관적 업데이트
                 const updatedComments = comments.map(c => {
                     if (c === targetComment) {
                         return { ...c, important: !c.important };
@@ -300,6 +301,7 @@
                 });
                 setComments(updatedComments);
 
+                // 2. 서버 전송 (날짜, 이름, 내용만 보냄)
                 fetch(COMMENT_WRITE_URL, {
                     method: 'POST',
                     mode: 'no-cors',
@@ -309,11 +311,9 @@
                         date: targetComment.date,
                         name: targetComment.name,
                         content: targetComment.content
-                        // 매칭 정확도를 위해 시간은 일부러 제외했습니다.
                     })
                 }).catch(err => {
-                    // 에러 발생 시 조용히 실패 (다음 새로고침 때 원래대로 돌아옴)
-                    console.error("체크 저장 실패", err);
+                    console.error("체크 실패");
                 });
             };
 
@@ -454,7 +454,7 @@
 
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v26.0</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v27.0</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
@@ -519,7 +519,6 @@
                                                 <div key={i} className={`p-3 rounded-xl border transition-all ${c.important ? 'bg-yellow-50 border-yellow-200 ring-2 ring-yellow-100' : 'bg-slate-50'}`}>
                                                     <div className="flex justify-between items-center mb-1">
                                                         <div className="flex items-center gap-1">
-                                                            {/* ★ 관리자 전용 체크박스 */}
                                                             {currentUser === ADMIN_NAME && (
                                                                 <input type="checkbox" className="imp-check mr-1" checked={c.important} onChange={()=>handleToggleImportant(c)} />
                                                             )}
