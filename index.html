@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v32.0</title>
+    <title>MISOYON MMS v33.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -368,7 +368,6 @@
                             <input type="text" className="login-input" placeholder="이름 (Name)" value={inputName} onChange={e => setInputName(e.target.value)} />
                             <input type="password" inputMode="numeric" className="login-input" placeholder="비밀번호 (Code)" value={inputCode} onChange={e => setInputCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                             <button onClick={handleLogin} className="login-btn">LOGIN</button>
-                            {/* ★ 로그인 화면 갱신 버튼 추가 (범인 체포!) */}
                             <div className="mt-4 pt-4 border-t border-slate-100">
                                 <button onClick={() => fetchData(true)} className="text-xs text-slate-400 font-bold flex items-center justify-center gap-1 w-full hover:text-blue-500">
                                     <span className={isRefreshing ? "spin-anim" : ""}>🔄</span> 
@@ -385,23 +384,31 @@
                 <div className="flex flex-col h-full w-full">
                     {activeBanner && <div className="top-banner"><span className="banner-icon">NOTICE</span><span>{activeBanner}</span></div>}
 
-                    <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
-                        <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v32.0</span></h1>
+                    {/* ★ v33.0 UI 변경: 3단 구성으로 모바일 최적화 */}
+                    <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
+                        {/* 1단: 타이틀 */}
+                        <div className="flex justify-between items-center">
+                            <h1 className="text-xl font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v33.0</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
-                            <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
+                        </div>
+
+                        {/* 2단: 날짜선택 + 갱신 + 로그아웃 */}
+                        <div className="flex gap-2">
+                            <div className="flex-1 flex items-center justify-center bg-slate-100 px-3 py-2 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
                                 <span className="mx-1">/</span>
                                 <select className="bg-transparent" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>{Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}</select>
                             </div>
+                            <button onClick={() => fetchData(true)} className="bg-slate-800 text-white px-3 py-2 rounded-xl font-black text-xs flex items-center gap-1">
+                                <span className={isRefreshing ? "spin-anim" : ""}>🔄</span> <span>{isRefreshing ? "갱신" : "갱신"}</span>
+                            </button>
+                            <button onClick={handleLogout} className="bg-red-500 text-white px-3 py-2 rounded-xl font-black text-xs">OUT</button>
                         </div>
+
+                        {/* 3단: 검색창 */}
                         <div className="flex gap-2">
-                             <button onClick={() => fetchData(true)} className="bg-slate-800 text-white px-3 py-1 rounded-lg font-black text-[10px] flex items-center gap-1">
-                                <span className={isRefreshing ? "spin-anim" : ""}>🔄</span> <span>{isRefreshing ? "갱신중" : "갱신"}</span>
-                             </button>
-                             <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-16 md:w-24 border outline-none" placeholder="검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
-                             <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">GO</button>
-                             <button onClick={handleLogout} className="bg-slate-800 text-white px-3 py-1 rounded-lg font-black text-[10px]">OUT</button>
+                            <input className="flex-1 bg-slate-100 px-3 py-2 rounded-xl text-xs font-bold border outline-none" placeholder="메뉴 검색 (예: 제육, 1월)" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
+                            <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs">GO</button>
                         </div>
                     </header>
 
@@ -540,19 +547,6 @@
                                         <MenuCard text={m.dinner} type="Dinner" query={modalSearch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} />
                                     </div>
                                 )) : <div className="text-center py-10 text-slate-400 font-bold">결과 없음</div>}
-                            </div>
-                        </div>
-                    )}
-
-                    {activePopup && (
-                        <div className="notice-popup">
-                            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95">
-                                <div className="flex justify-center mb-4"><span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest">NOTICE</span></div>
-                                <div className="text-center font-bold text-slate-800 text-lg mb-6 whitespace-pre-wrap leading-relaxed border-y py-4">{activePopup}</div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => handleClosePopup(true)} className="flex-1 bg-slate-100 text-slate-500 py-3 rounded-xl text-xs font-bold hover:bg-slate-200">오늘 하루 그만 보기</button>
-                                    <button onClick={() => handleClosePopup(false)} className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-xs font-bold hover:bg-blue-700">확인</button>
-                                </div>
                             </div>
                         </div>
                     )}
