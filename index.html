@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v27.0</title>
+    <title>MISOYON MMS v29.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -41,7 +41,10 @@
         .login-btn { width: 100%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 14px; transition: all 0.2s; margin-top: 4px; }
         
         .imp-check { width: 18px; height: 18px; accent-color: #f59e0b; cursor: pointer; }
-
+        
+        /* 갱신 버튼 애니메이션 */
+        .spin-anim { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
     </style>
 </head>
@@ -82,6 +85,9 @@
             const [comments, setComments] = useState([]);
             const [newComment, setNewComment] = useState("");
             const [isSubmitting, setIsSubmitting] = useState(false);
+            
+            // ★ 데이터 갱신 로딩 상태
+            const [isRefreshing, setIsRefreshing] = useState(false);
 
             const [currentMonth, setCurrentMonth] = useState(new Date()); 
             const [selectedDate, setSelectedDate] = useState(null);
@@ -116,8 +122,14 @@
                 };
             }, [isAuthenticated]);
 
-            useEffect(() => {
-                Papa.parse(USER_URL, { 
+            // ★ 데이터 불러오기 함수 (강제 갱신 옵션 추가)
+            const fetchData = (forceFresh = false) => {
+                if(forceFresh) setIsRefreshing(true);
+                
+                // 강제 갱신이면 시간 파라미터 붙임, 아니면 그냥 URL
+                const getUrl = (url) => forceFresh ? `${url}&t=${new Date().getTime()}` : url;
+
+                Papa.parse(getUrl(USER_URL), { 
                     download: true, header: false,
                     complete: (res) => {
                         const users = [];
@@ -131,12 +143,8 @@
                         setUserList(users);
                     }
                 });
-            }, []);
 
-            useEffect(() => {
-                if (!isAuthenticated) return;
-                
-                Papa.parse(MENU_URL, { 
+                Papa.parse(getUrl(MENU_URL), { 
                     download: true, 
                     complete: (res) => {
                         let temp = []; let headers = [];
@@ -168,7 +176,7 @@
                     }
                 });
 
-                Papa.parse(RECIPE_URL, { 
+                Papa.parse(getUrl(RECIPE_URL), { 
                     download: true, 
                     complete: (res) => {
                         const newRecipes = {};
@@ -181,7 +189,7 @@
                     }
                 });
 
-                Papa.parse(NOTICE_URL, {
+                Papa.parse(getUrl(NOTICE_URL), {
                     download: true,
                     complete: (res) => {
                         const now = new Date();
@@ -207,7 +215,7 @@
                     }
                 });
                 
-                Papa.parse(COMMENT_READ_URL, {
+                Papa.parse(getUrl(COMMENT_READ_URL), {
                     download: true,
                     complete: (res) => {
                         const loadedComments = [];
@@ -219,8 +227,17 @@
                         });
                         loadedComments.sort((a,b) => new Date(b.date) - new Date(a.date));
                         setComments(loadedComments);
+                        
+                        if(forceFresh) {
+                            setTimeout(() => setIsRefreshing(false), 500); // 로딩 효과
+                        }
                     }
                 });
+            };
+
+            // 처음엔 그냥 로딩 (캐시 사용)
+            useEffect(() => {
+                if (isAuthenticated) fetchData(false);
             }, [isAuthenticated]);
 
             useEffect(() => {
@@ -289,10 +306,8 @@
             };
 
             const handleToggleImportant = (targetComment) => {
-                // 관리자만 가능
                 if (currentUser !== ADMIN_NAME) return;
 
-                // 1. 낙관적 업데이트
                 const updatedComments = comments.map(c => {
                     if (c === targetComment) {
                         return { ...c, important: !c.important };
@@ -301,7 +316,6 @@
                 });
                 setComments(updatedComments);
 
-                // 2. 서버 전송 (날짜, 이름, 내용만 보냄)
                 fetch(COMMENT_WRITE_URL, {
                     method: 'POST',
                     mode: 'no-cors',
@@ -454,7 +468,7 @@
 
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v27.0</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v29.0</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
@@ -463,7 +477,12 @@
                             </div>
                         </div>
                         <div className="flex gap-2">
-                             <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-20 md:w-32 border outline-none" placeholder="검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
+                             {/* ★ 수동 갱신 버튼 추가 */}
+                             <button onClick={() => fetchData(true)} className="bg-slate-800 text-white px-3 py-1 rounded-lg font-black text-[10px] flex items-center gap-1">
+                                <span className={isRefreshing ? "spin-anim" : ""}>🔄</span> 
+                                <span>{isRefreshing ? "갱신중" : "갱신"}</span>
+                             </button>
+                             <input className="bg-slate-100 px-3 py-1 rounded-lg text-xs font-bold w-16 md:w-24 border outline-none" placeholder="검색..." value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
                              <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-3 py-1 rounded-lg font-black text-[10px]">GO</button>
                              <button onClick={handleLogout} className="bg-slate-800 text-white px-3 py-1 rounded-lg font-black text-[10px]">OUT</button>
                         </div>
@@ -578,47 +597,6 @@
                                         </div>
                                     );
                                 }) : <div className="text-center py-10 text-slate-400 font-bold">중요한 피드백이 없습니다.</div>}
-                            </div>
-                        </div>
-                    )}
-
-                    {activePopup && (
-                        <div className="notice-popup">
-                            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95">
-                                <div className="flex justify-center mb-4">
-                                    <span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest">NOTICE</span>
-                                </div>
-                                <div className="text-center font-bold text-slate-800 text-lg mb-6 whitespace-pre-wrap leading-relaxed border-y py-4">{activePopup}</div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => handleClosePopup(true)} className="flex-1 bg-slate-100 text-slate-500 py-3 rounded-xl text-xs font-bold hover:bg-slate-200">오늘 하루 그만 보기</button>
-                                    <button onClick={() => handleClosePopup(false)} className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-xs font-bold hover:bg-blue-700">확인</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {weeklyModal && selectedDate && (
-                        <div className="modal-view">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h2 className="text-xl font-black italic">WEEKLY MENU PLAN</h2>
-                                <button onClick={()=>setWeeklyModal(false)} className="text-3xl">&times;</button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto pb-10">
-                                {weeklyData.map((d, i) => (
-                                    <div key={i} className={`mb-4 p-3 border rounded-xl ${d.date === selectedDate.date ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'bg-slate-50'}`}>
-                                        <div className={`font-black mb-2 flex justify-between ${d.date === selectedDate.date ? 'text-blue-600' : 'text-slate-600'}`}>
-                                            <span>{d.date} ({weekDays[d.dayIdx]})</span>
-                                            {d.date === selectedDate.date && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">선택됨</span>}
-                                        </div>
-                                        {d.menu ? (
-                                            <div className="grid grid-cols-1 gap-3">
-                                                <WeeklyMenuRow label="아침" colorClass="text-orange-500" text={d.menu.morning} />
-                                                <WeeklyMenuRow label="점심" colorClass="text-blue-500" text={d.menu.lunch} />
-                                                <WeeklyMenuRow label="저녁" colorClass="text-purple-500" text={d.menu.dinner} />
-                                            </div>
-                                        ) : <div className="text-slate-400 text-xs font-bold">등록된 메뉴 없음</div>}
-                                    </div>
-                                ))}
                             </div>
                         </div>
                     )}
