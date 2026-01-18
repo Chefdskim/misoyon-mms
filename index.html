@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v30.0</title>
+    <title>MISOYON MMS v31.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -23,7 +23,6 @@
         .calendar-day.selected { background: #eff6ff !important; box-shadow: inset 0 0 0 2px #3b82f6; z-index: 10; }
         .menu-text { font-size: 9px; font-weight: 800; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; padding: 1px 2px; border-radius: 2px; }
         
-        /* 모달 Z-Index 상향 (1000) */
         .modal-view { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
         .notice-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1200; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(2px); }
@@ -33,7 +32,7 @@
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
         
         .top-banner { background: #4f46e5; color: white; padding: 8px 16px; font-size: 12px; font-weight: 700; text-align: center; animation: slideDown 0.5s; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 10px rgba(79, 70, 229, 0.2); }
-        .banner-icon { background: white; color: #4f46e5; border-radius: 4px; padding: 0 4px; font-size: 10px; font-weight: 900; }
+        .banner-icon { background: white; color: #4f46e5; border-radius: 4px; padding: 0 4px; font-size: 10px; font-weight: 900; flex-shrink: 0; }
 
         .login-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .login-box { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 100%; max-width: 320px; text-align: center; }
@@ -53,7 +52,6 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // ★ 레시피 매칭 함수 (전역 사용을 위해 분리)
         const findMatchedRecipes = (menuName, recipeMap) => {
             if (!menuName || menuName === "일정없음" || !recipeMap) return [];
             const cleanMenu = menuName.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
@@ -71,7 +69,6 @@
             return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
         };
 
-        // ★ 컴포넌트 분리 (성능 및 버그 방지)
         const MenuCard = ({text, type, query, recipeMap, setPopupRecipes, setActiveRecipeIndex}) => {
             const matched = findMatchedRecipes(text, recipeMap);
             return (
@@ -115,7 +112,6 @@
         };
 
         const MisoYonApp = () => {
-            // LINKS
             const getFreshUrl = (url) => `${url}&t=${new Date().getTime()}`;
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
@@ -237,26 +233,36 @@
                     }
                 });
 
+                // ★ 공지사항 멀티 표시 수정 (배너 배열로 수집)
                 Papa.parse(getUrl(NOTICE_URL), {
                     download: true,
                     complete: (res) => {
                         const now = new Date();
                         const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
                         const hiddenDate = localStorage.getItem("misoyon_notice_hidden");
-                        let banner = null; let popup = null;
+                        
+                        let banners = []; // 여러 개 담을 바구니
+                        let popup = null;
+                        
                         res.data.forEach(row => {
                             if(row.length < 4 || row[0] === "구분") return;
                             const sDateStr = row[1].trim();
                             const eDateStr = row[2].trim();
                             if(!sDateStr || !eDateStr) return;
+                            
                             const start = new Date(sDateStr + "T05:00:00");
                             const end = new Date(eDateStr + "T19:00:00");
+                            
                             if (now >= start && now <= end) {
-                                if (row[0].trim() === "배너") banner = row[3].trim();
-                                else if (row[0].trim() === "팝업" && hiddenDate !== todayStr) popup = row[3].trim();
+                                const type = row[0].trim();
+                                const content = row[3].trim();
+                                if (type === "배너") banners.push(content); // 바구니에 추가
+                                else if (type === "팝업" && hiddenDate !== todayStr) popup = content;
                             }
                         });
-                        setActiveBanner(banner);
+                        
+                        // 바구니에 담긴 게 있으면 " / "로 연결해서 보여줌
+                        setActiveBanner(banners.length > 0 ? banners.join("   /   ") : null);
                         setActivePopup(popup);
                     }
                 });
@@ -373,11 +379,12 @@
 
             return (
                 <div className="flex flex-col h-full w-full">
+                    {/* ★ 배너 영역 (여러 개 있으면 길게 표시) */}
                     {activeBanner && <div className="top-banner"><span className="banner-icon">NOTICE</span><span>{activeBanner}</span></div>}
 
                     <header className="flex justify-between items-center px-4 py-2 bg-white border-b shrink-0 h-[50px]">
                         <div className="flex items-center gap-4">
-                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v30.0</span></h1>
+                            <h1 className="text-lg font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v31.0</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                             <div className="flex items-center bg-slate-100 px-3 py-1 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
@@ -458,7 +465,6 @@
                         </aside>
                     </main>
 
-                    {/* 모달: 중요 리뷰 */}
                     {importantModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -489,7 +495,6 @@
                         </div>
                     )}
 
-                    {/* 모달: 주간 메뉴표 */}
                     {weeklyModal && selectedDate && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -516,7 +521,6 @@
                         </div>
                     )}
 
-                    {/* 모달: 검색 결과 */}
                     {activeModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -537,7 +541,6 @@
                         </div>
                     )}
 
-                    {/* 팝업: 공지사항 */}
                     {activePopup && (
                         <div className="notice-popup">
                             <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in zoom-in-95">
@@ -551,7 +554,6 @@
                         </div>
                     )}
 
-                    {/* 팝업: 레시피 */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
