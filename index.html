@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v33.0</title>
+    <title>MISOYON MMS v34.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -217,6 +217,18 @@
                             }
                         });
                         setMenus(temp);
+
+                        // ★ v34.0 추가: 데이터 로딩 완료 즉시 '오늘 날짜' 찾아 선택하기
+                        const now = new Date();
+                        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+                        const todayMenu = temp.find(m => m.date === todayStr);
+                        
+                        // 오늘 날짜 데이터가 있으면 그걸 선택, 없으면 빈 껍데기라도 선택
+                        if(todayMenu) {
+                            setSelectedDate(todayMenu);
+                        } else {
+                            setSelectedDate({ date: todayStr, morning: "", lunch: "", dinner: "", duty: "", packing: "" });
+                        }
                     }
                 });
 
@@ -384,15 +396,12 @@
                 <div className="flex flex-col h-full w-full">
                     {activeBanner && <div className="top-banner"><span className="banner-icon">NOTICE</span><span>{activeBanner}</span></div>}
 
-                    {/* ★ v33.0 UI 변경: 3단 구성으로 모바일 최적화 */}
+                    {/* Header (3-tier) */}
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
-                        {/* 1단: 타이틀 */}
                         <div className="flex justify-between items-center">
-                            <h1 className="text-xl font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v33.0</span></h1>
+                            <h1 className="text-xl font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v34.0</span></h1>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                         </div>
-
-                        {/* 2단: 날짜선택 + 갱신 + 로그아웃 */}
                         <div className="flex gap-2">
                             <div className="flex-1 flex items-center justify-center bg-slate-100 px-3 py-2 rounded-xl border font-bold text-sm">
                                 <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
@@ -404,8 +413,6 @@
                             </button>
                             <button onClick={handleLogout} className="bg-red-500 text-white px-3 py-2 rounded-xl font-black text-xs">OUT</button>
                         </div>
-
-                        {/* 3단: 검색창 */}
                         <div className="flex gap-2">
                             <input className="flex-1 bg-slate-100 px-3 py-2 rounded-xl text-xs font-bold border outline-none" placeholder="메뉴 검색 (예: 제육, 1월)" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
                             <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs">GO</button>
