@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>MISOYON MMS v36.0</title>
+    <title>Mise-On : Smart Kitchen System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
@@ -26,7 +26,6 @@
         .modal-view { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
         .notice-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1200; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(2px); }
-        /* ★ 확대 보기 팝업 스타일 (Z-Index 최상위) */
         .zoom-popup { position: fixed; inset: 0; background: rgba(255,255,255,0.95); z-index: 1500; display: flex; flex-direction: column; padding: 20px; animation: zoomIn 0.2s ease-out; }
         
         .recipe-tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; margin-right: 4px; margin-top: 4px; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; }
@@ -55,6 +54,16 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
+        // 구글 드라이브 공유 링크를 이미지 태그용 링크로 자동 변환해주는 함수
+        const formatImageUrl = (url) => {
+            if (!url) return "";
+            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+                return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+            }
+            return url;
+        };
+
         const findMatchedRecipes = (menuName, recipeMap) => {
             if (!menuName || menuName === "일정없음" || !recipeMap) return [];
             const cleanMenu = menuName.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
@@ -72,7 +81,6 @@
             return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
         };
 
-        // ★ MenuCard 수정: 클릭 시 onExpand 호출
         const MenuCard = ({text, type, query, recipeMap, setPopupRecipes, setActiveRecipeIndex, onExpand}) => {
             const matched = findMatchedRecipes(text, recipeMap);
             return (
@@ -116,7 +124,7 @@
             );
         };
 
-        const MisoYonApp = () => {
+        const MiseOnApp = () => {
             const getFreshUrl = (url) => `${url}&t=${new Date().getTime()}`;
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
@@ -124,6 +132,8 @@
             const NOTICE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=489171005&single=true&output=csv";
             const COMMENT_READ_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=918283439&single=true&output=csv";
             const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbxQt7hG7JaH3HBD0ygYNezSlNFEuqLZJAv-22gDCTMET7z2nZs_MarT47Rxq7GlxBxC-Q/exec";
+            const SEASONAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=123456789&single=true&output=csv";
+            const REPORT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=949601099&single=true&output=csv";
 
             const ADMIN_NAME = "관리자";
             const ADMIN_CODE = "2026";
@@ -157,8 +167,13 @@
             const [popupRecipes, setPopupRecipes] = useState([]);
             const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
 
-            // ★ 확대 보기용 상태 추가
-            const [expandedMenu, setExpandedMenu] = useState(null); // { type: 'Morning', text: '...' }
+            const [expandedMenu, setExpandedMenu] = useState(null);
+            
+            const [seasonalModal, setSeasonalModal] = useState(false);
+            const [seasonalData, setSeasonalData] = useState([]);
+
+            const [reports, setReports] = useState([]);
+            const [reportModal, setReportModal] = useState(false);
 
             const timerRef = useRef(null);
 
@@ -250,6 +265,42 @@
                     }
                 });
 
+                if(SEASONAL_URL.includes("docs.google.com")) {
+                     Papa.parse(getUrl(SEASONAL_URL), {
+                        download: true,
+                        complete: (res) => {
+                            const data = [];
+                            res.data.forEach(row => {
+                                if(row.length >= 2 && !isNaN(row[0])) {
+                                    data.push({ month: parseInt(row[0]), name: row[1], desc: row[2] || "", menu: row[3] || "" });
+                                }
+                            });
+                            setSeasonalData(data);
+                        }
+                    });
+                }
+
+                if(REPORT_URL) {
+                    Papa.parse(getUrl(REPORT_URL), {
+                        download: true,
+                        complete: (res) => {
+                            const data = [];
+                            res.data.forEach(row => {
+                                if(row.length >= 5 && row[0] !== "날짜") {
+                                    data.push({
+                                        date: row[0].trim(),
+                                        beforeImg: row[1].trim(),
+                                        afterImg: row[2].trim(),
+                                        content: row[3].trim(),
+                                        author: row[4].trim()
+                                    });
+                                }
+                            });
+                            setReports(data);
+                        }
+                    });
+                }
+
                 Papa.parse(getUrl(NOTICE_URL), {
                     download: true,
                     complete: (res) => {
@@ -314,7 +365,8 @@
             const handleCommentSubmit = () => {
                 if (!newComment.trim() || !selectedDate) return;
                 setIsSubmitting(true);
-                const commentData = { date: selectedDate.date, name: currentUser, content: newComment.trim(), action: 'write' };
+                const prefix = reportModal ? "[보고서 피드백] " : "";
+                const commentData = { date: selectedDate.date, name: currentUser, content: prefix + newComment.trim(), action: 'write' };
                 fetch(COMMENT_WRITE_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(commentData) })
                 .then(() => { setComments([{ ...commentData, time: new Date().toLocaleString("ko-KR"), important: false }, ...comments]); setNewComment(""); setIsSubmitting(false); })
                 .catch(err => { alert("전송 실패."); setIsSubmitting(false); });
@@ -375,19 +427,26 @@
             const currentRecipe = popupRecipes[activeRecipeIndex];
             const weeklyData = getWeeklyData();
             const todayComments = selectedDate ? comments.filter(c => c.date === selectedDate.date) : [];
+            const todayReport = selectedDate ? reports.find(r => r.date === selectedDate.date) : null;
 
-            // ★ 확대 보기 핸들러
             const handleExpandMenu = (type, text) => {
                 if(!text) return;
                 setExpandedMenu({ type, text });
             };
+            
+            const currentSeasonal = useMemo(() => {
+                const thisMonth = currentMonth.getMonth() + 1;
+                return seasonalData.filter(d => d.month === thisMonth);
+            }, [seasonalData, currentMonth]);
 
             if (!isAuthenticated) {
                 return (
                     <div className="login-screen">
                         <div className="login-box">
-                            <h1 className="text-2xl font-black italic tracking-tighter mb-2">MISOYON <span className="text-blue-600">MMS</span></h1>
-                            <p className="text-xs text-slate-400 font-bold mb-6">AUTHORIZED ACCESS ONLY</p>
+                            <h1 className="text-3xl font-black italic tracking-tighter mb-2">Mise-On</h1>
+                            <p className="text-xs text-blue-600 font-bold mb-1 uppercase tracking-widest">Digital Mise-en-place</p>
+                            <p className="text-[10px] text-slate-400 font-bold mb-6">Powered by Chef D.S. Kim</p>
+                            
                             <input type="text" className="login-input" placeholder="이름 (Name)" value={inputName} onChange={e => setInputName(e.target.value)} />
                             <input type="password" inputMode="numeric" className="login-input" placeholder="비밀번호 (Code)" value={inputCode} onChange={e => setInputCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                             <button onClick={handleLogin} className="login-btn">LOGIN</button>
@@ -398,6 +457,7 @@
                                 </button>
                             </div>
                             {loginError && <p className="text-red-500 text-xs font-bold mt-3">{loginError}</p>}
+                            <div className="mt-8 text-[10px] text-slate-300">Client: Misoyeon (味笑宴)</div>
                         </div>
                     </div>
                 );
@@ -409,7 +469,10 @@
 
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
-                            <h1 className="text-xl font-black italic tracking-tighter">MISOYON <span className="text-blue-600">v36.0</span></h1>
+                            <div>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v39.0</span></h1>
+                                <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
+                            </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
                         </div>
                         <div className="flex gap-2">
@@ -444,7 +507,11 @@
                                     </div>
                                 ))}
                             </div>
-                            <div className="p-2 bg-white border-t">
+                            <div className="p-2 bg-white border-t space-y-2">
+                                <button onClick={()=>setSeasonalModal(true)} className="w-full bg-green-500 text-white py-3 rounded-xl font-black text-sm shadow-sm hover:bg-green-600 transition-colors flex items-center justify-center gap-2">
+                                    <span>🌿 {currentMonth.getMonth()+1}월의 제철 식재료</span>
+                                    {currentSeasonal.length > 0 && <span className="bg-white text-green-700 text-xs px-2 py-0.5 rounded-full">{currentSeasonal.length}</span>}
+                                </button>
                                 <button onClick={()=>setImportantModal(true)} className="w-full bg-yellow-400 text-yellow-900 py-3 rounded-xl font-black text-sm shadow-sm hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2">
                                     <span>⭐ 중요 리뷰 모아보기</span><span className="bg-white text-yellow-800 text-xs px-2 py-0.5 rounded-full">{importantComments.length}</span>
                                 </button>
@@ -459,6 +526,13 @@
                                         <button onClick={()=>setWeeklyModal(true)} className="bg-slate-800 text-white px-3 py-1 rounded-lg text-xs font-bold shadow-lg hover:bg-slate-700 transition-all">📅 주간표 보기</button>
                                     </div>
                                     <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
+                                    
+                                    {todayReport && (
+                                        <button onClick={() => setReportModal(true)} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mb-3">
+                                            <span>📷 현장 보고서 확인 및 피드백</span>
+                                        </button>
+                                    )}
+
                                     {selectedDate.duty && <div className="p-4 rounded-xl border mb-3 bg-slate-50 border-slate-200"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Schedule</div><div className="text-sm font-black text-slate-800">👨‍🍳 {selectedDate.duty}</div></div>}
                                     <MenuCard text={selectedDate.morning} type="Morning" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
                                     <MenuCard text={selectedDate.lunch} type="Lunch" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
@@ -492,7 +566,62 @@
                         </aside>
                     </main>
 
-                    {/* ★ 확대 보기 팝업 (새로 추가됨) */}
+                    {/* ★ 현장 보고서 팝업창 (사진 및 코멘트 통합) */}
+                    {reportModal && todayReport && (
+                        <div className="modal-view bg-slate-50">
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h2 className="text-xl font-black italic text-indigo-600">📷 현장 보고서</h2>
+                                <button onClick={()=>setReportModal(false)} className="text-3xl">&times;</button>
+                            </div>
+                            
+                            <div className="flex-1 overflow-y-auto pb-4 space-y-4">
+                                <div className="flex flex-col md:flex-row gap-4">
+                                    <div className="flex-1">
+                                        <div className="text-xs font-black text-slate-400 mb-1">식전 세팅 상태</div>
+                                        {todayReport.beforeImg ? (
+                                            <img src={formatImageUrl(todayReport.beforeImg)} alt="식전 사진" className="w-full h-48 md:h-64 object-cover rounded-xl border bg-white shadow-sm" />
+                                        ) : (
+                                            <div className="w-full h-48 bg-slate-200 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">사진 없음</div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="text-xs font-black text-slate-400 mb-1">식후 잔반 상태</div>
+                                        {todayReport.afterImg ? (
+                                            <img src={formatImageUrl(todayReport.afterImg)} alt="식후 사진" className="w-full h-48 md:h-64 object-cover rounded-xl border bg-white shadow-sm" />
+                                        ) : (
+                                            <div className="w-full h-48 bg-slate-200 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">사진 없음</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-4 rounded-xl border shadow-sm mt-4">
+                                    <div className="text-xs text-indigo-600 font-black mb-2">보고내용 | 작성자: {todayReport.author}</div>
+                                    <div className="text-sm font-bold text-slate-800 whitespace-pre-wrap leading-relaxed">{todayReport.content}</div>
+                                </div>
+
+                                {/* 코멘트 영역 (오늘의 한마디 재사용) */}
+                                <div className="mt-8 pt-4 border-t-2 border-slate-200">
+                                    <h3 className="text-sm font-black text-slate-400 uppercase mb-3">💬 보고서 피드백 및 코멘트</h3>
+                                    <div className="space-y-3 mb-4">
+                                        {todayComments.length > 0 ? todayComments.map((c, i) => (
+                                            <div key={i} className={`p-3 rounded-xl border transition-all ${c.important ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}>
+                                                <div className="flex justify-between items-center mb-1">
+                                                    <span className={`text-xs font-black ${c.important ? 'text-yellow-700' : 'text-blue-600'}`}>{c.name}</span>
+                                                    <span className="text-[10px] text-slate-400">{c.time}</span>
+                                                </div>
+                                                <div className="text-xs font-bold text-slate-700 whitespace-pre-wrap">{c.content}</div>
+                                            </div>
+                                        )) : <div className="text-center text-xs text-slate-300 py-4">아직 코멘트가 없습니다.</div>}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input className="flex-1 bg-white px-3 py-2 rounded-xl text-xs font-bold outline-none border focus:border-indigo-500" placeholder="보고서에 대한 피드백을 남겨주세요..." value={newComment} onChange={e=>setNewComment(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleCommentSubmit()} disabled={isSubmitting}/>
+                                        <button onClick={handleCommentSubmit} disabled={isSubmitting} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-indigo-700 disabled:opacity-50">{isSubmitting ? "..." : "등록"}</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {expandedMenu && (
                         <div className="zoom-popup" onClick={() => setExpandedMenu(null)}>
                             <div className="flex justify-between items-center mb-6 border-b pb-4">
@@ -508,6 +637,26 @@
                                 </div>
                             </div>
                             <div className="text-center text-xs text-slate-400 mt-6 font-bold">화면을 터치하면 닫힙니다</div>
+                        </div>
+                    )}
+
+                    {seasonalModal && (
+                        <div className="modal-view">
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h2 className="text-xl font-black italic text-green-600">🌿 {currentMonth.getMonth()+1}월의 제철 식재료</h2>
+                                <button onClick={()=>setSeasonalModal(false)} className="text-3xl">&times;</button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto pb-10 space-y-4">
+                                {currentSeasonal.length > 0 ? currentSeasonal.map((item, i) => (
+                                    <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="bg-green-100 text-green-800 px-3 py-1 rounded-lg font-black">{item.name}</div>
+                                            {item.menu && <div className="text-xs font-bold text-slate-500">🍽️ 추천: {item.menu}</div>}
+                                        </div>
+                                        <div className="text-sm text-slate-700 font-bold leading-relaxed">{item.desc}</div>
+                                    </div>
+                                )) : <div className="text-center py-10 text-slate-400 font-bold">등록된 제철 재료가 없습니다.<br/><span className="text-xs font-normal">(구글 시트 '제철재료' 탭을 확인해주세요)</span></div>}
+                            </div>
                         </div>
                     )}
 
@@ -614,7 +763,7 @@
                 </div>
             );
         };
-        ReactDOM.createRoot(document.getElementById('root')).render(<MisoYonApp />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<MiseOnApp />);
     </script>
 </body>
 </html>
