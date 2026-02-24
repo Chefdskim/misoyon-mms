@@ -176,6 +176,7 @@
 
             const [reports, setReports] = useState([]);
             const [reportModal, setReportModal] = useState(false);
+            const [activeReportTab, setActiveReportTab] = useState('아침'); // v40.0: 끼니별 탭 상태 추가
 
             const timerRef = useRef(null);
 
@@ -287,14 +288,16 @@
                         download: true,
                         complete: (res) => {
                             const data = [];
+                            // v40.0: B열 '구분' 추가 반영 (인덱스 1씩 밀림)
                             res.data.forEach(row => {
                                 if(row.length >= 5 && row[0] !== "날짜") {
                                     data.push({
-                                        date: row[0].trim(),
-                                        beforeImg: row[1].trim(),
-                                        afterImg: row[2].trim(),
-                                        content: row[3].trim(),
-                                        author: row[4].trim()
+                                        date: row[0]?.trim() || "",
+                                        type: row[1]?.trim() || "아침", // 구분 (아침, 점심, 저녁)
+                                        beforeImg: row[2]?.trim() || "",
+                                        afterImg: row[3]?.trim() || "",
+                                        content: row[4]?.trim() || "",
+                                        author: row[5]?.trim() || ""
                                     });
                                 }
                             });
@@ -367,7 +370,7 @@
             const handleCommentSubmit = () => {
                 if (!newComment.trim() || !selectedDate) return;
                 setIsSubmitting(true);
-                const prefix = reportModal ? "[보고서 피드백] " : "";
+                const prefix = reportModal ? `[보고서/${activeReportTab}] ` : "";
                 const commentData = { date: selectedDate.date, name: currentUser, content: prefix + newComment.trim(), action: 'write' };
                 fetch(COMMENT_WRITE_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(commentData) })
                 .then(() => { setComments([{ ...commentData, time: new Date().toLocaleString("ko-KR"), important: false }, ...comments]); setNewComment(""); setIsSubmitting(false); })
@@ -429,7 +432,10 @@
             const currentRecipe = popupRecipes[activeRecipeIndex];
             const weeklyData = getWeeklyData();
             const todayComments = selectedDate ? comments.filter(c => c.date === selectedDate.date) : [];
-            const todayReport = selectedDate ? reports.find(r => r.date === selectedDate.date) : null;
+            
+            // v40.0: 선택된 날짜의 모든 보고서 배열 생성 및 탭에 맞는 보고서 필터링
+            const todayReports = selectedDate ? reports.filter(r => r.date === selectedDate.date) : [];
+            const currentTabReport = todayReports.find(r => r.type === activeReportTab);
 
             const handleExpandMenu = (type, text) => {
                 if(!text) return;
@@ -472,7 +478,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v39.2</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.0</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -489,7 +495,7 @@
                             <button onClick={handleLogout} className="bg-red-500 text-white px-3 py-2 rounded-xl font-black text-xs">OUT</button>
                         </div>
                         <div className="flex gap-2">
-                            <input className="flex-1 bg-slate-100 px-3 py-2 rounded-xl text-xs font-bold border outline-none" placeholder="메뉴 검색 (예: 제육, 1월)" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
+                            <input className="flex-1 bg-slate-100 px-3 py-2 rounded-xl text-xs font-bold border outline-none" placeholder="메세지를 입력하세요 (예: 제육, 1월)" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
                             <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs">GO</button>
                         </div>
                     </header>
@@ -529,9 +535,10 @@
                                     </div>
                                     <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
                                     
-                                    {todayReport && (
-                                        <button onClick={() => setReportModal(true)} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mb-3">
-                                            <span>📷 현장 보고서 확인 및 피드백</span>
+                                    {/* v40.0: 해당 날짜에 보고서가 1개라도 있으면 버튼 활성화 */}
+                                    {todayReports.length > 0 && (
+                                        <button onClick={() => {setReportModal(true); setActiveReportTab('아침');}} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mb-3">
+                                            <span>📷 현장 보고서 확인 ({todayReports.length}건)</span>
                                         </button>
                                     )}
 
@@ -568,41 +575,62 @@
                         </aside>
                     </main>
 
-                    {/* ★ v39.2: 사진이 잘리지 않도록 object-contain 및 h-auto 속성 적용 */}
-                    {reportModal && todayReport && (
+                    {/* ★ v40.0: 끼니별 탭이 추가된 현장 보고서 팝업창 */}
+                    {reportModal && (
                         <div className="modal-view bg-slate-50">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
                                 <h2 className="text-xl font-black italic text-indigo-600">📷 현장 보고서</h2>
                                 <button onClick={()=>setReportModal(false)} className="text-3xl">&times;</button>
                             </div>
                             
-                            <div className="flex-1 overflow-y-auto pb-4 space-y-4">
-                                <div className="flex flex-col md:flex-row gap-4">
-                                    <div className="flex-1">
-                                        <div className="text-xs font-black text-slate-400 mb-1">식전 세팅 상태</div>
-                                        {todayReport.beforeImg ? (
-                                            <img src={formatImageUrl(todayReport.beforeImg)} alt="식전 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
-                                        ) : (
-                                            <div className="w-full h-48 bg-slate-200 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">사진 없음</div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="text-xs font-black text-slate-400 mb-1">식후 잔반 상태</div>
-                                        {todayReport.afterImg ? (
-                                            <img src={formatImageUrl(todayReport.afterImg)} alt="식후 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
-                                        ) : (
-                                            <div className="w-full h-48 bg-slate-200 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">사진 없음</div>
-                                        )}
-                                    </div>
-                                </div>
+                            {/* 탭 네비게이션 */}
+                            <div className="flex gap-2 mb-4 shrink-0">
+                                {['아침', '점심', '저녁'].map(tab => (
+                                    <button 
+                                        key={tab} 
+                                        onClick={() => setActiveReportTab(tab)}
+                                        className={`flex-1 py-2 rounded-xl text-sm font-black transition-all ${activeReportTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'}`}
+                                    >
+                                        {tab === '아침' ? '☀️ 아침' : tab === '점심' ? '🌞 점심' : '🌙 저녁'}
+                                    </button>
+                                ))}
+                            </div>
 
-                                <div className="bg-white p-4 rounded-xl border shadow-sm mt-4">
-                                    <div className="text-xs text-indigo-600 font-black mb-2">보고내용 | 작성자: {todayReport.author}</div>
-                                    <div className="text-sm font-bold text-slate-800 whitespace-pre-wrap leading-relaxed">{todayReport.content}</div>
-                                </div>
+                            <div className="flex-1 overflow-y-auto pb-4 space-y-4">
+                                {currentTabReport ? (
+                                    <>
+                                        <div className="flex flex-col md:flex-row gap-4">
+                                            <div className="flex-1">
+                                                <div className="text-xs font-black text-slate-400 mb-1">식전 세팅 상태</div>
+                                                {currentTabReport.beforeImg ? (
+                                                    <img src={formatImageUrl(currentTabReport.beforeImg)} alt="식전 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
+                                                ) : (
+                                                    <div className="w-full h-48 bg-slate-200 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">사진 없음</div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="text-xs font-black text-slate-400 mb-1">식후 잔반 상태</div>
+                                                {currentTabReport.afterImg ? (
+                                                    <img src={formatImageUrl(currentTabReport.afterImg)} alt="식후 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
+                                                ) : (
+                                                    <div className="w-full h-48 bg-slate-200 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">사진 없음</div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white p-4 rounded-xl border shadow-sm mt-4">
+                                            <div className="text-xs text-indigo-600 font-black mb-2">보고내용 | 작성자: {currentTabReport.author}</div>
+                                            <div className="text-sm font-bold text-slate-800 whitespace-pre-wrap leading-relaxed">{currentTabReport.content}</div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-center py-10 bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 font-bold">
+                                        해당 끼니의 보고서가 등록되지 않았습니다.
+                                    </div>
+                                )}
 
                                 <div className="mt-8 pt-4 border-t-2 border-slate-200">
-                                    <h3 className="text-sm font-black text-slate-400 uppercase mb-3">💬 보고서 피드백 및 코멘트</h3>
+                                    <h3 className="text-sm font-black text-slate-400 uppercase mb-3">💬 통합 피드백 및 코멘트</h3>
                                     <div className="space-y-3 mb-4">
                                         {todayComments.length > 0 ? todayComments.map((c, i) => (
                                             <div key={i} className={`p-3 rounded-xl border transition-all ${c.important ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}>
