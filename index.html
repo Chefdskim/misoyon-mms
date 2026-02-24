@@ -54,18 +54,13 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // [v39.1 핵심 패치] 구글 드라이브 보안 우회 이미지 변환 함수
         const formatImageUrl = (url) => {
             if (!url) return "";
-            // 링크 형식 1: /d/아이디/view
             const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-            // 링크 형식 2: ?id=아이디
             const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
-            
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
 
             if (fileId) {
-                // 구글 드라이브 썸네일 전용 API를 호출하여 강제 표시 (sz=w1000은 가로 1000픽셀 해상도)
                 return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
             }
             return url;
@@ -477,7 +472,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v39.1</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v39.2</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -573,6 +568,7 @@
                         </aside>
                     </main>
 
+                    {/* ★ v39.2: 사진이 잘리지 않도록 object-contain 및 h-auto 속성 적용 */}
                     {reportModal && todayReport && (
                         <div className="modal-view bg-slate-50">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -585,7 +581,7 @@
                                     <div className="flex-1">
                                         <div className="text-xs font-black text-slate-400 mb-1">식전 세팅 상태</div>
                                         {todayReport.beforeImg ? (
-                                            <img src={formatImageUrl(todayReport.beforeImg)} alt="식전 사진" className="w-full h-48 md:h-64 object-cover rounded-xl border bg-white shadow-sm" />
+                                            <img src={formatImageUrl(todayReport.beforeImg)} alt="식전 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
                                         ) : (
                                             <div className="w-full h-48 bg-slate-200 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">사진 없음</div>
                                         )}
@@ -593,7 +589,7 @@
                                     <div className="flex-1">
                                         <div className="text-xs font-black text-slate-400 mb-1">식후 잔반 상태</div>
                                         {todayReport.afterImg ? (
-                                            <img src={formatImageUrl(todayReport.afterImg)} alt="식후 사진" className="w-full h-48 md:h-64 object-cover rounded-xl border bg-white shadow-sm" />
+                                            <img src={formatImageUrl(todayReport.afterImg)} alt="식후 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
                                         ) : (
                                             <div className="w-full h-48 bg-slate-200 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">사진 없음</div>
                                         )}
