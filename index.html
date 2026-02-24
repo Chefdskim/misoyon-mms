@@ -54,6 +54,31 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
+        // ★ [v40.3 핵심] 제미의 비밀 식재료 사진 사전 (오직 제철 도감에서만 사용됨!)
+        // 셰프님이 리스트 주시면 이곳에 고화질 무료 이미지(Unsplash 등)를 제가 다 채워 넣을 겁니다.
+        const INGREDIENT_IMAGES = {
+            "딸기": "https://images.unsplash.com/photo-1518635017498-87f514b751ba?auto=format&fit=crop&w=300&q=80",
+            "꼬막": "https://images.unsplash.com/photo-1627308595171-d1b5d67129c4?auto=format&fit=crop&w=300&q=80",
+            "우엉": "https://images.unsplash.com/photo-1615486171448-4fd0bd651167?auto=format&fit=crop&w=300&q=80",
+            "과메기": "https://images.unsplash.com/photo-1620060012423-74b859d042f0?auto=format&fit=crop&w=300&q=80",
+            // 셰프님 리스트에 맞춰 계속 추가될 공간입니다.
+        };
+
+        // ★ [v40.3 핵심] 사진이 없는 재료를 위한 예쁜 '첫 글자 아이콘' 생성기
+        const getFallbackIcon = (name) => {
+            if (!name) return { bg: 'bg-slate-100', text: 'text-slate-500', char: '?' };
+            const colors = [
+                { bg: 'bg-red-100', text: 'text-red-600' }, { bg: 'bg-orange-100', text: 'text-orange-600' },
+                { bg: 'bg-amber-100', text: 'text-amber-600' }, { bg: 'bg-green-100', text: 'text-green-600' },
+                { bg: 'bg-emerald-100', text: 'text-emerald-600' }, { bg: 'bg-teal-100', text: 'text-teal-600' },
+                { bg: 'bg-blue-100', text: 'text-blue-600' }, { bg: 'bg-indigo-100', text: 'text-indigo-600' },
+                { bg: 'bg-purple-100', text: 'text-purple-600' }, { bg: 'bg-pink-100', text: 'text-pink-600' }
+            ];
+            const charCode = name.charCodeAt(0);
+            const color = colors[charCode % colors.length];
+            return { ...color, char: name.charAt(0) };
+        };
+
         const formatImageUrl = (url) => {
             if (!url) return "";
             const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -268,18 +293,14 @@
                     }
                 });
 
-                // ★ v40.2: 제철 식재료 파싱 고도화 (글자 제거, 5개 열 인식)
                 if(SEASONAL_URL.includes("docs.google.com")) {
                      Papa.parse(getUrl(SEASONAL_URL), {
                         download: true,
                         complete: (res) => {
                             const data = [];
                             res.data.forEach(row => {
-                                // 월 칸에 '2월'이라고 적어도 '2'만 뽑아내는 마법의 코드
                                 const monthStr = row[0] ? row[0].toString().replace(/[^0-9]/g, '') : '';
                                 const m = parseInt(monthStr);
-                                
-                                // 정상적인 데이터이고 월이 1~12 사이일 때만 저장 (제목 줄 무시)
                                 if(row.length >= 3 && !isNaN(m) && m >= 1 && m <= 12) {
                                     data.push({ 
                                         month: m, 
@@ -452,7 +473,6 @@
                 setExpandedMenu({ type, text });
             };
             
-            // ★ v40.2: 이번 달 데이터를 가져온 후, 카테고리(구분)별로 예쁘게 그룹화합니다.
             const groupedSeasonal = useMemo(() => {
                 const thisMonth = currentMonth.getMonth() + 1;
                 const thisMonthData = seasonalData.filter(d => d.month === thisMonth);
@@ -496,7 +516,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.2</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.3</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -666,7 +686,7 @@
                         </div>
                     )}
 
-                    {/* ★ v40.2: 카테고리별로 정렬된 제철 식재료 모달 */}
+                    {/* ★ v40.3: 제철 식재료 팝업 (사진 및 아이콘 연동) - 오직 여기에만 뜹니다! */}
                     {seasonalModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -677,29 +697,41 @@
                                 {Object.keys(groupedSeasonal).length > 0 ? (
                                     Object.keys(groupedSeasonal).map(cat => (
                                         <div key={cat} className="mb-8">
-                                            {/* 카테고리 헤더 */}
                                             <div className="flex items-center gap-2 mb-3 border-b-2 border-green-500 pb-1 w-max">
                                                 <span className="text-lg font-black text-green-800">
                                                     {cat.includes('수산') ? '🐟' : cat.includes('과일') || cat.includes('채소') ? '🥬' : '✨'} {cat}
                                                 </span>
                                             </div>
-                                            {/* 해당 카테고리 아이템 리스트 */}
                                             <div className="space-y-3">
-                                                {groupedSeasonal[cat].map((item, i) => (
-                                                    <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden">
-                                                        <div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
-                                                        <div className="font-black text-green-900 text-lg mb-1">{item.name}</div>
-                                                        <div className="text-sm text-slate-700 font-bold leading-relaxed mb-2">{item.desc}</div>
-                                                        
-                                                        {/* 궁합이 좋은 음식 태그 */}
-                                                        {item.pairing && (
-                                                            <div className="bg-orange-50 p-2.5 rounded-lg border border-orange-100 text-xs font-bold text-orange-950 mt-3 flex items-start gap-2">
-                                                                <span className="shrink-0 text-orange-600">🤝 찰떡궁합:</span> 
-                                                                <span>{item.pairing}</span>
+                                                {groupedSeasonal[cat].map((item, i) => {
+                                                    const icon = getFallbackIcon(item.name);
+                                                    return (
+                                                        <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden flex gap-4">
+                                                            <div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
+                                                            
+                                                            {/* 사진 또는 자동 아이콘 영역 */}
+                                                            {INGREDIENT_IMAGES[item.name] ? (
+                                                                <img src={INGREDIENT_IMAGES[item.name]} alt={item.name} className="w-16 h-16 object-cover rounded-xl shrink-0 border border-slate-100 shadow-sm" />
+                                                            ) : (
+                                                                <div className={`w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-black shrink-0 shadow-inner ${icon.bg} ${icon.text}`}>
+                                                                    {icon.char}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {/* 내용 영역 */}
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="font-black text-green-900 text-lg mb-1">{item.name}</div>
+                                                                <div className="text-sm text-slate-700 font-bold leading-relaxed mb-2">{item.desc}</div>
+                                                                {item.pairing && (
+                                                                    <div className="bg-orange-50 p-2.5 rounded-lg border border-orange-100 text-xs font-bold text-orange-950 mt-1 inline-flex items-center gap-2 max-w-full">
+                                                                        <span className="shrink-0 text-orange-600">🤝 찰떡궁합:</span> 
+                                                                        <span className="truncate">{item.pairing}</span>
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                        </div>
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     ))
