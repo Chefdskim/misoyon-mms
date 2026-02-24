@@ -54,17 +54,44 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // ★ [v40.3 핵심] 제미의 비밀 식재료 사진 사전 (오직 제철 도감에서만 사용됨!)
-        // 셰프님이 리스트 주시면 이곳에 고화질 무료 이미지(Unsplash 등)를 제가 다 채워 넣을 겁니다.
+        // ★ [v40.4] 셰프님이 주신 34개 식재료 매칭 사진첩 (제철 도감 전용)
         const INGREDIENT_IMAGES = {
-            "딸기": "https://images.unsplash.com/photo-1518635017498-87f514b751ba?auto=format&fit=crop&w=300&q=80",
-            "꼬막": "https://images.unsplash.com/photo-1627308595171-d1b5d67129c4?auto=format&fit=crop&w=300&q=80",
+            "봄동": "https://images.unsplash.com/photo-1557053964-93765dcddb05?auto=format&fit=crop&w=300&q=80",
+            "시금치": "https://images.unsplash.com/photo-1576045057995-468820f1301c?auto=format&fit=crop&w=300&q=80",
+            "콜라비": "https://images.unsplash.com/photo-1610450702816-db7e8913d803?auto=format&fit=crop&w=300&q=80",
             "우엉": "https://images.unsplash.com/photo-1615486171448-4fd0bd651167?auto=format&fit=crop&w=300&q=80",
+            "연근": "https://images.unsplash.com/photo-1590483868661-ee2cb92eb2cc?auto=format&fit=crop&w=300&q=80",
+            "구좌당근": "https://images.unsplash.com/photo-1598170845058-2640af05220c?auto=format&fit=crop&w=300&q=80",
+            "딸기": "https://images.unsplash.com/photo-1518635017498-87f514b751ba?auto=format&fit=crop&w=300&q=80",
+            "한라봉": "https://images.unsplash.com/photo-1556041074-ce497a7e80f5?auto=format&fit=crop&w=300&q=80",
+            "방울양배추": "https://images.unsplash.com/photo-1438118908562-baa5e4ae5c43?auto=format&fit=crop&w=300&q=80",
+            "더덕": "https://images.unsplash.com/photo-1626200424564-916828f7311c?auto=format&fit=crop&w=300&q=80",
+            "참다래": "https://images.unsplash.com/photo-1560155016259-2c5e52dc7792?auto=format&fit=crop&w=300&q=80",
+            "콜리플라워": "https://images.unsplash.com/photo-1512595085374-2c700cb62eb5?auto=format&fit=crop&w=300&q=80",
+            "꼬막": "https://images.unsplash.com/photo-1627308595171-d1b5d67129c4?auto=format&fit=crop&w=300&q=80",
+            "가자미": "https://images.unsplash.com/photo-1615141907722-178ecde6a540?auto=format&fit=crop&w=300&q=80",
+            "방어": "https://images.unsplash.com/photo-1534948834241-11884dc1307b?auto=format&fit=crop&w=300&q=80",
+            "대구": "https://images.unsplash.com/photo-1580479101035-7140e698889b?auto=format&fit=crop&w=300&q=80",
+            "매생이": "https://images.unsplash.com/photo-1580910543666-4e5c8e33f381?auto=format&fit=crop&w=300&q=80",
+            "아귀": "https://images.unsplash.com/photo-1596797782613-2d17c76899ba?auto=format&fit=crop&w=300&q=80",
             "과메기": "https://images.unsplash.com/photo-1620060012423-74b859d042f0?auto=format&fit=crop&w=300&q=80",
-            // 셰프님 리스트에 맞춰 계속 추가될 공간입니다.
+            "굴": "https://images.unsplash.com/photo-1599551139434-601d670f5e71?auto=format&fit=crop&w=300&q=80",
+            "파래": "https://images.unsplash.com/photo-1540340003-827fb7058a5c?auto=format&fit=crop&w=300&q=80",
+            "물미역": "https://images.unsplash.com/photo-1559869273-04db96ebdc85?auto=format&fit=crop&w=300&q=80",
+            "대게": "https://images.unsplash.com/photo-1558231575-b8dd6b0b2e25?auto=format&fit=crop&w=300&q=80",
+            "빙어": "https://images.unsplash.com/photo-1613506161477-981881a7b8e1?auto=format&fit=crop&w=300&q=80",
+            "호래기(겨울)": "https://images.unsplash.com/photo-1624462114757-cfb5a03e1e6e?auto=format&fit=crop&w=300&q=80",
+            "복어": "https://images.unsplash.com/photo-1583344073356-9a29c782bdce?auto=format&fit=crop&w=300&q=80",
+            "새조개": "https://images.unsplash.com/photo-1569263901614-7d526e838ff2?auto=format&fit=crop&w=300&q=80",
+            "명태": "https://images.unsplash.com/photo-1600862024107-164741639d1b?auto=format&fit=crop&w=300&q=80",
+            "개불": "https://images.unsplash.com/photo-1611171801267-3315a6b0c26b?auto=format&fit=crop&w=300&q=80",
+            "명란": "https://images.unsplash.com/photo-1613327663228-5696d5162a8c?auto=format&fit=crop&w=300&q=80",
+            "삼치": "https://images.unsplash.com/photo-1597561917711-2eb261af910c?auto=format&fit=crop&w=300&q=80",
+            "문어": "https://images.unsplash.com/photo-1541810574-e34923f6630f?auto=format&fit=crop&w=300&q=80",
+            "도미": "https://images.unsplash.com/photo-1516053331566-ee4c321484be?auto=format&fit=crop&w=300&q=80",
+            "낙지": "https://images.unsplash.com/photo-1575024227768-e4b7787fc388?auto=format&fit=crop&w=300&q=80"
         };
 
-        // ★ [v40.3 핵심] 사진이 없는 재료를 위한 예쁜 '첫 글자 아이콘' 생성기
         const getFallbackIcon = (name) => {
             if (!name) return { bg: 'bg-slate-100', text: 'text-slate-500', char: '?' };
             const colors = [
@@ -198,6 +225,9 @@
             
             const [seasonalModal, setSeasonalModal] = useState(false);
             const [seasonalData, setSeasonalData] = useState([]);
+            
+            // 사진 에러 상태 관리
+            const [imgError, setImgError] = useState({});
 
             const [reports, setReports] = useState([]);
             const [reportModal, setReportModal] = useState(false);
@@ -516,7 +546,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.3</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.4</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -686,7 +716,7 @@
                         </div>
                     )}
 
-                    {/* ★ v40.3: 제철 식재료 팝업 (사진 및 아이콘 연동) - 오직 여기에만 뜹니다! */}
+                    {/* ★ v40.4: 에러 방지(onError)가 적용된 제철 식재료 팝업 */}
                     {seasonalModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -705,20 +735,26 @@
                                             <div className="space-y-3">
                                                 {groupedSeasonal[cat].map((item, i) => {
                                                     const icon = getFallbackIcon(item.name);
+                                                    const hasImage = INGREDIENT_IMAGES[item.name] && !imgError[item.name];
+                                                    
                                                     return (
                                                         <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden flex gap-4">
                                                             <div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
                                                             
-                                                            {/* 사진 또는 자동 아이콘 영역 */}
-                                                            {INGREDIENT_IMAGES[item.name] ? (
-                                                                <img src={INGREDIENT_IMAGES[item.name]} alt={item.name} className="w-16 h-16 object-cover rounded-xl shrink-0 border border-slate-100 shadow-sm" />
+                                                            {/* ★ 이미지 렌더링 영역 (에러 시 자동으로 아이콘으로 교체됨) */}
+                                                            {hasImage ? (
+                                                                <img 
+                                                                    src={INGREDIENT_IMAGES[item.name]} 
+                                                                    alt={item.name} 
+                                                                    onError={() => setImgError(prev => ({...prev, [item.name]: true}))}
+                                                                    className="w-16 h-16 object-cover rounded-xl shrink-0 border border-slate-100 shadow-sm" 
+                                                                />
                                                             ) : (
                                                                 <div className={`w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-black shrink-0 shadow-inner ${icon.bg} ${icon.text}`}>
                                                                     {icon.char}
                                                                 </div>
                                                             )}
                                                             
-                                                            {/* 내용 영역 */}
                                                             <div className="flex-1 min-w-0">
                                                                 <div className="font-black text-green-900 text-lg mb-1">{item.name}</div>
                                                                 <div className="text-sm text-slate-700 font-bold leading-relaxed mb-2">{item.desc}</div>
