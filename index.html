@@ -54,12 +54,19 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // 구글 드라이브 공유 링크를 이미지 태그용 링크로 자동 변환해주는 함수
+        // [v39.1 핵심 패치] 구글 드라이브 보안 우회 이미지 변환 함수
         const formatImageUrl = (url) => {
             if (!url) return "";
-            const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-            if (match && match[1]) {
-                return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+            // 링크 형식 1: /d/아이디/view
+            const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            // 링크 형식 2: ?id=아이디
+            const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
+            
+            const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
+
+            if (fileId) {
+                // 구글 드라이브 썸네일 전용 API를 호출하여 강제 표시 (sz=w1000은 가로 1000픽셀 해상도)
+                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
             }
             return url;
         };
@@ -470,7 +477,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v39.0</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v39.1</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -566,7 +573,6 @@
                         </aside>
                     </main>
 
-                    {/* ★ 현장 보고서 팝업창 (사진 및 코멘트 통합) */}
                     {reportModal && todayReport && (
                         <div className="modal-view bg-slate-50">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -599,7 +605,6 @@
                                     <div className="text-sm font-bold text-slate-800 whitespace-pre-wrap leading-relaxed">{todayReport.content}</div>
                                 </div>
 
-                                {/* 코멘트 영역 (오늘의 한마디 재사용) */}
                                 <div className="mt-8 pt-4 border-t-2 border-slate-200">
                                     <h3 className="text-sm font-black text-slate-400 uppercase mb-3">💬 보고서 피드백 및 코멘트</h3>
                                     <div className="space-y-3 mb-4">
