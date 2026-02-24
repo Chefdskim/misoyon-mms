@@ -134,7 +134,6 @@
             const NOTICE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=489171005&single=true&output=csv";
             const COMMENT_READ_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=918283439&single=true&output=csv";
             const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbxQt7hG7JaH3HBD0ygYNezSlNFEuqLZJAv-22gDCTMET7z2nZs_MarT47Rxq7GlxBxC-Q/exec";
-            // ★ v40.1: 셰프님이 생성해주신 '제철재료' 시트의 URL로 교체 완료!
             const SEASONAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1051704487&single=true&output=csv";
             const REPORT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=949601099&single=true&output=csv";
 
@@ -269,14 +268,26 @@
                     }
                 });
 
+                // ★ v40.2: 제철 식재료 파싱 고도화 (글자 제거, 5개 열 인식)
                 if(SEASONAL_URL.includes("docs.google.com")) {
                      Papa.parse(getUrl(SEASONAL_URL), {
                         download: true,
                         complete: (res) => {
                             const data = [];
                             res.data.forEach(row => {
-                                if(row.length >= 2 && !isNaN(row[0])) {
-                                    data.push({ month: parseInt(row[0]), name: row[1]?.trim() || "", desc: row[2]?.trim() || "", menu: row[3]?.trim() || "" });
+                                // 월 칸에 '2월'이라고 적어도 '2'만 뽑아내는 마법의 코드
+                                const monthStr = row[0] ? row[0].toString().replace(/[^0-9]/g, '') : '';
+                                const m = parseInt(monthStr);
+                                
+                                // 정상적인 데이터이고 월이 1~12 사이일 때만 저장 (제목 줄 무시)
+                                if(row.length >= 3 && !isNaN(m) && m >= 1 && m <= 12) {
+                                    data.push({ 
+                                        month: m, 
+                                        category: row[1]?.trim() || "기타", 
+                                        name: row[2]?.trim() || "", 
+                                        desc: row[3]?.trim() || "", 
+                                        pairing: row[4]?.trim() || "" 
+                                    });
                                 }
                             });
                             setSeasonalData(data);
@@ -441,9 +452,17 @@
                 setExpandedMenu({ type, text });
             };
             
-            const currentSeasonal = useMemo(() => {
+            // ★ v40.2: 이번 달 데이터를 가져온 후, 카테고리(구분)별로 예쁘게 그룹화합니다.
+            const groupedSeasonal = useMemo(() => {
                 const thisMonth = currentMonth.getMonth() + 1;
-                return seasonalData.filter(d => d.month === thisMonth);
+                const thisMonthData = seasonalData.filter(d => d.month === thisMonth);
+                
+                return thisMonthData.reduce((acc, item) => {
+                    const cat = item.category || '기타';
+                    if(!acc[cat]) acc[cat] = [];
+                    acc[cat].push(item);
+                    return acc;
+                }, {});
             }, [seasonalData, currentMonth]);
 
             if (!isAuthenticated) {
@@ -477,7 +496,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.1</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.2</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -517,7 +536,7 @@
                             <div className="p-2 bg-white border-t space-y-2">
                                 <button onClick={()=>setSeasonalModal(true)} className="w-full bg-green-500 text-white py-3 rounded-xl font-black text-sm shadow-sm hover:bg-green-600 transition-colors flex items-center justify-center gap-2">
                                     <span>🌿 {currentMonth.getMonth()+1}월의 제철 식재료</span>
-                                    {currentSeasonal.length > 0 && <span className="bg-white text-green-700 text-xs px-2 py-0.5 rounded-full">{currentSeasonal.length}</span>}
+                                    {Object.keys(groupedSeasonal).length > 0 && <span className="bg-white text-green-700 text-xs px-2 py-0.5 rounded-full">{Object.values(groupedSeasonal).flat().length}</span>}
                                 </button>
                                 <button onClick={()=>setImportantModal(true)} className="w-full bg-yellow-400 text-yellow-900 py-3 rounded-xl font-black text-sm shadow-sm hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2">
                                     <span>⭐ 중요 리뷰 모아보기</span><span className="bg-white text-yellow-800 text-xs px-2 py-0.5 rounded-full">{importantComments.length}</span>
@@ -647,6 +666,53 @@
                         </div>
                     )}
 
+                    {/* ★ v40.2: 카테고리별로 정렬된 제철 식재료 모달 */}
+                    {seasonalModal && (
+                        <div className="modal-view">
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h2 className="text-xl font-black italic text-green-600">🌿 {currentMonth.getMonth()+1}월의 제철 식재료</h2>
+                                <button onClick={()=>setSeasonalModal(false)} className="text-3xl">&times;</button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto pb-10 px-1">
+                                {Object.keys(groupedSeasonal).length > 0 ? (
+                                    Object.keys(groupedSeasonal).map(cat => (
+                                        <div key={cat} className="mb-8">
+                                            {/* 카테고리 헤더 */}
+                                            <div className="flex items-center gap-2 mb-3 border-b-2 border-green-500 pb-1 w-max">
+                                                <span className="text-lg font-black text-green-800">
+                                                    {cat.includes('수산') ? '🐟' : cat.includes('과일') || cat.includes('채소') ? '🥬' : '✨'} {cat}
+                                                </span>
+                                            </div>
+                                            {/* 해당 카테고리 아이템 리스트 */}
+                                            <div className="space-y-3">
+                                                {groupedSeasonal[cat].map((item, i) => (
+                                                    <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden">
+                                                        <div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
+                                                        <div className="font-black text-green-900 text-lg mb-1">{item.name}</div>
+                                                        <div className="text-sm text-slate-700 font-bold leading-relaxed mb-2">{item.desc}</div>
+                                                        
+                                                        {/* 궁합이 좋은 음식 태그 */}
+                                                        {item.pairing && (
+                                                            <div className="bg-orange-50 p-2.5 rounded-lg border border-orange-100 text-xs font-bold text-orange-950 mt-3 flex items-start gap-2">
+                                                                <span className="shrink-0 text-orange-600">🤝 찰떡궁합:</span> 
+                                                                <span>{item.pairing}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-10 text-slate-400 font-bold">
+                                        등록된 제철 재료가 없습니다.<br/>
+                                        <span className="text-xs font-normal">(구글 시트 '제철재료' 탭을 확인해주세요)</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {expandedMenu && (
                         <div className="zoom-popup" onClick={() => setExpandedMenu(null)}>
                             <div className="flex justify-between items-center mb-6 border-b pb-4">
@@ -662,26 +728,6 @@
                                 </div>
                             </div>
                             <div className="text-center text-xs text-slate-400 mt-6 font-bold">화면을 터치하면 닫힙니다</div>
-                        </div>
-                    )}
-
-                    {seasonalModal && (
-                        <div className="modal-view">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h2 className="text-xl font-black italic text-green-600">🌿 {currentMonth.getMonth()+1}월의 제철 식재료</h2>
-                                <button onClick={()=>setSeasonalModal(false)} className="text-3xl">&times;</button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto pb-10 space-y-4">
-                                {currentSeasonal.length > 0 ? currentSeasonal.map((item, i) => (
-                                    <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <div className="bg-green-100 text-green-800 px-3 py-1 rounded-lg font-black">{item.name}</div>
-                                            {item.menu && <div className="text-xs font-bold text-slate-500">🍽️ 추천: {item.menu}</div>}
-                                        </div>
-                                        <div className="text-sm text-slate-700 font-bold leading-relaxed">{item.desc}</div>
-                                    </div>
-                                )) : <div className="text-center py-10 text-slate-400 font-bold">등록된 제철 재료가 없습니다.<br/><span className="text-xs font-normal">(구글 시트 '제철재료' 탭을 확인해주세요)</span></div>}
-                            </div>
                         </div>
                     )}
 
