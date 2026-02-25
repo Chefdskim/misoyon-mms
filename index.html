@@ -77,6 +77,7 @@
             return '🍽️';
         };
 
+        // ★ [v40.8 핵심 수정] 구글 드라이브 사진 직접 출력 우회 방식 변경
         const formatImageUrl = (url) => {
             if (!url) return "";
             const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -84,7 +85,8 @@
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
 
             if (fileId) {
-                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+                // 이전의 thumbnail API 대신, 직접 이미지 다운로드/뷰 링크(uc?export=view) 사용
+                return `https://drive.google.com/uc?export=view&id=${fileId}`;
             }
             return url;
         };
@@ -278,7 +280,6 @@
                     }
                 });
 
-                // ★ [v40.7] 레시피 시트 7번째 칸(G열)의 사진 링크 파싱 추가
                 Papa.parse(getUrl(RECIPE_URL), { 
                     download: true, 
                     complete: (res) => {
@@ -524,7 +525,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.7</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.8</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -843,7 +844,6 @@
                         </div>
                     )}
 
-                    {/* ★ [v40.7] 레시피 팝업: 이미지 렌더링 코드 추가 */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
@@ -857,7 +857,6 @@
                                     </div>
                                 )}
                                 <div className="animate-in fade-in zoom-in-95 duration-200">
-                                    {/* 썸네일 이미지를 재료 설명 우측에 배치 */}
                                     <div className="flex gap-4 items-start mb-4">
                                         <div className="flex-1">
                                             <div className="bg-blue-600 text-white px-3 py-1 rounded-full inline-block text-xs font-black mb-3 uppercase">{currentRecipe.name}</div>
@@ -866,7 +865,6 @@
                                                 <div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.ingredients}</div>
                                             </div>
                                         </div>
-                                        {/* 사진이 있을 때만 썸네일 출력 */}
                                         {currentRecipe.image && (
                                             <img 
                                                 src={formatImageUrl(currentRecipe.image)} 
