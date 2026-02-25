@@ -286,12 +286,12 @@
                             if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
                             const key = row[0].trim();
                             
-                            // ★ [v41.5 핵심] 칸 위치 무시! 줄 전체를 한 문장으로 합쳐서 링크를 추출합니다.
+                            // ★ [v41.6 핵심] 투시경 코드: G열과 H열에 진짜 무슨 텍스트가 들어왔는지 확인합니다.
                             const rowString = row.join(" ");
                             let foundImage = "";
                             const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
                             if(urlMatch) {
-                                foundImage = urlMatch[0].trim().replace(/["']$/, ""); // 혹시 모를 따옴표 제거
+                                foundImage = urlMatch[0].trim().replace(/["']$/, "");
                             }
                             
                             newRecipes[key] = { 
@@ -302,7 +302,10 @@
                                 tip: row[4] || "", 
                                 nutrition: row[5] || "",
                                 image: foundImage,
-                                colCount: row.length // 디버그: 구글 시트가 읽어들인 칸 갯수
+                                colCount: row.length,
+                                // 디버그용 투시경 데이터
+                                debugG: row.length > 6 ? row[6] : "비었음",
+                                debugH: row.length > 7 ? row[7] : "비었음"
                             };
                         });
                         setRecipeMap(newRecipes);
@@ -533,7 +536,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v41.5</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v41.6</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -852,7 +855,7 @@
                         </div>
                     )}
 
-                    {/* ★ [v41.5] 레시피 팝업: 완벽 복구된 디자인 + 진단 모드 */}
+                    {/* ★ [v41.6] 레시피 팝업: 데이터 투시경 디버그 추가 */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
@@ -875,6 +878,7 @@
                                             </div>
                                         </div>
                                         
+                                        {/* 앱이 링크를 찾아냈을 때만 사진을 띄웁니다. */}
                                         {currentRecipe.image ? (
                                             <img 
                                                 src={formatImageUrl(currentRecipe.image)} 
@@ -884,7 +888,10 @@
                                         ) : (
                                             <div className="w-24 h-24 flex flex-col items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-slate-300 bg-slate-50 p-1 text-center">
                                                 <span className="text-[10px] font-bold text-slate-400 mb-1">사진 없음</span>
-                                                <span className="text-[8px] text-slate-300">인식된 칸: {currentRecipe.colCount}개</span>
+                                                <span className="text-[8px] text-slate-300 break-all overflow-hidden text-left bg-white p-1 rounded w-full h-full">
+                                                    G열: {currentRecipe.debugG}<br/>
+                                                    H열: {currentRecipe.debugH}
+                                                </span>
                                             </div>
                                         )}
                                     </div>
