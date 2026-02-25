@@ -278,6 +278,8 @@
                     }
                 });
 
+                // ★ [v41.2 핵심] 초강력 링크 진공청소기!
+                // G열이든 Z열이든, 행의 모든 칸을 다 뒤져서 'http'가 포함된 링크를 강제로 뽑아냅니다.
                 Papa.parse(getUrl(RECIPE_URL), { 
                     download: true, 
                     complete: (res) => {
@@ -286,12 +288,16 @@
                             if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
                             const key = row[0].trim();
                             
-                            // ★ [v41.1 핵심] 시트 G, H, I열 어디에 있든 'http'가 포함된 링크를 무조건 찾아내는 스마트 스캐너!
                             let foundImage = "";
-                            for(let i = 5; i < Math.max(row.length, 10); i++) {
+                            // 2번 칸(재료)부터 행의 끝까지 전부 다 뒤집니다!
+                            for(let i = 2; i < row.length; i++) {
                                 if(row[i] && typeof row[i] === 'string' && row[i].includes('http')) {
-                                    foundImage = row[i].trim();
-                                    break;
+                                    // 텍스트 안에 섞여 있어도 링크만 쏙 뽑아냅니다.
+                                    const urlMatch = row[i].match(/(https?:\/\/[^\s]+)/);
+                                    if(urlMatch) {
+                                        foundImage = urlMatch[0].trim();
+                                        break; // 하나 찾으면 멈춤
+                                    }
                                 }
                             }
                             
@@ -302,7 +308,7 @@
                                 process: row[3] || "", 
                                 tip: row[4] || "", 
                                 nutrition: row[5] || "",
-                                image: foundImage // 찾아낸 사진 링크를 여기에 딱 넣습니다.
+                                image: foundImage 
                             };
                         });
                         setRecipeMap(newRecipes);
@@ -533,7 +539,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v41.1</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v41.2</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -852,7 +858,7 @@
                         </div>
                     )}
 
-                    {/* ★ [v41.1] 레시피 팝업: 스마트 이미지 확인 디버그 박스 추가 */}
+                    {/* ★ [v41.2] 레시피 팝업: 만약 사진이 없으면 회색 네모 대신 그냥 깔끔하게 빈 공간으로 둡니다. */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
@@ -875,17 +881,13 @@
                                             </div>
                                         </div>
                                         
-                                        {/* 앱이 링크를 읽어왔으면 사진을 띄우고, 못 읽어왔으면 '사진 없음' 박스를 띄웁니다! */}
-                                        {currentRecipe.image ? (
+                                        {/* 앱이 링크를 찾아냈을 때만 사진을 띄웁니다. */}
+                                        {currentRecipe.image && (
                                             <img 
                                                 src={formatImageUrl(currentRecipe.image)} 
                                                 alt={currentRecipe.name} 
                                                 className="w-24 h-24 object-cover rounded-xl shrink-0 border border-slate-200 shadow-sm bg-slate-100" 
                                             />
-                                        ) : (
-                                            <div className="w-24 h-24 flex items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-slate-300 bg-slate-50 text-[10px] font-bold text-slate-400 text-center p-2">
-                                                사진<br/>없음
-                                            </div>
                                         )}
                                     </div>
                                     
