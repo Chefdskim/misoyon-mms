@@ -54,59 +54,32 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // ★ [v40.5 핵심] 키워드 인식형 식재료 사진 매칭 (위키백과 공용 DB)
-        // 구좌당근이라고 써도 '당근'을 찾아 사진을 띄워주는 마법의 함수입니다.
-        const getFoodImage = (name) => {
-            if(!name) return null;
-            const n = name.replace(/\s+/g, ''); // 띄어쓰기 제거 후 검색
-            if(n.includes('딸기')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/PerfectStrawberry.jpg/300px-PerfectStrawberry.jpg';
-            if(n.includes('시금치')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Spinach.jpg/300px-Spinach.jpg';
-            if(n.includes('당근')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/13-08-31-Wien-Rathausplatz-Farmers_market-041.jpg/300px-13-08-31-Wien-Rathausplatz-Farmers_market-041.jpg';
-            if(n.includes('콜라비')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Kohlrabi_and_cross_section.jpg/300px-Kohlrabi_and_cross_section.jpg';
-            if(n.includes('우엉')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Burdock_roots.jpg/300px-Burdock_roots.jpg';
-            if(n.includes('연근')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Lotus_root_cross_section.jpg/300px-Lotus_root_cross_section.jpg';
-            if(n.includes('한라봉') || n.includes('귤')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/25/Dekopon.jpg/300px-Dekopon.jpg';
-            if(n.includes('방울양배추') || n.includes('양배추')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Brussels_sprouts_on_stalk_2.jpg/300px-Brussels_sprouts_on_stalk_2.jpg';
-            if(n.includes('다래') || n.includes('키위')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Kiwi_%28Actinidia_chinensis%29_1_Luc_Viatour.jpg/300px-Kiwi_%28Actinidia_chinensis%29_1_Luc_Viatour.jpg';
-            if(n.includes('콜리플라워')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Cauliflower.JPG/300px-Cauliflower.JPG';
-            if(n.includes('꼬막')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Tegillarca_granosa.jpg/300px-Tegillarca_granosa.jpg';
-            if(n.includes('가자미')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Pseudopleuronectes_americanus.jpg/300px-Pseudopleuronectes_americanus.jpg';
-            if(n.includes('방어')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Seriola_quinqueradiata.jpg/300px-Seriola_quinqueradiata.jpg';
-            if(n.includes('대구')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Gadus_morhua.jpg/300px-Gadus_morhua.jpg';
-            if(n.includes('굴')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Oysters_open_and_closed.jpg/300px-Oysters_open_and_closed.jpg';
-            if(n.includes('미역') || n.includes('파래') || n.includes('매생이')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Wakame.jpg/300px-Wakame.jpg';
-            if(n.includes('대게') || n.includes('게')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Chionoecetes_opilio.jpg/300px-Chionoecetes_opilio.jpg';
-            if(n.includes('문어')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Octopus_vulgaris_Croatia.jpg/300px-Octopus_vulgaris_Croatia.jpg';
-            if(n.includes('낙지')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Octopus_minor.jpg/300px-Octopus_minor.jpg';
-            if(n.includes('명태')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Gadus_chalcogrammus.jpg/300px-Gadus_chalcogrammus.jpg';
-            if(n.includes('명란')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Mentaiko.jpg/300px-Mentaiko.jpg';
-            if(n.includes('도미')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Pagrus_major.jpg/300px-Pagrus_major.jpg';
-            if(n.includes('복어')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Takifugu_rubripes.jpg/300px-Takifugu_rubripes.jpg';
-            if(n.includes('개불')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Urechis_unicinctus.jpg/300px-Urechis_unicinctus.jpg';
-            if(n.includes('아귀')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Lophius_piscatorius_1.jpg/300px-Lophius_piscatorius_1.jpg';
-            if(n.includes('봄동')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Bomdong.jpg/300px-Bomdong.jpg';
-            if(n.includes('호래기') || n.includes('오징어')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Loligo_vulgaris.jpg/300px-Loligo_vulgaris.jpg';
-            if(n.includes('새조개') || n.includes('조개')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Fulvia_mutica.jpg/300px-Fulvia_mutica.jpg';
-            if(n.includes('빙어')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Hypomesus_nipponensis.jpg/300px-Hypomesus_nipponensis.jpg';
-            if(n.includes('삼치')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Scomberomorus_niphonius.jpg/300px-Scomberomorus_niphonius.jpg';
-            if(n.includes('더덕')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Codonopsis_lanceolata.jpg/300px-Codonopsis_lanceolata.jpg';
-            if(n.includes('과메기')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Gwamegi.jpg/300px-Gwamegi.jpg';
+        // ★ [v40.6 핵심] 셰프님 아이디어: 100% 뜨고 에러 없는 스마트 이모티콘 자동 매칭!
+        const getFoodEmoji = (name, category) => {
+            if(!name) return '✨';
+            const n = name.replace(/\s+/g, '');
             
-            return null; // 사전에 없는 재료는 null 반환 -> 자동으로 예쁜 아이콘 생성됨!
-        };
-
-        const getFallbackIcon = (name) => {
-            if (!name) return { bg: 'bg-slate-100', text: 'text-slate-500', char: '?' };
-            const colors = [
-                { bg: 'bg-red-100', text: 'text-red-600' }, { bg: 'bg-orange-100', text: 'text-orange-600' },
-                { bg: 'bg-amber-100', text: 'text-amber-600' }, { bg: 'bg-green-100', text: 'text-green-600' },
-                { bg: 'bg-emerald-100', text: 'text-emerald-600' }, { bg: 'bg-teal-100', text: 'text-teal-600' },
-                { bg: 'bg-blue-100', text: 'text-blue-600' }, { bg: 'bg-indigo-100', text: 'text-indigo-600' },
-                { bg: 'bg-purple-100', text: 'text-purple-600' }, { bg: 'bg-pink-100', text: 'text-pink-600' }
-            ];
-            const charCode = name.charCodeAt(0);
-            const color = colors[charCode % colors.length];
-            return { ...color, char: name.charAt(0) };
+            // 1. 특정 식재료 직접 매칭
+            if(n.includes('딸기')) return '🍓';
+            if(n.includes('당근')) return '🥕';
+            if(n.includes('한라봉') || n.includes('귤')) return '🍊';
+            if(n.includes('다래') || n.includes('키위')) return '🥝';
+            if(n.includes('콜리플라워') || n.includes('방울양배추') || n.includes('양배추')) return '🥦';
+            if(n.includes('꼬막') || n.includes('굴') || n.includes('새조개') || n.includes('조개')) return '🦪';
+            if(n.includes('게') || n.includes('대게')) return '🦀';
+            if(n.includes('문어') || n.includes('낙지') || n.includes('호래기') || n.includes('오징어')) return '🐙';
+            if(n.includes('복어') || n.includes('아귀')) return '🐡';
+            if(n.includes('새우')) return '🦐';
+            if(n.includes('가자미') || n.includes('방어') || n.includes('대구') || n.includes('명태') || n.includes('삼치') || n.includes('도미') || n.includes('빙어') || n.includes('과메기')) return '🐟';
+            if(n.includes('우엉') || n.includes('연근') || n.includes('더덕')) return '🥔';
+            if(n.includes('봄동') || n.includes('시금치') || n.includes('파래') || n.includes('매생이') || n.includes('미역')) return '🌿';
+            
+            // 2. 사전에 없으면 '구분(카테고리)'을 보고 찰떡같이 맞춰줌
+            if(category && category.includes('수산')) return '🐟';
+            if(category && (category.includes('과일') || category.includes('채소'))) return '🥬';
+            
+            // 3. 다 아니면 예쁜 접시 아이콘
+            return '🍽️';
         };
 
         const formatImageUrl = (url) => {
@@ -228,8 +201,6 @@
             
             const [seasonalModal, setSeasonalModal] = useState(false);
             const [seasonalData, setSeasonalData] = useState([]);
-            
-            const [imgError, setImgError] = useState({});
 
             const [reports, setReports] = useState([]);
             const [reportModal, setReportModal] = useState(false);
@@ -339,7 +310,9 @@
                                         category: row[1]?.trim() || "기타", 
                                         name: row[2]?.trim() || "", 
                                         desc: row[3]?.trim() || "", 
-                                        pairing: row[4]?.trim() || "" 
+                                        pairing: row[4]?.trim() || "",
+                                        // ★ [v40.6 핵심] 셰프님이 시트에 추가하신 F열(인덱스 5) 데이터를 가져옵니다!
+                                        menu: row[5]?.trim() || ""
                                     });
                                 }
                             });
@@ -548,7 +521,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.5</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.6</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -718,6 +691,7 @@
                         </div>
                     )}
 
+                    {/* ★ v40.6: 이모티콘 100% 매칭 & F열 추천메뉴 표시 */}
                     {seasonalModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -734,41 +708,38 @@
                                                 </span>
                                             </div>
                                             <div className="space-y-3">
-                                                {groupedSeasonal[cat].map((item, i) => {
-                                                    const icon = getFallbackIcon(item.name);
-                                                    const imgUrl = getFoodImage(item.name); // 새로 만든 스마트 인식 함수
-                                                    const hasImage = imgUrl && !imgError[item.name];
-                                                    
-                                                    return (
-                                                        <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden flex gap-4">
-                                                            <div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
+                                                {groupedSeasonal[cat].map((item, i) => (
+                                                    <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden flex gap-4">
+                                                        <div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
+                                                        
+                                                        {/* 무조건 뜨는 초고속 이모티콘 영역 */}
+                                                        <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center text-4xl shrink-0 shadow-inner border border-slate-100">
+                                                            {getFoodEmoji(item.name, item.category)}
+                                                        </div>
+                                                        
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="font-black text-green-900 text-lg mb-1">{item.name}</div>
+                                                            <div className="text-sm text-slate-700 font-bold leading-relaxed mb-2">{item.desc}</div>
                                                             
-                                                            {hasImage ? (
-                                                                <img 
-                                                                    src={imgUrl} 
-                                                                    alt={item.name} 
-                                                                    onError={() => setImgError(prev => ({...prev, [item.name]: true}))}
-                                                                    className="w-16 h-16 object-cover rounded-xl shrink-0 border border-slate-100 shadow-sm" 
-                                                                />
-                                                            ) : (
-                                                                <div className={`w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-black shrink-0 shadow-inner ${icon.bg} ${icon.text}`}>
-                                                                    {icon.char}
-                                                                </div>
-                                                            )}
-                                                            
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="font-black text-green-900 text-lg mb-1">{item.name}</div>
-                                                                <div className="text-sm text-slate-700 font-bold leading-relaxed mb-2">{item.desc}</div>
+                                                            <div className="flex flex-col gap-1.5 mt-2">
+                                                                {/* F열: 추천메뉴 (파란색) */}
+                                                                {item.menu && (
+                                                                    <div className="bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 text-xs font-bold text-blue-900 inline-flex items-start gap-2 max-w-full">
+                                                                        <span className="shrink-0">🍳 추천요리:</span> 
+                                                                        <span className="break-words whitespace-pre-wrap leading-tight">{item.menu}</span>
+                                                                    </div>
+                                                                )}
+                                                                {/* E열: 찰떡궁합 (주황색) */}
                                                                 {item.pairing && (
-                                                                    <div className="bg-orange-50 p-2.5 rounded-lg border border-orange-100 text-xs font-bold text-orange-950 mt-1 inline-flex items-center gap-2 max-w-full">
+                                                                    <div className="bg-orange-50 px-2.5 py-1.5 rounded-lg border border-orange-100 text-xs font-bold text-orange-950 inline-flex items-start gap-2 max-w-full">
                                                                         <span className="shrink-0 text-orange-600">🤝 찰떡궁합:</span> 
-                                                                        <span className="truncate">{item.pairing}</span>
+                                                                        <span className="break-words whitespace-pre-wrap leading-tight">{item.pairing}</span>
                                                                     </div>
                                                                 )}
                                                             </div>
                                                         </div>
-                                                    )
-                                                })}
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     ))
