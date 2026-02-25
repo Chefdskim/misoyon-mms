@@ -82,7 +82,10 @@
             const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
             const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
-            if (fileId) return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+
+            if (fileId) {
+                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+            }
             return url;
         };
 
@@ -275,7 +278,6 @@
                     }
                 });
 
-                // ★ [v42.0] 스캐너 유지: 어디에 적든 http만 있으면 다 가져옵니다.
                 Papa.parse(getUrl(RECIPE_URL), { 
                     download: true, 
                     complete: (res) => {
@@ -284,6 +286,7 @@
                             if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
                             const key = row[0].trim();
                             
+                            // 스캐너: 행 전체를 문장으로 만들어서 http 링크 텍스트를 강제로 잡아냅니다.
                             const rowString = row.join(" ");
                             let foundImage = "";
                             const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
@@ -529,7 +532,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v42.0</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v42.1</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -848,7 +851,7 @@
                         </div>
                     )}
 
-                    {/* ★ [v42.0 핵심] 사진을 억지로 끼워넣지 않고, 깔끔한 '사진 보기' 버튼으로 변경! */}
+                    {/* ★ [v42.1] 팝업 화면: 사진 내장 + 에러 시 대체 버튼 동시 구현! */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
@@ -871,17 +874,38 @@
                                             </div>
                                         </div>
                                         
-                                        {/* 구글 드라이브 링크가 있으면 멋진 사진 보기 버튼을 띄워줍니다! */}
+                                        {/* 사진이 팝업에 바로 뜨는 영역 */}
                                         {currentRecipe.image && (
-                                            <a 
-                                                href={currentRecipe.image} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer" 
-                                                className="w-24 h-24 flex flex-col items-center justify-center rounded-xl shrink-0 border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 transition-all text-center no-underline shadow-sm"
-                                            >
-                                                <span className="text-2xl mb-1">📸</span>
-                                                <span className="text-[10px] font-black text-blue-700">완성사진<br/>크게보기</span>
-                                            </a>
+                                            <div className="w-28 h-28 shrink-0 relative rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 group">
+                                                <img 
+                                                    src={formatImageUrl(currentRecipe.image)} 
+                                                    alt={currentRecipe.name} 
+                                                    className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none'; // 에러 시 이미지 숨김
+                                                        if(e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; // 숨겨진 버튼 표시
+                                                    }}
+                                                />
+                                                {/* 사진 로딩 실패 시 나타나는 비상 버튼 */}
+                                                <a 
+                                                    href={currentRecipe.image} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    style={{display: 'none'}}
+                                                    className="absolute inset-0 flex-col items-center justify-center bg-slate-50 text-center no-underline hover:bg-slate-100"
+                                                >
+                                                    <span className="text-xl mb-1">🔗</span>
+                                                    <span className="text-[10px] font-black text-blue-600 break-words w-full px-1">사진 보기</span>
+                                                </a>
+                                                {/* 이미지가 정상적으로 떴을 때 클릭하면 원본 볼 수 있게 덮는 투명막 */}
+                                                <a 
+                                                    href={currentRecipe.image} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    className="absolute inset-0 z-10"
+                                                    title="원본 사진 크게 보기"
+                                                ></a>
+                                            </div>
                                         )}
                                     </div>
                                     
