@@ -286,13 +286,12 @@
                             if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
                             const key = row[0].trim();
                             
-                            // ★ [v41.1 핵심] 시트 G, H, I열 어디에 있든 'http'가 포함된 링크를 무조건 찾아내는 스마트 스캐너!
+                            // ★ [v41.5 핵심] 칸 위치 무시! 줄 전체를 한 문장으로 합쳐서 링크를 추출합니다.
+                            const rowString = row.join(" ");
                             let foundImage = "";
-                            for(let i = 5; i < Math.max(row.length, 10); i++) {
-                                if(row[i] && typeof row[i] === 'string' && row[i].includes('http')) {
-                                    foundImage = row[i].trim();
-                                    break;
-                                }
+                            const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
+                            if(urlMatch) {
+                                foundImage = urlMatch[0].trim().replace(/["']$/, ""); // 혹시 모를 따옴표 제거
                             }
                             
                             newRecipes[key] = { 
@@ -302,7 +301,8 @@
                                 process: row[3] || "", 
                                 tip: row[4] || "", 
                                 nutrition: row[5] || "",
-                                image: foundImage // 찾아낸 사진 링크를 여기에 딱 넣습니다.
+                                image: foundImage,
+                                colCount: row.length // 디버그: 구글 시트가 읽어들인 칸 갯수
                             };
                         });
                         setRecipeMap(newRecipes);
@@ -533,7 +533,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v41.1</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v41.5</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -852,7 +852,7 @@
                         </div>
                     )}
 
-                    {/* ★ [v41.1] 레시피 팝업: 스마트 이미지 확인 디버그 박스 추가 */}
+                    {/* ★ [v41.5] 레시피 팝업: 완벽 복구된 디자인 + 진단 모드 */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
@@ -875,7 +875,6 @@
                                             </div>
                                         </div>
                                         
-                                        {/* 앱이 링크를 읽어왔으면 사진을 띄우고, 못 읽어왔으면 '사진 없음' 박스를 띄웁니다! */}
                                         {currentRecipe.image ? (
                                             <img 
                                                 src={formatImageUrl(currentRecipe.image)} 
@@ -883,8 +882,9 @@
                                                 className="w-24 h-24 object-cover rounded-xl shrink-0 border border-slate-200 shadow-sm bg-slate-100" 
                                             />
                                         ) : (
-                                            <div className="w-24 h-24 flex items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-slate-300 bg-slate-50 text-[10px] font-bold text-slate-400 text-center p-2">
-                                                사진<br/>없음
+                                            <div className="w-24 h-24 flex flex-col items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-slate-300 bg-slate-50 p-1 text-center">
+                                                <span className="text-[10px] font-bold text-slate-400 mb-1">사진 없음</span>
+                                                <span className="text-[8px] text-slate-300">인식된 칸: {currentRecipe.colCount}개</span>
                                             </div>
                                         )}
                                     </div>
