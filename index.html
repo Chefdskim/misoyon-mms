@@ -54,42 +54,45 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // ★ [v40.4] 셰프님이 주신 34개 식재료 매칭 사진첩 (제철 도감 전용)
-        const INGREDIENT_IMAGES = {
-            "봄동": "https://images.unsplash.com/photo-1557053964-93765dcddb05?auto=format&fit=crop&w=300&q=80",
-            "시금치": "https://images.unsplash.com/photo-1576045057995-468820f1301c?auto=format&fit=crop&w=300&q=80",
-            "콜라비": "https://images.unsplash.com/photo-1610450702816-db7e8913d803?auto=format&fit=crop&w=300&q=80",
-            "우엉": "https://images.unsplash.com/photo-1615486171448-4fd0bd651167?auto=format&fit=crop&w=300&q=80",
-            "연근": "https://images.unsplash.com/photo-1590483868661-ee2cb92eb2cc?auto=format&fit=crop&w=300&q=80",
-            "구좌당근": "https://images.unsplash.com/photo-1598170845058-2640af05220c?auto=format&fit=crop&w=300&q=80",
-            "딸기": "https://images.unsplash.com/photo-1518635017498-87f514b751ba?auto=format&fit=crop&w=300&q=80",
-            "한라봉": "https://images.unsplash.com/photo-1556041074-ce497a7e80f5?auto=format&fit=crop&w=300&q=80",
-            "방울양배추": "https://images.unsplash.com/photo-1438118908562-baa5e4ae5c43?auto=format&fit=crop&w=300&q=80",
-            "더덕": "https://images.unsplash.com/photo-1626200424564-916828f7311c?auto=format&fit=crop&w=300&q=80",
-            "참다래": "https://images.unsplash.com/photo-1560155016259-2c5e52dc7792?auto=format&fit=crop&w=300&q=80",
-            "콜리플라워": "https://images.unsplash.com/photo-1512595085374-2c700cb62eb5?auto=format&fit=crop&w=300&q=80",
-            "꼬막": "https://images.unsplash.com/photo-1627308595171-d1b5d67129c4?auto=format&fit=crop&w=300&q=80",
-            "가자미": "https://images.unsplash.com/photo-1615141907722-178ecde6a540?auto=format&fit=crop&w=300&q=80",
-            "방어": "https://images.unsplash.com/photo-1534948834241-11884dc1307b?auto=format&fit=crop&w=300&q=80",
-            "대구": "https://images.unsplash.com/photo-1580479101035-7140e698889b?auto=format&fit=crop&w=300&q=80",
-            "매생이": "https://images.unsplash.com/photo-1580910543666-4e5c8e33f381?auto=format&fit=crop&w=300&q=80",
-            "아귀": "https://images.unsplash.com/photo-1596797782613-2d17c76899ba?auto=format&fit=crop&w=300&q=80",
-            "과메기": "https://images.unsplash.com/photo-1620060012423-74b859d042f0?auto=format&fit=crop&w=300&q=80",
-            "굴": "https://images.unsplash.com/photo-1599551139434-601d670f5e71?auto=format&fit=crop&w=300&q=80",
-            "파래": "https://images.unsplash.com/photo-1540340003-827fb7058a5c?auto=format&fit=crop&w=300&q=80",
-            "물미역": "https://images.unsplash.com/photo-1559869273-04db96ebdc85?auto=format&fit=crop&w=300&q=80",
-            "대게": "https://images.unsplash.com/photo-1558231575-b8dd6b0b2e25?auto=format&fit=crop&w=300&q=80",
-            "빙어": "https://images.unsplash.com/photo-1613506161477-981881a7b8e1?auto=format&fit=crop&w=300&q=80",
-            "호래기(겨울)": "https://images.unsplash.com/photo-1624462114757-cfb5a03e1e6e?auto=format&fit=crop&w=300&q=80",
-            "복어": "https://images.unsplash.com/photo-1583344073356-9a29c782bdce?auto=format&fit=crop&w=300&q=80",
-            "새조개": "https://images.unsplash.com/photo-1569263901614-7d526e838ff2?auto=format&fit=crop&w=300&q=80",
-            "명태": "https://images.unsplash.com/photo-1600862024107-164741639d1b?auto=format&fit=crop&w=300&q=80",
-            "개불": "https://images.unsplash.com/photo-1611171801267-3315a6b0c26b?auto=format&fit=crop&w=300&q=80",
-            "명란": "https://images.unsplash.com/photo-1613327663228-5696d5162a8c?auto=format&fit=crop&w=300&q=80",
-            "삼치": "https://images.unsplash.com/photo-1597561917711-2eb261af910c?auto=format&fit=crop&w=300&q=80",
-            "문어": "https://images.unsplash.com/photo-1541810574-e34923f6630f?auto=format&fit=crop&w=300&q=80",
-            "도미": "https://images.unsplash.com/photo-1516053331566-ee4c321484be?auto=format&fit=crop&w=300&q=80",
-            "낙지": "https://images.unsplash.com/photo-1575024227768-e4b7787fc388?auto=format&fit=crop&w=300&q=80"
+        // ★ [v40.5 핵심] 키워드 인식형 식재료 사진 매칭 (위키백과 공용 DB)
+        // 구좌당근이라고 써도 '당근'을 찾아 사진을 띄워주는 마법의 함수입니다.
+        const getFoodImage = (name) => {
+            if(!name) return null;
+            const n = name.replace(/\s+/g, ''); // 띄어쓰기 제거 후 검색
+            if(n.includes('딸기')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/PerfectStrawberry.jpg/300px-PerfectStrawberry.jpg';
+            if(n.includes('시금치')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Spinach.jpg/300px-Spinach.jpg';
+            if(n.includes('당근')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/13-08-31-Wien-Rathausplatz-Farmers_market-041.jpg/300px-13-08-31-Wien-Rathausplatz-Farmers_market-041.jpg';
+            if(n.includes('콜라비')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Kohlrabi_and_cross_section.jpg/300px-Kohlrabi_and_cross_section.jpg';
+            if(n.includes('우엉')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Burdock_roots.jpg/300px-Burdock_roots.jpg';
+            if(n.includes('연근')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/Lotus_root_cross_section.jpg/300px-Lotus_root_cross_section.jpg';
+            if(n.includes('한라봉') || n.includes('귤')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/25/Dekopon.jpg/300px-Dekopon.jpg';
+            if(n.includes('방울양배추') || n.includes('양배추')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Brussels_sprouts_on_stalk_2.jpg/300px-Brussels_sprouts_on_stalk_2.jpg';
+            if(n.includes('다래') || n.includes('키위')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Kiwi_%28Actinidia_chinensis%29_1_Luc_Viatour.jpg/300px-Kiwi_%28Actinidia_chinensis%29_1_Luc_Viatour.jpg';
+            if(n.includes('콜리플라워')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Cauliflower.JPG/300px-Cauliflower.JPG';
+            if(n.includes('꼬막')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Tegillarca_granosa.jpg/300px-Tegillarca_granosa.jpg';
+            if(n.includes('가자미')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Pseudopleuronectes_americanus.jpg/300px-Pseudopleuronectes_americanus.jpg';
+            if(n.includes('방어')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Seriola_quinqueradiata.jpg/300px-Seriola_quinqueradiata.jpg';
+            if(n.includes('대구')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/Gadus_morhua.jpg/300px-Gadus_morhua.jpg';
+            if(n.includes('굴')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Oysters_open_and_closed.jpg/300px-Oysters_open_and_closed.jpg';
+            if(n.includes('미역') || n.includes('파래') || n.includes('매생이')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Wakame.jpg/300px-Wakame.jpg';
+            if(n.includes('대게') || n.includes('게')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Chionoecetes_opilio.jpg/300px-Chionoecetes_opilio.jpg';
+            if(n.includes('문어')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Octopus_vulgaris_Croatia.jpg/300px-Octopus_vulgaris_Croatia.jpg';
+            if(n.includes('낙지')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/23/Octopus_minor.jpg/300px-Octopus_minor.jpg';
+            if(n.includes('명태')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Gadus_chalcogrammus.jpg/300px-Gadus_chalcogrammus.jpg';
+            if(n.includes('명란')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Mentaiko.jpg/300px-Mentaiko.jpg';
+            if(n.includes('도미')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Pagrus_major.jpg/300px-Pagrus_major.jpg';
+            if(n.includes('복어')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6f/Takifugu_rubripes.jpg/300px-Takifugu_rubripes.jpg';
+            if(n.includes('개불')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Urechis_unicinctus.jpg/300px-Urechis_unicinctus.jpg';
+            if(n.includes('아귀')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Lophius_piscatorius_1.jpg/300px-Lophius_piscatorius_1.jpg';
+            if(n.includes('봄동')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Bomdong.jpg/300px-Bomdong.jpg';
+            if(n.includes('호래기') || n.includes('오징어')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Loligo_vulgaris.jpg/300px-Loligo_vulgaris.jpg';
+            if(n.includes('새조개') || n.includes('조개')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1a/Fulvia_mutica.jpg/300px-Fulvia_mutica.jpg';
+            if(n.includes('빙어')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Hypomesus_nipponensis.jpg/300px-Hypomesus_nipponensis.jpg';
+            if(n.includes('삼치')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Scomberomorus_niphonius.jpg/300px-Scomberomorus_niphonius.jpg';
+            if(n.includes('더덕')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Codonopsis_lanceolata.jpg/300px-Codonopsis_lanceolata.jpg';
+            if(n.includes('과메기')) return 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Gwamegi.jpg/300px-Gwamegi.jpg';
+            
+            return null; // 사전에 없는 재료는 null 반환 -> 자동으로 예쁜 아이콘 생성됨!
         };
 
         const getFallbackIcon = (name) => {
@@ -226,7 +229,6 @@
             const [seasonalModal, setSeasonalModal] = useState(false);
             const [seasonalData, setSeasonalData] = useState([]);
             
-            // 사진 에러 상태 관리
             const [imgError, setImgError] = useState({});
 
             const [reports, setReports] = useState([]);
@@ -546,7 +548,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.4</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v40.5</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -716,7 +718,6 @@
                         </div>
                     )}
 
-                    {/* ★ v40.4: 에러 방지(onError)가 적용된 제철 식재료 팝업 */}
                     {seasonalModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -735,16 +736,16 @@
                                             <div className="space-y-3">
                                                 {groupedSeasonal[cat].map((item, i) => {
                                                     const icon = getFallbackIcon(item.name);
-                                                    const hasImage = INGREDIENT_IMAGES[item.name] && !imgError[item.name];
+                                                    const imgUrl = getFoodImage(item.name); // 새로 만든 스마트 인식 함수
+                                                    const hasImage = imgUrl && !imgError[item.name];
                                                     
                                                     return (
                                                         <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden flex gap-4">
                                                             <div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
                                                             
-                                                            {/* ★ 이미지 렌더링 영역 (에러 시 자동으로 아이콘으로 교체됨) */}
                                                             {hasImage ? (
                                                                 <img 
-                                                                    src={INGREDIENT_IMAGES[item.name]} 
+                                                                    src={imgUrl} 
                                                                     alt={item.name} 
                                                                     onError={() => setImgError(prev => ({...prev, [item.name]: true}))}
                                                                     className="w-16 h-16 object-cover rounded-xl shrink-0 border border-slate-100 shadow-sm" 
