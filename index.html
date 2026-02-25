@@ -77,12 +77,16 @@
             return '🍽️';
         };
 
+        // ★ [v41.7] 가장 강력한 구글 CDN(lh3) 우회 함수 적용
         const formatImageUrl = (url) => {
             if (!url) return "";
             const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
             const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
-            if (fileId) return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+
+            if (fileId) {
+                return `https://lh3.googleusercontent.com/d/${fileId}`;
+            }
             return url;
         };
 
@@ -275,7 +279,6 @@
                     }
                 });
 
-                // ★ [v42.0] 스캐너 유지: 어디에 적든 http만 있으면 다 가져옵니다.
                 Papa.parse(getUrl(RECIPE_URL), { 
                     download: true, 
                     complete: (res) => {
@@ -284,6 +287,7 @@
                             if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
                             const key = row[0].trim();
                             
+                            // 통스캔: 줄 전체를 합쳐서 http 링크만 쏙 뽑아냅니다
                             const rowString = row.join(" ");
                             let foundImage = "";
                             const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
@@ -298,7 +302,10 @@
                                 process: row[3] || "", 
                                 tip: row[4] || "", 
                                 nutrition: row[5] || "",
-                                image: foundImage
+                                image: foundImage,
+                                colCount: row.length,
+                                debugG: row.length > 6 ? row[6] : "비었음",
+                                debugH: row.length > 7 ? row[7] : "비었음"
                             };
                         });
                         setRecipeMap(newRecipes);
@@ -529,7 +536,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v42.0</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v41.7</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -848,7 +855,7 @@
                         </div>
                     )}
 
-                    {/* ★ [v42.0 핵심] 사진을 억지로 끼워넣지 않고, 깔끔한 '사진 보기' 버튼으로 변경! */}
+                    {/* ★ [v41.7] 레시피 팝업: 최강 우회 서버 + 2단계 에러 방어(onError) 추가 */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
@@ -871,17 +878,37 @@
                                             </div>
                                         </div>
                                         
-                                        {/* 구글 드라이브 링크가 있으면 멋진 사진 보기 버튼을 띄워줍니다! */}
-                                        {currentRecipe.image && (
-                                            <a 
-                                                href={currentRecipe.image} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer" 
-                                                className="w-24 h-24 flex flex-col items-center justify-center rounded-xl shrink-0 border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 transition-all text-center no-underline shadow-sm"
-                                            >
-                                                <span className="text-2xl mb-1">📸</span>
-                                                <span className="text-[10px] font-black text-blue-700">완성사진<br/>크게보기</span>
-                                            </a>
+                                        {/* 앱이 텍스트 링크를 찾아냈을 때만 사진을 띄웁니다. */}
+                                        {currentRecipe.image ? (
+                                            <>
+                                                <img 
+                                                    src={formatImageUrl(currentRecipe.image)} 
+                                                    alt={currentRecipe.name} 
+                                                    className="w-24 h-24 object-cover rounded-xl shrink-0 border border-slate-200 shadow-sm bg-slate-100" 
+                                                    onError={(e) => {
+                                                        const match = currentRecipe.image.match(/\/d\/([a-zA-Z0-9_-]+)/) || currentRecipe.image.match(/id=([a-zA-Z0-9_-]+)/);
+                                                        if(match && !e.target.dataset.retried) {
+                                                            e.target.dataset.retried = 'true';
+                                                            e.target.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`; // 두 번째 우회 시도
+                                                        } else {
+                                                            e.target.style.display = 'none'; // 다 실패하면 사진 숨기고 에러박스 띄움
+                                                            if(e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                                        }
+                                                    }}
+                                                />
+                                                <div style={{display: 'none'}} className="w-24 h-24 flex-col items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-red-300 bg-red-50 p-1 text-center">
+                                                    <span className="text-[10px] font-bold text-red-400 mb-1">권한 잠김</span>
+                                                    <span className="text-[8px] text-red-300">구글 드라이브<br/>공유설정 변경필요</span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="w-24 h-24 flex flex-col items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-slate-300 bg-slate-50 p-1 text-center">
+                                                <span className="text-[10px] font-bold text-slate-400 mb-1">사진 없음</span>
+                                                <span className="text-[8px] text-slate-300 break-all overflow-hidden text-left bg-white p-1 rounded w-full h-full">
+                                                    G열: {currentRecipe.debugG}<br/>
+                                                    H열: {currentRecipe.debugH}
+                                                </span>
+                                            </div>
                                         )}
                                     </div>
                                     
