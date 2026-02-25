@@ -77,7 +77,6 @@
             return '🍽️';
         };
 
-        // ★ [v41.0 핵심 패치] 가장 안정적인 구글 썸네일 고화질 엔진 적용
         const formatImageUrl = (url) => {
             if (!url) return "";
             const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -85,7 +84,6 @@
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
 
             if (fileId) {
-                // 공유 권한이 '링크가 있는 모든 사용자'로 되어있다면 100% 뜨는 가장 안정적인 주소
                 return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
             }
             return url;
@@ -287,6 +285,16 @@
                         res.data.forEach(row => {
                             if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
                             const key = row[0].trim();
+                            
+                            // ★ [v41.1 핵심] 시트 G, H, I열 어디에 있든 'http'가 포함된 링크를 무조건 찾아내는 스마트 스캐너!
+                            let foundImage = "";
+                            for(let i = 5; i < Math.max(row.length, 10); i++) {
+                                if(row[i] && typeof row[i] === 'string' && row[i].includes('http')) {
+                                    foundImage = row[i].trim();
+                                    break;
+                                }
+                            }
+                            
                             newRecipes[key] = { 
                                 key: key, 
                                 name: row[1] || key, 
@@ -294,7 +302,7 @@
                                 process: row[3] || "", 
                                 tip: row[4] || "", 
                                 nutrition: row[5] || "",
-                                image: row[6] ? row[6].trim() : "" 
+                                image: foundImage // 찾아낸 사진 링크를 여기에 딱 넣습니다.
                             };
                         });
                         setRecipeMap(newRecipes);
@@ -525,7 +533,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v41.0</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v41.1</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -844,7 +852,7 @@
                         </div>
                     )}
 
-                    {/* ★ 레시피 팝업: 이미지 렌더링 유지 */}
+                    {/* ★ [v41.1] 레시피 팝업: 스마트 이미지 확인 디버그 박스 추가 */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
@@ -866,12 +874,18 @@
                                                 <div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.ingredients}</div>
                                             </div>
                                         </div>
-                                        {currentRecipe.image && (
+                                        
+                                        {/* 앱이 링크를 읽어왔으면 사진을 띄우고, 못 읽어왔으면 '사진 없음' 박스를 띄웁니다! */}
+                                        {currentRecipe.image ? (
                                             <img 
                                                 src={formatImageUrl(currentRecipe.image)} 
                                                 alt={currentRecipe.name} 
                                                 className="w-24 h-24 object-cover rounded-xl shrink-0 border border-slate-200 shadow-sm bg-slate-100" 
                                             />
+                                        ) : (
+                                            <div className="w-24 h-24 flex items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-slate-300 bg-slate-50 text-[10px] font-bold text-slate-400 text-center p-2">
+                                                사진<br/>없음
+                                            </div>
                                         )}
                                     </div>
                                     
