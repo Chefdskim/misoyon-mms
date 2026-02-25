@@ -77,6 +77,7 @@
             return '🍽️';
         };
 
+        // 구글 CDN 우회 함수 (레시피, 보고서, 제철재료 공통 사용)
         const formatImageUrl = (url) => {
             if (!url) return "";
             const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -84,7 +85,7 @@
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
 
             if (fileId) {
-                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+                return `https://lh3.googleusercontent.com/d/${fileId}`;
             }
             return url;
         };
@@ -286,7 +287,7 @@
                             if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
                             const key = row[0].trim();
                             
-                            // 스캐너: 행 전체를 문장으로 만들어서 http 링크 텍스트를 강제로 잡아냅니다.
+                            // 통스캔: 줄 전체를 합쳐서 http 링크만 쏙 뽑아냅니다.
                             const rowString = row.join(" ");
                             let foundImage = "";
                             const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
@@ -301,13 +302,16 @@
                                 process: row[3] || "", 
                                 tip: row[4] || "", 
                                 nutrition: row[5] || "",
-                                image: foundImage
+                                image: foundImage,
+                                debugG: row.length > 6 ? row[6] : "비었음",
+                                debugH: row.length > 7 ? row[7] : "비었음"
                             };
                         });
                         setRecipeMap(newRecipes);
                     }
                 });
 
+                // ★ [v42.2 핵심] 제철재료 탭에서도 사진 스캐너 작동!
                 if(SEASONAL_URL.includes("docs.google.com")) {
                      Papa.parse(getUrl(SEASONAL_URL), {
                         download: true,
@@ -317,13 +321,22 @@
                                 const monthStr = row[0] ? row[0].toString().replace(/[^0-9]/g, '') : '';
                                 const m = parseInt(monthStr);
                                 if(row.length >= 3 && !isNaN(m) && m >= 1 && m <= 12) {
+                                    // 제철재료 행에서도 통스캔 실행
+                                    const rowString = row.join(" ");
+                                    let foundImage = "";
+                                    const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
+                                    if(urlMatch) {
+                                        foundImage = urlMatch[0].trim().replace(/["']$/, "");
+                                    }
+
                                     data.push({ 
                                         month: m, 
                                         category: row[1]?.trim() || "기타", 
                                         name: row[2]?.trim() || "", 
                                         desc: row[3]?.trim() || "", 
                                         pairing: row[4]?.trim() || "",
-                                        menu: row[5]?.trim() || ""
+                                        menu: row[5]?.trim() || "",
+                                        image: foundImage // 사진 데이터 추가!
                                     });
                                 }
                             });
@@ -532,7 +545,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v42.1</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v42.2</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
                             </div>
                             <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
@@ -702,6 +715,7 @@
                         </div>
                     )}
 
+                    {/* ★ [v42.2] 제철식재료 팝업: 이모티콘 대신 실사 이미지가 있으면 출력! */}
                     {seasonalModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -721,9 +735,35 @@
                                                 {groupedSeasonal[cat].map((item, i) => (
                                                     <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden flex gap-4">
                                                         <div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
-                                                        <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center text-4xl shrink-0 shadow-inner border border-slate-100">
-                                                            {getFoodEmoji(item.name, item.category)}
-                                                        </div>
+                                                        
+                                                        {/* 이미지가 있으면 이미지 출력, 없으면 귀여운 이모티콘 유지 */}
+                                                        {item.image ? (
+                                                            <div className="w-16 h-16 shrink-0 relative rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 group cursor-pointer" onClick={() => window.open(item.image, '_blank')}>
+                                                                <img 
+                                                                    src={formatImageUrl(item.image)} 
+                                                                    alt={item.name} 
+                                                                    className="w-full h-full object-cover transition-transform group-hover:scale-110" 
+                                                                    onError={(e) => {
+                                                                        const match = item.image.match(/\/d\/([a-zA-Z0-9_-]+)/) || item.image.match(/id=([a-zA-Z0-9_-]+)/);
+                                                                        if(match && !e.target.dataset.retried) {
+                                                                            e.target.dataset.retried = 'true';
+                                                                            e.target.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+                                                                        } else {
+                                                                            e.target.style.display = 'none';
+                                                                            if(e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                                                        }
+                                                                    }}
+                                                                />
+                                                                <div style={{display: 'none'}} className="absolute inset-0 flex-col items-center justify-center bg-slate-50 text-center text-[10px] font-black text-blue-500">
+                                                                    사진<br/>열기
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center text-4xl shrink-0 shadow-inner border border-slate-100">
+                                                                {getFoodEmoji(item.name, item.category)}
+                                                            </div>
+                                                        )}
+
                                                         <div className="flex-1 min-w-0">
                                                             <div className="font-black text-green-900 text-lg mb-1">{item.name}</div>
                                                             <div className="text-sm text-slate-700 font-bold leading-relaxed mb-2">{item.desc}</div>
@@ -851,7 +891,6 @@
                         </div>
                     )}
 
-                    {/* ★ [v42.1] 팝업 화면: 사진 내장 + 에러 시 대체 버튼 동시 구현! */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
@@ -874,37 +913,30 @@
                                             </div>
                                         </div>
                                         
-                                        {/* 사진이 팝업에 바로 뜨는 영역 */}
-                                        {currentRecipe.image && (
-                                            <div className="w-28 h-28 shrink-0 relative rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 group">
+                                        {currentRecipe.image ? (
+                                            <div className="w-24 h-24 shrink-0 relative rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 group cursor-pointer" onClick={() => window.open(currentRecipe.image, '_blank')}>
                                                 <img 
                                                     src={formatImageUrl(currentRecipe.image)} 
                                                     alt={currentRecipe.name} 
                                                     className="w-full h-full object-cover transition-transform group-hover:scale-110" 
                                                     onError={(e) => {
-                                                        e.target.style.display = 'none'; // 에러 시 이미지 숨김
-                                                        if(e.target.nextSibling) e.target.nextSibling.style.display = 'flex'; // 숨겨진 버튼 표시
+                                                        const match = currentRecipe.image.match(/\/d\/([a-zA-Z0-9_-]+)/) || currentRecipe.image.match(/id=([a-zA-Z0-9_-]+)/);
+                                                        if(match && !e.target.dataset.retried) {
+                                                            e.target.dataset.retried = 'true';
+                                                            e.target.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+                                                        } else {
+                                                            e.target.style.display = 'none';
+                                                            if(e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                                                        }
                                                     }}
                                                 />
-                                                {/* 사진 로딩 실패 시 나타나는 비상 버튼 */}
-                                                <a 
-                                                    href={currentRecipe.image} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer" 
-                                                    style={{display: 'none'}}
-                                                    className="absolute inset-0 flex-col items-center justify-center bg-slate-50 text-center no-underline hover:bg-slate-100"
-                                                >
-                                                    <span className="text-xl mb-1">🔗</span>
-                                                    <span className="text-[10px] font-black text-blue-600 break-words w-full px-1">사진 보기</span>
-                                                </a>
-                                                {/* 이미지가 정상적으로 떴을 때 클릭하면 원본 볼 수 있게 덮는 투명막 */}
-                                                <a 
-                                                    href={currentRecipe.image} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer" 
-                                                    className="absolute inset-0 z-10"
-                                                    title="원본 사진 크게 보기"
-                                                ></a>
+                                                <div style={{display: 'none'}} className="absolute inset-0 flex-col items-center justify-center bg-slate-50 text-center text-[10px] font-black text-blue-500">
+                                                    사진<br/>열기
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="w-24 h-24 flex flex-col items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-slate-300 bg-slate-50 p-1 text-center">
+                                                <span className="text-[10px] font-bold text-slate-400 mb-1">사진 없음</span>
                                             </div>
                                         )}
                                     </div>
