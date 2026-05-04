@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -77,7 +77,6 @@
             return '🍽️';
         };
 
-        // 구글 CDN 우회 함수 (레시피, 보고서, 제철재료 공통 사용)
         const formatImageUrl = (url) => {
             if (!url) return "";
             const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -85,7 +84,7 @@
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
 
             if (fileId) {
-                return `https://lh3.googleusercontent.com/d/${fileId}`;
+                return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
             }
             return url;
         };
@@ -152,6 +151,10 @@
 
         const MiseOnApp = () => {
             const getFreshUrl = (url) => `${url}&t=${new Date().getTime()}`;
+            
+            // ★ 셰프님의 구글 시트 원본 주소 (관리자 전용 데이터 관리용) ★
+            const SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1ipSLhBGgAW1U_RF9Xkez3hUl_Eiklyor-OeQ-DtHV9o/edit?usp=sharing"; 
+
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
@@ -287,7 +290,6 @@
                             if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
                             const key = row[0].trim();
                             
-                            // 통스캔: 줄 전체를 합쳐서 http 링크만 쏙 뽑아냅니다.
                             const rowString = row.join(" ");
                             let foundImage = "";
                             const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
@@ -303,6 +305,7 @@
                                 tip: row[4] || "", 
                                 nutrition: row[5] || "",
                                 image: foundImage,
+                                colCount: row.length,
                                 debugG: row.length > 6 ? row[6] : "비었음",
                                 debugH: row.length > 7 ? row[7] : "비었음"
                             };
@@ -311,7 +314,6 @@
                     }
                 });
 
-                // ★ [v42.2 핵심] 제철재료 탭에서도 사진 스캐너 작동!
                 if(SEASONAL_URL.includes("docs.google.com")) {
                      Papa.parse(getUrl(SEASONAL_URL), {
                         download: true,
@@ -321,7 +323,6 @@
                                 const monthStr = row[0] ? row[0].toString().replace(/[^0-9]/g, '') : '';
                                 const m = parseInt(monthStr);
                                 if(row.length >= 3 && !isNaN(m) && m >= 1 && m <= 12) {
-                                    // 제철재료 행에서도 통스캔 실행
                                     const rowString = row.join(" ");
                                     let foundImage = "";
                                     const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
@@ -336,7 +337,7 @@
                                         desc: row[3]?.trim() || "", 
                                         pairing: row[4]?.trim() || "",
                                         menu: row[5]?.trim() || "",
-                                        image: foundImage // 사진 데이터 추가!
+                                        image: foundImage
                                     });
                                 }
                             });
@@ -532,7 +533,7 @@
                                 </button>
                             </div>
                             {loginError && <p className="text-red-500 text-xs font-bold mt-3">{loginError}</p>}
-                            <div className="mt-8 text-[10px] text-slate-300">Client: Misoyeon (味笑宴)</div>
+                            <div className="mt-8 text-[10px] text-slate-300">Smart Kitchen System</div>
                         </div>
                     </div>
                 );
@@ -545,10 +546,23 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v42.2</span></h1>
-                                <div className="text-[10px] text-slate-400 font-bold">Site: 미소연(味笑宴)</div>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v1.1</span></h1>
+                                <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
                             </div>
-                            <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
+                            
+                            <div className="flex items-center gap-2">
+                                {currentUser === ADMIN_NAME && (
+                                    <a 
+                                        href={SHEET_EDIT_URL} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 font-black text-xs shadow-sm hover:bg-indigo-100 transition-all flex items-center gap-1 no-underline"
+                                    >
+                                        ⚙️ 데이터 관리
+                                    </a>
+                                )}
+                                <div className="hidden md:flex items-center bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl border border-blue-100 font-bold text-xs">👨‍🍳 {currentUser}</div>
+                            </div>
                         </div>
                         <div className="flex gap-2">
                             <div className="flex-1 flex items-center justify-center bg-slate-100 px-3 py-2 rounded-xl border font-bold text-sm">
@@ -715,7 +729,6 @@
                         </div>
                     )}
 
-                    {/* ★ [v42.2] 제철식재료 팝업: 이모티콘 대신 실사 이미지가 있으면 출력! */}
                     {seasonalModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -736,7 +749,6 @@
                                                     <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden flex gap-4">
                                                         <div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
                                                         
-                                                        {/* 이미지가 있으면 이미지 출력, 없으면 귀여운 이모티콘 유지 */}
                                                         {item.image ? (
                                                             <div className="w-16 h-16 shrink-0 relative rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 group cursor-pointer" onClick={() => window.open(item.image, '_blank')}>
                                                                 <img 
@@ -914,26 +926,11 @@
                                         </div>
                                         
                                         {currentRecipe.image ? (
-                                            <div className="w-24 h-24 shrink-0 relative rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 group cursor-pointer" onClick={() => window.open(currentRecipe.image, '_blank')}>
-                                                <img 
-                                                    src={formatImageUrl(currentRecipe.image)} 
-                                                    alt={currentRecipe.name} 
-                                                    className="w-full h-full object-cover transition-transform group-hover:scale-110" 
-                                                    onError={(e) => {
-                                                        const match = currentRecipe.image.match(/\/d\/([a-zA-Z0-9_-]+)/) || currentRecipe.image.match(/id=([a-zA-Z0-9_-]+)/);
-                                                        if(match && !e.target.dataset.retried) {
-                                                            e.target.dataset.retried = 'true';
-                                                            e.target.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
-                                                        } else {
-                                                            e.target.style.display = 'none';
-                                                            if(e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
-                                                        }
-                                                    }}
-                                                />
-                                                <div style={{display: 'none'}} className="absolute inset-0 flex-col items-center justify-center bg-slate-50 text-center text-[10px] font-black text-blue-500">
-                                                    사진<br/>열기
-                                                </div>
-                                            </div>
+                                            <img 
+                                                src={formatImageUrl(currentRecipe.image)} 
+                                                alt={currentRecipe.name} 
+                                                className="w-24 h-24 object-cover rounded-xl shrink-0 border border-slate-200 shadow-sm bg-slate-100" 
+                                            />
                                         ) : (
                                             <div className="w-24 h-24 flex flex-col items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-slate-300 bg-slate-50 p-1 text-center">
                                                 <span className="text-[10px] font-bold text-slate-400 mb-1">사진 없음</span>
