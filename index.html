@@ -50,10 +50,11 @@
 
         const formatImageUrl = (url) => {
             if (!url) return "";
+            if (url.startsWith("blob:") || url.startsWith("data:")) return url;
             const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
             const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
-            return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000` : url;
+            return fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : url;
         };
 
         const findMatchedRecipes = (menuName, recipeMap) => {
@@ -102,10 +103,7 @@
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
             const COMMENT_READ_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=918283439&single=true&output=csv";
-            
-            // ★ 셰프님이 새로 발급받으신 최신 Apps Script URL ★
             const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbwgiUhKY0oZiG4g0peqqpHWpOYeuAZN-n0JOvx9NXuLZw2grZCqnNRRab0SuX4Fl2xSXg/exec";
-            
             const REPORT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=949601099&single=true&output=csv";
 
             const ADMIN_NAME = "관리자";
@@ -130,7 +128,6 @@
             const [selectedDate, setSelectedDate] = useState(null);
             const [popupRecipes, setPopupRecipes] = useState([]);
             const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
-            const [expandedMenu, setExpandedMenu] = useState(null);
 
             const [reports, setReports] = useState([]);
             const [reportModal, setReportModal] = useState(false);
@@ -202,7 +199,7 @@
                     complete: (res) => {
                         const data = [];
                         res.data.forEach(row => {
-                            if(row.length >= 5 && row[0] !== "날짜") {
+                            if(row.length >= 4 && row[0] !== "날짜") {
                                 data.push({ date: row[0]?.trim(), type: row[1]?.trim() || "아침", beforeImg: row[2]?.trim(), afterImg: row[3]?.trim(), content: row[4]?.trim(), author: row[5]?.trim() });
                             }
                         });
@@ -243,6 +240,8 @@
                 if (!file || !selectedDate) return;
                 setIsUploading(true);
 
+                const localPreviewUrl = URL.createObjectURL(file);
+
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     const base64Data = event.target.result.split(',')[1];
@@ -258,6 +257,29 @@
                         author: currentUser
                     };
 
+                    // 화면에 즉시 로컬 이미지 표시 (서버 지연 대비)
+                    setReports(prev => {
+                        const existingIndex = prev.findIndex(r => r.date === selectedDate.date && r.type === activeReportTab);
+                        if (existingIndex >= 0) {
+                            const updated = [...prev];
+                            updated[existingIndex] = {
+                                ...updated[existingIndex],
+                                beforeImg: photoType === 'before' ? localPreviewUrl : updated[existingIndex].beforeImg,
+                                afterImg: photoType === 'after' ? localPreviewUrl : updated[existingIndex].afterImg
+                            };
+                            return updated;
+                        } else {
+                            return [...prev, {
+                                date: selectedDate.date,
+                                type: activeReportTab,
+                                beforeImg: photoType === 'before' ? localPreviewUrl : '',
+                                afterImg: photoType === 'after' ? localPreviewUrl : '',
+                                content: '',
+                                author: currentUser
+                            }];
+                        }
+                    });
+
                     fetch(COMMENT_WRITE_URL, {
                         method: 'POST',
                         mode: 'no-cors',
@@ -265,9 +287,8 @@
                         body: JSON.stringify(payload)
                     })
                     .then(() => {
-                        alert("사진 업로드 요청이 완료되었습니다!");
+                        alert("사진 업로드가 완료되었습니다!");
                         setIsUploading(false);
-                        fetchData(true);
                     })
                     .catch(err => {
                         alert("업로드 실패. 네트워크 상태를 확인하세요.");
@@ -367,9 +388,9 @@
                                     </div>
                                     <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
 
-                                    <MenuCard text={selectedDate.morning} type="Morning" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={(type, text)=>setExpandedMenu({type, text})} />
-                                    <MenuCard text={selectedDate.lunch} type="Lunch" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={(type, text)=>setExpandedMenu({type, text})} />
-                                    <MenuCard text={selectedDate.dinner} type="Dinner" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={(type, text)=>setExpandedMenu({type, text})} />
+                                    <MenuCard text={selectedDate.morning} type="Morning" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} />
+                                    <MenuCard text={selectedDate.lunch} type="Lunch" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} />
+                                    <MenuCard text={selectedDate.dinner} type="Dinner" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} />
                                     
                                     <div className="mt-8 pt-4 border-t-2 border-slate-100">
                                         <h3 className="text-sm font-black text-slate-400 uppercase mb-3">💬 오늘의 피드백</h3>
