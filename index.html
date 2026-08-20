@@ -25,36 +25,52 @@
         
         .modal-view { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
-        .zoom-popup { position: fixed; inset: 0; background: rgba(255,255,255,0.95); z-index: 1500; display: flex; flex-direction: column; padding: 20px; animation: zoomIn 0.2s ease-out; }
-        
         .recipe-tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; margin-right: 4px; margin-top: 4px; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; }
-        .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
         
         .login-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
         .login-box { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 100%; max-width: 320px; text-align: center; }
         .login-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; text-align: center; margin-bottom: 12px; outline: none; transition: all 0.2s; font-weight: 700; }
-        .login-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-        .login-btn { width: 100%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 14px; transition: all 0.2s; margin-top: 4px; }
+        .login-btn { width: 100%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 14px; margin-top: 4px; }
         
         .spin-anim { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        @keyframes zoomIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo } = React;
 
+        // ★ 날짜 정규화 (2026. 8. 20 -> 2026-08-20 자동 변환) ★
+        const normalizeDate = (dStr) => {
+            if (!dStr) return "";
+            const m = String(dStr).match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
+            return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : String(dStr).trim();
+        };
+
+        // ★ 끼니 구분 정규화 (조식, 아침식사 등 통합) ★
+        const normalizeMealType = (tStr) => {
+            if (!tStr) return "아침";
+            const s = String(tStr).trim();
+            if (s.includes("아침") || s.includes("조식") || s.toLowerCase().includes("morning")) return "아침";
+            if (s.includes("점심") || s.includes("중식") || s.toLowerCase().includes("lunch")) return "점심";
+            if (s.includes("저녁") || s.includes("석식") || s.toLowerCase().includes("dinner")) return "저녁";
+            return s;
+        };
+
+        // ★ 구글 드라이브 썸네일 고화질 주소 변환 ★
         const formatImageUrl = (url) => {
             if (!url) return "";
-            if (url.startsWith("blob:") || url.startsWith("data:")) return url;
-            const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-            const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
+            let cleanUrl = String(url).trim();
+            if (cleanUrl.startsWith("blob:") || cleanUrl.startsWith("data:")) return cleanUrl;
+            
+            const match1 = cleanUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            const match2 = cleanUrl.match(/id=([a-zA-Z0-9_-]+)/);
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
-            return fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : url;
+            
+            return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000` : cleanUrl;
         };
 
         const findMatchedRecipes = (menuName, recipeMap) => {
@@ -154,10 +170,7 @@
                             const label = (row[0] || "").replace(/\s/g, "");
                             const vals = row.slice(1);
                             if (label === "날짜") {
-                                headers = vals.map(v => {
-                                    const m = (v || "").match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
-                                    return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null;
-                                });
+                                headers = vals.map(v => normalizeDate(v));
                                 headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "", duty: "", packing: "" }); });
                             } else if (headers.length > 0) {
                                 vals.forEach((v, i) => {
@@ -174,7 +187,7 @@
                             }
                         });
                         setMenus(temp);
-                        const todayStr = new Date().toISOString().split('T')[0];
+                        const todayStr = normalizeDate(new Date().toISOString().split('T')[0]);
                         setSelectedDate(temp.find(m => m.date === todayStr) || { date: todayStr, morning: "", lunch: "", dinner: "", duty: "", packing: "" });
                     }
                 });
@@ -194,13 +207,21 @@
                     }
                 });
 
+                // ★ 현장 보고서 및 수기 사진 데이터 정규화 로직 적용 ★
                 Papa.parse(getUrl(REPORT_URL), {
                     download: true,
                     complete: (res) => {
                         const data = [];
                         res.data.forEach(row => {
-                            if(row.length >= 4 && row[0] !== "날짜") {
-                                data.push({ date: row[0]?.trim(), type: row[1]?.trim() || "아침", beforeImg: row[2]?.trim(), afterImg: row[3]?.trim(), content: row[4]?.trim(), author: row[5]?.trim() });
+                            if(row.length >= 3 && row[0] && !row[0].includes("날짜")) {
+                                data.push({ 
+                                    date: normalizeDate(row[0]), 
+                                    type: normalizeMealType(row[1]), 
+                                    beforeImg: row[2]?.trim() || "", 
+                                    afterImg: row[3]?.trim() || "", 
+                                    content: row[4]?.trim() || "", 
+                                    author: row[5]?.trim() || "" 
+                                });
                             }
                         });
                         setReports(data);
@@ -213,7 +234,7 @@
                         const loaded = [];
                         res.data.forEach(row => {
                             if(row.length >= 4 && row[0] !== "날짜") {
-                                loaded.push({ date: row[0], name: row[1], content: row[2], time: row[3], important: row[4] && row[4].trim() !== "" });
+                                loaded.push({ date: normalizeDate(row[0]), name: row[1], content: row[2], time: row[3], important: row[4] && row[4].trim() !== "" });
                             }
                         });
                         loaded.sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -257,7 +278,6 @@
                         author: currentUser
                     };
 
-                    // 화면에 즉시 로컬 이미지 표시 (서버 지연 대비)
                     setReports(prev => {
                         const existingIndex = prev.findIndex(r => r.date === selectedDate.date && r.type === activeReportTab);
                         if (existingIndex >= 0) {
@@ -315,7 +335,7 @@
                 const days = [];
                 for (let i = 0; i < firstDay; i++) days.push(null);
                 for (let i = 1; i <= lastDate; i++) {
-                    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                    const ds = normalizeDate(`${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`);
                     days.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
                 }
                 while (days.length < 42) days.push(null);
