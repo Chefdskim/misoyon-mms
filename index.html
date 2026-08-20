@@ -103,6 +103,7 @@
             const [inventoryModal, setInventoryModal] = useState(false);
             const [inventoryList, setInventoryList] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
+            const [isLoadingInv, setIsLoadingInv] = useState(false);
 
             const [inputItems, setInputItems] = useState([
                 { name: "한우꼬리 반골", inQty: 1 },
@@ -114,15 +115,22 @@
                 localStorage.setItem("misoyon_webapp_url", inputUrl.trim());
                 setWebAppUrl(inputUrl.trim());
                 setUrlSettingModal(false);
-                alert("웹앱 URL이 성공적으로 연결되었습니다!");
+                alert("웹앱 URL 연결 저장 완료!");
             };
 
             const fetchInventoryData = () => {
                 if (!webAppUrl) return;
-                fetch(`${webAppUrl}?action=inventory&t=${new Date().getTime()}`)
+                setIsLoadingInv(true);
+                fetch(`${webAppUrl}?t=${new Date().getTime()}`)
                 .then(res => res.json())
-                .then(data => { if (Array.isArray(data)) setInventoryList(data); })
-                .catch(err => console.log(err));
+                .then(data => {
+                    setIsLoadingInv(false);
+                    if (Array.isArray(data)) setInventoryList(data);
+                })
+                .catch(err => {
+                    setIsLoadingInv(false);
+                    console.log(err);
+                });
             };
 
             const fetchData = () => {
@@ -182,9 +190,10 @@
 
             const handleLogout = () => { setIsAuthenticated(false); setCurrentUser(""); localStorage.removeItem("misoyon_user"); window.location.reload(); };
 
+            // 명세서 보관 및 재고 자동 업데이트
             const handlePhotoAndSave = async (e) => {
                 if (!webAppUrl) {
-                    alert("먼저 상단의 [⚙️ URL 연결] 버튼을 눌러 웹앱 URL을 입력해 주세요.");
+                    alert("상단의 [⚙️ URL 연결] 버튼을 눌러 새 배포 URL을 입력해 주세요.");
                     return;
                 }
                 const file = e.target.files[0];
@@ -207,19 +216,43 @@
                     .then(resData => {
                         setIsUploading(false);
                         if (resData.status === 'success') {
-                            alert("명세서 사진이 드라이브에 저장되었으며, 구글 시트 재고 관리에 즉시 반영되었습니다!");
-                            fetchInventoryData();
+                            alert("구글 시트에 등록이 완료되었습니다!");
+                            if (Array.isArray(resData.inventory)) {
+                                setInventoryList(resData.inventory); // 실시간 표 즉시 갱신
+                            } else {
+                                fetchInventoryData();
+                            }
                         } else {
-                            alert("저장 실패: " + (resData.message || "오류 발생"));
+                            alert("저장 오류: " + (resData.message || "오류 발생"));
                         }
                     })
                     .catch(() => {
                         setIsUploading(false);
-                        alert("전송 실패. 웹앱 URL을 다시 확인해 주세요.");
+                        alert("전송 실패. URL을 다시 확인해 주세요.");
                     });
                 } catch(err) {
                     setIsUploading(false);
                 }
+            };
+
+            // 사용량 조정
+            const handleUpdateUsedQty = (item, delta) => {
+                const newUsed = Math.max(0, (item.usedQty || 0) + delta);
+                fetch(webAppUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify({
+                        action: 'update_used',
+                        rowNum: item.rowNum,
+                        usedQty: newUsed
+                    })
+                })
+                .then(res => res.json())
+                .then(resData => {
+                    if (resData.status === 'success' && Array.isArray(resData.inventory)) {
+                        setInventoryList(resData.inventory);
+                    }
+                });
             };
 
             const handleAddRow = () => setInputItems([...inputItems, { name: "", inQty: 1 }]);
@@ -267,7 +300,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v2.1</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v2.2</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -326,12 +359,14 @@
                             <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl border shadow-sm">
                                 <div>
                                     <h2 className="text-xl font-black text-emerald-700 italic">📦 명세서 드라이브 보관 및 재고 관리</h2>
-                                    <p className="text-[10px] font-bold text-slate-400">사진 찍어 보관하기 누르면 구글 드라이브 보관 + 시트 자동 입고</p>
+                                    <p className="text-[10px] font-bold text-slate-400">명세서 촬영 시 구글 드라이브 보관 + 시트 자동 입고</p>
                                 </div>
-                                <button onClick={() => setInventoryModal(false)} className="text-2xl font-bold text-slate-400 px-2">×</button>
+                                <div className="flex gap-2">
+                                    <button onClick={fetchInventoryData} className="bg-slate-800 text-white px-2.5 py-1.5 rounded-xl text-xs font-black">🔄 새로고침</button>
+                                    <button onClick={() => setInventoryModal(false)} className="text-2xl font-bold text-slate-400 px-2">×</button>
+                                </div>
                             </div>
 
-                            {/* 식재료 입고 항목 및 사진 전송 */}
                             <div className="bg-white p-4 rounded-2xl border shadow-sm mb-4 space-y-3">
                                 <div className="flex justify-between items-center">
                                     <span className="text-xs font-black text-slate-700">오늘 입고할 식재료 목록</span>
@@ -354,7 +389,7 @@
                                 </label>
                             </div>
 
-                            {/* 📋 구글 시트 연동 재고 현황 */}
+                            {/* 📋 구글 시트 연동 재고 현황 표 */}
                             <div className="flex-1 bg-white rounded-2xl border overflow-y-auto p-2 shadow-sm">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
@@ -368,32 +403,44 @@
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y text-xs font-bold">
-                                        {inventoryList.map((item, idx) => (
-                                            <tr key={idx} className="hover:bg-slate-50">
-                                                <td className="p-2 font-black text-slate-800">{item.name}</td>
-                                                <td className="p-2 text-center font-black text-slate-700">{item.inQty}</td>
-                                                <td className="p-2 text-center font-black text-indigo-600">{item.usedQty}</td>
-                                                <td className="p-2 text-center font-black text-sm text-emerald-600">{item.currentQty}</td>
-                                                <td className="p-2 text-right text-[10px] text-slate-400">{item.lastDate}</td>
-                                                <td className="p-2 text-right">
-                                                    {item.note && item.note.includes("http") ? (
-                                                        <a href={item.note} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-black text-[10px]">📷 원본 사진</a>
-                                                    ) : "-"}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {isLoadingInv ? (
+                                            <tr><td colSpan="6" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
+                                        ) : inventoryList.length === 0 ? (
+                                            <tr><td colSpan="6" className="p-4 text-center text-slate-400">등록된 재고 데이터가 없습니다. 상단에서 명세서를 저장해 보세요.</td></tr>
+                                        ) : (
+                                            inventoryList.map((item, idx) => (
+                                                <tr key={idx} className="hover:bg-slate-50">
+                                                    <td className="p-2 font-black text-slate-800">{item.name}</td>
+                                                    <td className="p-2 text-center font-black text-slate-700">{item.inQty}</td>
+                                                    <td className="p-2 text-center">
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <button onClick={() => handleUpdateUsedQty(item, -1)} className="w-5 h-5 bg-slate-200 rounded font-black text-xs">-</button>
+                                                            <span className="w-6 text-center text-indigo-600 font-black">{item.usedQty}</span>
+                                                            <button onClick={() => handleUpdateUsedQty(item, 1)} className="w-5 h-5 bg-slate-200 rounded font-black text-xs">+</button>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-2 text-center font-black text-sm text-emerald-600">{item.currentQty}</td>
+                                                    <td className="p-2 text-right text-[10px] text-slate-400">{item.lastDate}</td>
+                                                    <td className="p-2 text-right">
+                                                        {item.note && item.note.includes("http") ? (
+                                                            <a href={item.note} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-black text-[10px]">📷 원본 사진</a>
+                                                        ) : "-"}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     )}
 
-                    {/* ⚙️ 웹앱 URL 설정 모달 */}
+                    {/* ⚙️ URL 설정 모달 */}
                     {urlSettingModal && (
                         <div className="recipe-popup" onClick={() => setUrlSettingModal(false)}>
                             <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
                                 <h3 className="text-lg font-black text-slate-800">⚙️ 구글 시트 웹앱 URL 등록</h3>
-                                <p className="text-xs text-slate-500 font-bold">새로 배포하신 Apps Script 웹앱 URL을 등록해 주십시오.</p>
+                                <p className="text-xs text-slate-500 font-bold">새로 배포하신 Apps Script 웹앱 URL을 입력해 주십시오.</p>
                                 <input className="w-full p-3 border rounded-xl text-xs font-bold outline-none" placeholder="https://script.google.com/macros/s/.../exec" value={inputUrl} onChange={e => setInputUrl(e.target.value)} />
                                 <div className="flex gap-2">
                                     <button onClick={saveWebAppUrl} className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-black text-xs">저장 및 연결</button>
