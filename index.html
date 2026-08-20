@@ -58,7 +58,6 @@
             return s;
         };
 
-        // ★ 구글 드라이브 전용 직접 노출 링크 변환 ★
         const formatImageUrl = (url) => {
             if (!url) return "";
             let cleanUrl = String(url).trim();
@@ -68,7 +67,18 @@
             const match2 = cleanUrl.match(/id=([a-zA-Z0-9_-]+)/);
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
             
-            return fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : cleanUrl;
+            return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000` : cleanUrl;
+        };
+
+        const saveLocalReportPhoto = (date, mealType, photoType, fileUrl) => {
+            try {
+                const local = JSON.parse(localStorage.getItem("miseon_local_photos") || "{}");
+                const key = `${date}_${mealType}`;
+                if (!local[key]) local[key] = {};
+                if (photoType === 'before') local[key].beforeImg = fileUrl;
+                if (photoType === 'after') local[key].afterImg = fileUrl;
+                localStorage.setItem("miseon_local_photos", JSON.stringify(local));
+            } catch(e){}
         };
 
         const findMatchedRecipes = (menuName, recipeMap) => {
@@ -217,13 +227,21 @@
                     download: true,
                     complete: (res) => {
                         const data = [];
+                        let localPhotos = {};
+                        try { localPhotos = JSON.parse(localStorage.getItem("miseon_local_photos") || "{}"); } catch(e){}
+
                         res.data.forEach(row => {
                             if(row.length >= 3 && row[0] && !row[0].includes("날짜")) {
+                                const d = normalizeDate(row[0]);
+                                const t = normalizeMealType(row[1]);
+                                const key = `${d}_${t}`;
+                                const loc = localPhotos[key] || {};
+
                                 data.push({ 
-                                    date: normalizeDate(row[0]), 
-                                    type: normalizeMealType(row[1]), 
-                                    beforeImg: row[2]?.trim() || "", 
-                                    afterImg: row[3]?.trim() || "", 
+                                    date: d, 
+                                    type: t, 
+                                    beforeImg: row[2]?.trim() || loc.beforeImg || "", 
+                                    afterImg: row[3]?.trim() || loc.afterImg || "", 
                                     content: row[4]?.trim() || "", 
                                     author: row[5]?.trim() || "" 
                                 });
@@ -266,8 +284,6 @@
                 if (!file || !selectedDate) return;
                 setIsUploading(true);
 
-                const localPreviewUrl = URL.createObjectURL(file);
-
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     const base64Data = event.target.result.split(',')[1];
@@ -283,36 +299,40 @@
                         author: currentUser
                     };
 
-                    setReports(prev => {
-                        const existingIndex = prev.findIndex(r => r.date === selectedDate.date && r.type === activeReportTab);
-                        if (existingIndex >= 0) {
-                            const updated = [...prev];
-                            updated[existingIndex] = {
-                                ...updated[existingIndex],
-                                beforeImg: photoType === 'before' ? localPreviewUrl : updated[existingIndex].beforeImg,
-                                afterImg: photoType === 'after' ? localPreviewUrl : updated[existingIndex].afterImg
-                            };
-                            return updated;
-                        } else {
-                            return [...prev, {
-                                date: selectedDate.date,
-                                type: activeReportTab,
-                                beforeImg: photoType === 'before' ? localPreviewUrl : '',
-                                afterImg: photoType === 'after' ? localPreviewUrl : '',
-                                content: '',
-                                author: currentUser
-                            }];
-                        }
-                    });
-
                     fetch(COMMENT_WRITE_URL, {
                         method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify(payload)
                     })
-                    .then(() => {
-                        alert("사진 업로드가 완료되었습니다!");
+                    .then(res => res.json())
+                    .then(resData => {
+                        if (resData.status === 'success' && resData.url) {
+                            saveLocalReportPhoto(selectedDate.date, activeReportTab, photoType, resData.url);
+                            setReports(prev => {
+                                const existingIndex = prev.findIndex(r => r.date === selectedDate.date && r.type === activeReportTab);
+                                if (existingIndex >= 0) {
+                                    const updated = [...prev];
+                                    updated[existingIndex] = {
+                                        ...updated[existingIndex],
+                                        beforeImg: photoType === 'before' ? resData.url : updated[existingIndex].beforeImg,
+                                        afterImg: photoType === 'after' ? resData.url : updated[existingIndex].afterImg
+                                    };
+                                    return updated;
+                                } else {
+                                    return [...prev, {
+                                        date: selectedDate.date,
+                                        type: activeReportTab,
+                                        beforeImg: photoType === 'before' ? resData.url : '',
+                                        afterImg: photoType === 'after' ? resData.url : '',
+                                        content: '',
+                                        author: currentUser
+                                    }];
+                                }
+                            });
+                            alert("사진 등록이 완료되었습니다!");
+                        } else {
+                            alert("등록 처리 중 문제가 발생했습니다.");
+                        }
                         setIsUploading(false);
                     })
                     .catch(err => {
@@ -328,7 +348,7 @@
                 setIsSubmitting(true);
                 const prefix = reportModal ? `[보고서/${activeReportTab}] ` : "";
                 const commentData = { date: selectedDate.date, name: currentUser, content: prefix + newComment.trim(), action: 'write' };
-                fetch(COMMENT_WRITE_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(commentData) })
+                fetch(COMMENT_WRITE_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(commentData) })
                 .then(() => { setComments([{ ...commentData, time: new Date().toLocaleString("ko-KR"), important: false }, ...comments]); setNewComment(""); setIsSubmitting(false); })
                 .catch(() => { alert("전송 실패."); setIsSubmitting(false); });
             };
@@ -440,7 +460,6 @@
                         </aside>
                     </main>
 
-                    {/* ★ 사진 업로드 & 현장 보고서 팝업 모달 ★ */}
                     {reportModal && (
                         <div className="modal-view bg-slate-50">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -492,7 +511,6 @@
                         </div>
                     )}
 
-                    {/* ★ 상세 레시피 팝업 (6열 전체 항목 복원) ★ */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
