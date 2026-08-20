@@ -70,6 +70,29 @@
             return s;
         };
 
+        // 앱 파일명 조립 함수
+        const makeCustomFileName = (dateStr, mealType, photoType) => {
+            if (!dateStr) return "사진.jpg";
+            const str = String(dateStr).trim();
+            let y = "2026", m = "8", d = "20";
+            const match = str.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
+            if (match) {
+                y = match[1];
+                m = parseInt(match[2], 10);
+                d = parseInt(match[3], 10);
+            } else {
+                const digits = str.replace(/[^\d]/g, '');
+                if (digits.length >= 8) {
+                    y = digits.substring(0, 4);
+                    m = parseInt(digits.substring(4, 6), 10);
+                    d = parseInt(digits.substring(6, 8), 10);
+                }
+            }
+            const meal = normalizeMealType(mealType);
+            const pt = (photoType === 'before') ? "식전" : "식후";
+            return `${y}년${m}월${d}일 ${meal}${pt}.jpg`;
+        };
+
         const formatImageUrl = (url) => {
             if (!url) return "";
             let cleanUrl = String(url).trim();
@@ -358,6 +381,9 @@
                         });
                     }
 
+                    // 파일명 동적 조립
+                    const dynamicFileName = makeCustomFileName(selectedDate.date, activeReportTab, photoType);
+
                     const payload = {
                         action: 'upload_photo',
                         type: 'report',
@@ -365,7 +391,7 @@
                         date: selectedDate.date,
                         mealType: activeReportTab,
                         photoType: photoType,
-                        fileName: 'menu_photo.jpg',
+                        fileName: dynamicFileName,
                         mimeType: 'image/jpeg',
                         imageBase64: base64Data,
                         author: currentUser
