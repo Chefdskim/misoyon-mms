@@ -479,8 +479,10 @@
                     .then(res => res.json())
                     .then(data => {
                         setIsUploadingReport(null);
-                        if (data.status === 'success') alert("현장 사진이 구글 드라이브 및 시트에 저장되었습니다!");
-                        else alert("등록 실패");
+                        if (data.status === 'success') {
+                            alert("현장 사진이 구글 드라이브 및 시트에 저장되었습니다!");
+                            fetchData(true);
+                        } else alert("등록 실패");
                     })
                     .catch(() => {
                         setIsUploadingReport(null);
