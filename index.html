@@ -43,10 +43,22 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
+        // ★ 강력한 날짜 표준화 엔진 (어떤 날짜 형태든 2026-08-20 변환) ★
         const normalizeDate = (dStr) => {
             if (!dStr) return "";
-            const m = String(dStr).match(/(\d{4})[^\d]*(\d{1,2})[^\d]*(\d{1,2})/);
-            return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : String(dStr).trim();
+            const str = String(dStr).trim();
+            const match = str.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
+            if (match) {
+                const y = match[1];
+                const m = String(match[2]).padStart(2, '0');
+                const d = String(match[3]).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+            const digits = str.replace(/[^\d]/g, "");
+            if (digits.length >= 8) {
+                return `${digits.substring(0,4)}-${digits.substring(4,6)}-${digits.substring(6,8)}`;
+            }
+            return str;
         };
 
         const normalizeMealType = (tStr) => {
