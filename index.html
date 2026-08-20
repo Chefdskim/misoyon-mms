@@ -263,7 +263,7 @@ const handleInventoryPhotoAndSave = async (e) => {
                 if (Array.isArray(resData.inventory)) setInventoryList(resData.inventory);
                 else fetchInventoryData();
             } else {
-                alert("저장 실패: " + (resData.message || "오류"));
+                alert("저장 실패");
             }
         })
         .catch(() => {
@@ -609,6 +609,7 @@ return (<div className="flex flex-col h-full w-full">
 </div></div></div>) : <div className="h-full flex items-center justify-center text-slate-300 font-black">SELECT DATE</div>}
 </aside></main>
 
+{/* 1. 재고 관리 모달 */}
 {inventoryModal && (
     <div className="modal-view bg-slate-100">
         <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl border shadow-sm">
@@ -672,6 +673,7 @@ return (<div className="flex flex-col h-full w-full">
     </div>
 )}
 
+{/* 2. URL 설정 모달 */}
 {urlSettingModal && currentUser === ADMIN_NAME && (
     <div className="recipe-popup" onClick={() => setUrlSettingModal(false)}>
         <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
@@ -684,6 +686,206 @@ return (<div className="flex flex-col h-full w-full">
         </div>
     </div>
 )}
+
+{/* 3. 현장 보고서 모달 */}
+{reportModal && (
+<div className="modal-view bg-slate-50">
+<div className="flex justify-between items-center mb-4 border-b pb-2">
+<h2 className="text-xl font-black italic text-indigo-600">📷 현장 보고서</h2>
+<button onClick={()=>setReportModal(false)} className="text-3xl">×</button>
+</div><div className="flex gap-2 mb-4 shrink-0">
+{['아침', '점심', '저녁'].map(tab => (
+<button key={tab} onClick={() => setActiveReportTab(tab)}
+className={`flex-1 py-2 rounded-xl text-sm font-black transition-all ${activeReportTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'}`}
+>{tab === '아침' ? '☀️ 아침' : tab === '점심' ? '🌞 점심' : '🌙 저녁'}
+</button>))}</div>
+<div className="flex-1 overflow-y-auto pb-4 space-y-4">
+    <div className="flex flex-col md:flex-row gap-4">
+        <div className="flex-1">
+            <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-black text-slate-400">식전 세팅 상태</span>
+                <label className="text-[10px] bg-indigo-500 text-white px-2 py-1.5 rounded shadow-sm font-bold cursor-pointer hover:bg-indigo-600">
+                    {isUploadingReport === 'before' ? "업로드 중..." : "📷 직접 촬영/등록"}
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleReportPhotoUpload(activeReportTab, 'before', e)} disabled={!!isUploadingReport} />
+                </label>
+            </div>
+            {currentTabReport.beforeImg ? (
+                <img src={formatImageUrl(currentTabReport.beforeImg)} alt="식전 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
+            ) : (
+                <div className="w-full h-48 bg-white border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">우측 상단의 카메라 버튼으로<br/>사진을 등록해 주세요.</div>
+            )}
+        </div>
+        <div className="flex-1">
+            <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-black text-slate-400">식후 잔반 상태</span>
+                <label className="text-[10px] bg-indigo-500 text-white px-2 py-1.5 rounded shadow-sm font-bold cursor-pointer hover:bg-indigo-600">
+                    {isUploadingReport === 'after' ? "업로드 중..." : "📷 직접 촬영/등록"}
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleReportPhotoUpload(activeReportTab, 'after', e)} disabled={!!isUploadingReport} />
+                </label>
+            </div>
+            {currentTabReport.afterImg ? (
+                <img src={formatImageUrl(currentTabReport.afterImg)} alt="식후 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
+            ) : (
+                <div className="w-full h-48 bg-white border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">우측 상단의 카메라 버튼으로<br/>사진을 등록해 주세요.</div>
+            )}
+        </div>
+    </div>
+    
+    {currentTabReport.content && (
+        <div className="bg-white p-4 rounded-xl border shadow-sm mt-4">
+            <div className="text-xs text-indigo-600 font-black mb-2">보고내용 | 작성자: {currentTabReport.author}</div>
+            <div className="text-sm font-bold text-slate-800 whitespace-pre-wrap leading-relaxed">{currentTabReport.content}</div>
+        </div>
+    )}
+
+<div className="mt-8 pt-4 border-t-2 border-slate-200">
+<h3 className="text-sm font-black text-slate-400 uppercase mb-3">💬 통합 피드백 및 코멘트</h3>
+<div className="space-y-3 mb-4">
+{todayComments.length > 0 ? todayComments.map((c, i) => (
+<div key={i} className={`p-3 rounded-xl border transition-all ${c.important ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}>
+<div className="flex justify-between items-center mb-1">
+<span className={`text-xs font-black ${c.important ? 'text-yellow-700' : 'text-blue-600'}`}>{c.name}</span>
+<span className="text-[10px] text-slate-400">{c.time}</span>
+</div><div className="text-xs font-bold text-slate-700 whitespace-pre-wrap">{c.content}</div>
+</div>)) : <div className="text-center text-xs text-slate-300 py-4">아직 코멘트가 없습니다.</div>}
+</div><div className="flex gap-2">
+<input className="flex-1 bg-white px-3 py-2 rounded-xl text-xs font-bold outline-none border focus:border-indigo-500" placeholder="보고서에 대한 피드백을 남겨주세요..." value={newComment} onChange={e=>setNewComment(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleCommentSubmit()} disabled={isSubmitting}/>
+<button onClick={handleCommentSubmit} disabled={isSubmitting} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-indigo-700 disabled:opacity-50">{isSubmitting ? "..." : "등록"}</button>
+</div></div></div></div>)}
+
+{/* 4. 제철 식재료 모달 */}
+{seasonalModal && (
+<div className="modal-view">
+<div className="flex justify-between items-center mb-4 border-b pb-2">
+<h2 className="text-xl font-black italic text-green-600">🌿 {currentMonth.getMonth()+1}월의 제철 식재료</h2>
+<button onClick={()=>setSeasonalModal(false)} className="text-3xl">×</button>
+</div><div className="flex-1 overflow-y-auto pb-10 px-1">
+{Object.keys(groupedSeasonal).length > 0 ? (
+Object.keys(groupedSeasonal).map(cat => (
+<div key={cat} className="mb-8">
+<div className="flex items-center gap-2 mb-3 border-b-2 border-green-500 pb-1 w-max">
+<span className="text-lg font-black text-green-800">
+{cat.includes('수산') ? '🐟' : cat.includes('과일') || cat.includes('채소') ? '🥬' : '✨'} {cat}
+</span></div><div className="space-y-3">
+{groupedSeasonal[cat].map((item, i) => (
+<div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden flex gap-4">
+<div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
+{item.image ? (<div className="w-16 h-16 shrink-0 relative rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 group cursor-pointer" onClick={() => window.open(item.image, '_blank')}>
+<img src={formatImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+</div>) : (<div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center text-4xl shrink-0 shadow-inner border border-slate-100">
+{getFoodEmoji(item.name, item.category)}
+</div>)}<div className="flex-1 min-w-0">
+<div className="font-black text-green-900 text-lg mb-1">{item.name}</div>
+<div className="text-sm text-slate-700 font-bold leading-relaxed mb-2">{item.desc}</div>
+<div className="flex flex-col gap-1.5 mt-2">
+{item.menu && (<div className="bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 text-xs font-bold text-blue-900 inline-flex items-start gap-2 max-w-full">
+<span className="shrink-0">🍳 추천요리:</span>
+<span className="break-words whitespace-pre-wrap leading-tight">{item.menu}</span>
+</div>)}{item.pairing && (
+<div className="bg-orange-50 px-2.5 py-1.5 rounded-lg border border-orange-100 text-xs font-bold text-orange-950 inline-flex items-start gap-2 max-w-full">
+<span className="shrink-0 text-orange-600">🤝 찰떡궁합:</span>
+<span className="break-words whitespace-pre-wrap leading-tight">{item.pairing}</span>
+</div>)}</div></div></div>))}</div></div>))) : (<div className="text-center py-10 text-slate-400 font-bold">
+등록된 제철 재료가 없습니다.
+</div>)}</div></div>)}
+
+{/* 5. 메뉴 확대 모달 */}
+{expandedMenu && (
+<div className="zoom-popup" onClick={() => setExpandedMenu(null)}>
+<div className="flex justify-between items-center mb-6 border-b pb-4">
+<div><div className="text-sm font-black text-slate-400 uppercase mb-1">{selectedDate.date}</div>
+<div className="text-3xl font-black italic text-blue-600">{expandedMenu.type}</div>
+</div><button onClick={() => setExpandedMenu(null)} className="text-4xl text-slate-300">×</button>
+</div><div className="flex-1 overflow-y-auto flex items-center justify-center">
+<div className="text-2xl md:text-4xl font-black text-slate-800 leading-relaxed text-center whitespace-pre-wrap">
+{expandedMenu.text}
+</div></div><div className="text-center text-xs text-slate-400 mt-6 font-bold">화면을 터치하면 닫힙니다</div>
+</div>)}
+
+{/* 6. 중요 리뷰 모달 */}
+{importantModal && (
+<div className="modal-view">
+<div className="flex justify-between items-center mb-4 border-b pb-2">
+<h2 className="text-xl font-black italic text-yellow-600">⭐ IMPORTANT REVIEWS</h2>
+<button onClick={()=>setImportantModal(false)} className="text-3xl">×</button>
+</div><div className="flex-1 overflow-y-auto pb-10 space-y-6">
+{importantComments.length > 0 ? importantComments.map((c, i) => {
+const menu = menus.find(m => m.date === c.date);
+return (<div key={i} className="bg-white p-4 rounded-xl border-2 border-yellow-200 shadow-md">
+<div className="bg-slate-50 p-3 rounded-lg border mb-3">
+<div className="font-black text-blue-600 mb-2 border-b pb-1">{c.date}</div>
+{menu ? (<div className="text-xs font-bold space-y-1">
+<div className="flex gap-2"><span className="text-orange-500 w-6">아침</span> <span className="text-slate-600">{menu.morning}</span></div>
+<div className="flex gap-2"><span className="text-blue-500 w-6">점심</span> <span className="text-slate-600">{menu.lunch}</span></div>
+<div className="flex gap-2"><span className="text-purple-500 w-6">저녁</span> <span className="text-slate-600">{menu.dinner}</span></div>
+</div>) : <div className="text-xs text-slate-300">메뉴 정보 없음</div>}
+</div><div className="flex justify-between items-center mb-1 px-1">
+<div className="flex items-center gap-1"><span className="text-xs">⭐</span><span className="text-xs font-black text-yellow-800">{c.name}</span></div><span className="text-[10px] text-slate-400">{c.time}</span>
+</div><div className="text-sm font-bold text-slate-800 bg-yellow-50 p-3 rounded-lg">{c.content}</div>
+</div>);}) : <div className="text-center py-10 text-slate-400 font-bold">중요한 피드백이 없습니다.</div>}
+</div></div>)}
+
+{/* 7. 주간 메뉴표 모달 */}
+{weeklyModal && selectedDate && (
+<div className="modal-view">
+<div className="flex justify-between items-center mb-4 border-b pb-2">
+<h2 className="text-xl font-black italic">WEEKLY MENU PLAN</h2>
+<button onClick={()=>setWeeklyModal(false)} className="text-3xl">×</button>
+</div><div className="flex-1 overflow-y-auto pb-10">
+{weeklyData.map((d, i) => (
+<div key={i} className={`mb-4 p-3 border rounded-xl ${d.date === selectedDate.date ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'bg-slate-50'}`}>
+<div className={`font-black mb-2 flex justify-between ${d.date === selectedDate.date ? 'text-blue-600' : 'text-slate-600'}`}>
+<span>{d.date} ({weekDays[d.dayIdx]})</span>
+{d.date === selectedDate.date && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">선택됨</span>}
+</div>{d.menu ? (<div className="grid grid-cols-1 gap-3">
+<WeeklyMenuRow label="아침" colorClass="text-orange-500" text={d.menu.morning} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} />
+<WeeklyMenuRow label="점심" colorClass="text-blue-500" text={d.menu.lunch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} />
+<WeeklyMenuRow label="저녁" colorClass="text-purple-500" text={d.menu.dinner} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} />
+</div>) : <div className="text-slate-400 text-xs font-bold">등록된 메뉴 없음</div>}
+</div>))}</div></div>)}
+
+{/* 8. 검색 결과 모달 */}
+{activeModal && (
+<div className="modal-view">
+<div className="flex justify-between items-center mb-4 border-b pb-2">
+<h2 className="text-xl font-black italic">SEARCH RESULT</h2>
+<button onClick={()=>setActiveModal(false)} className="text-3xl">×</button>
+</div><input className="bg-slate-100 px-4 py-3 rounded-xl w-full font-bold mb-4 border-2 border-blue-500 outline-none" placeholder="검색어..." autoFocus value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
+<div className="flex-1 overflow-y-auto space-y-4 pb-10">
+{currentSearchResults.length > 0 ? currentSearchResults.map((m, i) => (
+<div key={i} className="bg-slate-50 p-4 rounded-xl border">
+<div className="font-black text-blue-600 mb-2">{m.date}</div>
+<MenuCard text={m.morning} type="Morning" query={modalSearch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
+<MenuCard text={m.lunch} type="Lunch" query={modalSearch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
+<MenuCard text={m.dinner} type="Dinner" query={modalSearch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
+</div>)) : <div className="text-center py-10 text-slate-400 font-bold">결과 없음</div>}
+</div></div>)}
+
+{/* 9. 레시피 팝업 모달 */}
+{popupRecipes.length > 0 && currentRecipe && (
+<div className="recipe-popup" onClick={() => setPopupRecipes([])}>
+<div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
+<div className="flex justify-between items-center mb-4 border-b pb-2">
+<h3 className="text-xl font-black uppercase italic text-blue-600">Recipe Master</h3>
+<button onClick={() => setPopupRecipes([])} className="text-4xl font-thin">×</button>
+</div>{popupRecipes.length > 1 && (
+<div className="flex overflow-x-auto border-b mb-4 no-scrollbar">
+{popupRecipes.map((r, i) => <div key={i} onClick={() => setActiveRecipeIndex(i)} className={`tab-btn whitespace-nowrap ${i === activeRecipeIndex ? 'active' : ''}`}>{r.name}</div>)}
+</div>)}<div className="animate-in fade-in zoom-in-95 duration-200">
+<div className="flex gap-4 items-start mb-4">
+<div className="flex-1">
+<div className="bg-blue-600 text-white px-3 py-1 rounded-full inline-block text-xs font-black mb-3 uppercase">{currentRecipe.name}</div>
+<div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Ingredients</div>
+<div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.ingredients}</div>
+</div></div>{currentRecipe.image ? (
+<img src={formatImageUrl(currentRecipe.image)} alt={currentRecipe.name} className="w-24 h-24 object-cover rounded-xl shrink-0 border border-slate-200 shadow-sm bg-slate-100" />
+) : (<div className="w-24 h-24 flex flex-col items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-slate-300 bg-slate-50 p-1 text-center">
+<span className="text-[10px] font-bold text-slate-400 mb-1">사진 없음</span>
+</div>)}</div><div className="space-y-4">
+<div><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Instructions</div><div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.process}</div></div>
+{currentRecipe.tip && <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 font-bold text-orange-950 text-xs">💡 {currentRecipe.tip}</div>}
+{currentRecipe.nutrition && <div className="bg-teal-50 p-3 rounded-xl border border-teal-100 font-bold text-teal-900 text-xs">📊 {currentRecipe.nutrition}</div>}
+</div></div></div></div>)}
 
 </div>);};
 
