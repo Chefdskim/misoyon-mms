@@ -91,11 +91,15 @@ if(category && (category.includes('과일') || category.includes('채소'))) ret
 return '🍽️';};
 
 const formatImageUrl = (url) => {
-if (!url) return "";const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+if (!url) return "";
+const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
 const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
 const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
-if (fileId) {return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
-}return url;};
+if (fileId) {
+    return `https://lh3.googleusercontent.com/d/${fileId}`;
+}
+return url;
+};
 
 const findMatchedRecipes = (menuName, recipeMap) => {
 if (!menuName || menuName === "일정없음" || !recipeMap) return [];
@@ -142,7 +146,6 @@ return (<div className="flex gap-2 text-sm items-start">
 ))}</div>)}</div></div>);};
 
 const MiseOnApp = () => {
-const getFreshUrl = (url) => `${url}&t=${new Date().getTime()}`;
 const SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1ipSLhBGgAW1U_RF9Xkez3hUl_Eiklyor-OeQ-DtHV9o/edit?usp=sharing";
 const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
 const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
@@ -153,9 +156,17 @@ const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbxQt7hG7JaH3H
 const SEASONAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1051704487&single=true&output=csv";
 const REPORT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=949601099&single=true&output=csv";
 
-// ★ 백엔드 배포 URL ★
+// ★ 최신 백엔드 배포 URL 고정 ★
 const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzsP6VpbSGKUt6iJr83B7FcJC5MyDZpwVSGzRuj_zJFGWLOicBIByxdLO1-1f8Mn4UFNg/exec";
-const [webAppUrl, setWebAppUrl] = useState(localStorage.getItem("misoyon_webapp_url") || DEFAULT_WEB_APP_URL);
+
+const [webAppUrl, setWebAppUrl] = useState(() => {
+    const saved = localStorage.getItem("misoyon_webapp_url");
+    if (!saved || saved.indexOf("AKfycbzsP6VpbSGKUt6iJr83B7FcJC") === -1) {
+        localStorage.setItem("misoyon_webapp_url", DEFAULT_WEB_APP_URL);
+        return DEFAULT_WEB_APP_URL;
+    }
+    return saved;
+});
 const [urlSettingModal, setUrlSettingModal] = useState(false);
 const [inputUrl, setInputUrl] = useState(webAppUrl);
 
@@ -193,7 +204,7 @@ const [reportModal, setReportModal] = useState(false);
 const [activeReportTab, setActiveReportTab] = useState('아침');
 
 // 📷 현장보고 사진 업로드 State
-const [isUploadingReport, setIsUploadingReport] = useState(null); // 'before' or 'after'
+const [isUploadingReport, setIsUploadingReport] = useState(null);
 
 // 📦 재고 관리 State
 const [inventoryModal, setInventoryModal] = useState(false);
@@ -228,7 +239,7 @@ const saveWebAppUrl = () => {
 };
 
 const fetchInventoryData = () => {
-    const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
+    const targetUrl = DEFAULT_WEB_APP_URL;
     setIsLoadingInv(true);
     fetch(`${targetUrl}?t=${new Date().getTime()}`)
     .then(res => res.json())
@@ -242,7 +253,6 @@ const fetchInventoryData = () => {
 };
 
 const handleInventoryPhotoAndSave = async (e) => {
-    const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
     const file = e.target.files[0];
     if (!file) return;
     setIsUploadingInv(true);
@@ -250,35 +260,45 @@ const handleInventoryPhotoAndSave = async (e) => {
     try {
         const base64Data = await compressImage(file, 1000, 0.75);
         const validItems = inputItems.filter(item => item.name.trim() !== "");
+        const targetUrl = DEFAULT_WEB_APP_URL;
+
         fetch(targetUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ imageBase64: base64Data, items: validItems })
+            body: JSON.stringify({
+                imageBase64: base64Data,
+                items: validItems
+            })
         })
         .then(res => res.json())
         .then(resData => {
             setIsUploadingInv(false);
             if (resData.status === 'success') {
-                alert("구글 시트에 등록 완료!");
+                alert("구글 드라이브 보관 및 시트 저장 완료!");
                 if (Array.isArray(resData.inventory)) setInventoryList(resData.inventory);
                 else fetchInventoryData();
             } else {
                 alert("저장 오류: " + (resData.message || "오류 발생"));
             }
         })
-        .catch(() => { setIsUploadingInv(false); alert("전송 실패."); });
+        .catch(() => {
+            setIsUploadingInv(false);
+            alert("전송 실패. 네트워크 상태를 확인해 주세요.");
+        });
     } catch(err) { setIsUploadingInv(false); }
 };
 
-// 📷 현장보고 사진 업로드 핸들러
+// 📷 현장보고 사진 촬영 및 구글 드라이브/시트 등록 핸들러 (실시간 반영)
 const handleReportPhotoUpload = async (mealType, imageType, e) => {
     const file = e.target.files[0];
     if (!file || !selectedDate) return;
     setIsUploadingReport(imageType);
     
     try {
-        const base64 = await compressImage(file, 1200, 0.8);
-        fetch(webAppUrl || DEFAULT_WEB_APP_URL, {
+        const base64 = await compressImage(file, 1000, 0.75);
+        const targetUrl = DEFAULT_WEB_APP_URL;
+        
+        fetch(targetUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({
@@ -289,26 +309,49 @@ const handleReportPhotoUpload = async (mealType, imageType, e) => {
                 imageBase64: base64,
                 author: currentUser
             })
-        }).then(res => res.json()).then(data => {
+        })
+        .then(res => res.json())
+        .then(data => {
             setIsUploadingReport(null);
             if (data.status === 'success') {
-                alert("사진이 성공적으로 등록되었습니다!");
-                fetchData(true); // 시트 새로고침하여 바뀐 사진 불러오기
+                alert("사진이 구글 드라이브 및 시트에 저장되었습니다!");
+                
+                // 앱 화면 즉시 반영 (실시간)
+                setReports(prev => {
+                    const existingIdx = prev.findIndex(r => r.date === selectedDate.date && r.type === mealType);
+                    if (existingIdx >= 0) {
+                        const updated = [...prev];
+                        if (imageType === 'before') updated[existingIdx].beforeImg = data.url;
+                        if (imageType === 'after') updated[existingIdx].afterImg = data.url;
+                        updated[existingIdx].author = currentUser;
+                        return updated;
+                    } else {
+                        return [...prev, {
+                            date: selectedDate.date,
+                            type: mealType,
+                            beforeImg: imageType === 'before' ? data.url : '',
+                            afterImg: imageType === 'after' ? data.url : '',
+                            content: '',
+                            author: currentUser
+                        }];
+                    }
+                });
             } else {
-                alert("등록 실패: " + data.message);
+                alert("등록 실패: " + (data.message || "알 수 없는 오류"));
             }
-        }).catch(() => {
+        })
+        .catch(() => {
             setIsUploadingReport(null);
-            alert("전송 실패. 네트워크 상태를 확인해주세요.");
+            alert("전송 실패. 네트워크 상태나 연결 URL을 확인해주세요.");
         });
     } catch (err) {
         setIsUploadingReport(null);
-        alert("업로드 중 오류 발생");
+        alert("이미지 처리 중 오류 발생");
     }
 };
 
 const handleUpdateUsedQty = (item, delta) => {
-    const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
+    const targetUrl = DEFAULT_WEB_APP_URL;
     const newUsed = Math.max(0, (item.usedQty || 0) + delta);
     fetch(targetUrl, {
         method: 'POST', headers: { 'Content-Type': 'text/plain' },
@@ -502,7 +545,6 @@ const weeklyData = getWeeklyData();
 const todayComments = selectedDate ? comments.filter(c => c.date === selectedDate.date) : [];
 const todayReports = selectedDate ? reports.filter(r => r.date === selectedDate.date) : [];
 
-// 💡 탭 데이터 매핑 방식 변경 (사진을 올리기 위해 비어있어도 접근 가능하도록)
 const currentTabReport = todayReports.find(r => r.type === activeReportTab) || { type: activeReportTab, beforeImg: '', afterImg: '', content: '', author: currentUser };
 
 const handleExpandMenu = (type, text) => {
@@ -541,10 +583,8 @@ return (<div className="flex flex-col h-full w-full">
 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
 </div><div className="flex items-center gap-2">
 
-{/* 📦 재고 관리 (전체 접근) */}
 <button onClick={() => { setInventoryModal(true); fetchInventoryData(); }} className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm hover:bg-emerald-700">📦 재고 관리</button>
 
-{/* ★ 관리자 전용 메뉴 ★ */}
 {currentUser === ADMIN_NAME && (
 <>
 <button onClick={() => setUrlSettingModal(true)} className="bg-amber-500 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm">⚙️ URL 연결</button>
@@ -589,7 +629,6 @@ return (<div className="flex flex-col h-full w-full">
 <button onClick={()=>setWeeklyModal(true)} className="bg-slate-800 text-white px-3 py-1 rounded-lg text-xs font-bold shadow-lg hover:bg-slate-700 transition-all">📅 주간표 보기</button>
 </div><div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
 
-{/* 📷 항상 현장 보고서 진입 가능하도록 수정 */}
 <button onClick={() => {setReportModal(true); setActiveReportTab('아침');}} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mb-3">
 <span>📷 현장 보고서 확인 및 촬영 ({todayReports.length}건)</span>
 </button>
@@ -710,7 +749,7 @@ return (<div className="flex flex-col h-full w-full">
     </div>
 )}
 
-{/* 📷 수정된 현장 보고서 모달 (직접 촬영 등록 추가) */}
+{/* 📷 현장 보고서 모달 (직접 촬영 등록 + 즉시 출력) */}
 {reportModal && (
 <div className="modal-view bg-slate-50">
 <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -802,7 +841,7 @@ onError={(e) => {
 const match = item.image.match(/\/d\/([a-zA-Z0-9_-]+)/) || item.image.match(/id=([a-zA-Z0-9_-]+)/);
 if(match && !e.target.dataset.retried) {
 e.target.dataset.retried = 'true';
-e.target.src = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1000`;
+e.target.src = `https://lh3.googleusercontent.com/d/${match[1]}`;
 } else {e.target.style.display = 'none';
 if(e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
 }}}/>
