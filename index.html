@@ -112,23 +112,9 @@
             });
         };
 
-        const saveLocalReportPhoto = (date, mealType, photoType, fileUrl) => {
-            try {
-                const local = JSON.parse(localStorage.getItem("miseon_local_photos") || "{}");
-                const key = `${normalizeDate(date)}_${normalizeMealType(mealType)}`;
-                if (!local[key]) local[key] = {};
-                if (photoType === 'before') local[key].beforeImg = fileUrl;
-                if (photoType === 'after') local[key].afterImg = fileUrl;
-                localStorage.setItem("miseon_local_photos", JSON.stringify(local));
-            } catch(e){}
-        };
-
-        const mergeReportsWithLocal = (rawRows) => {
-            let localPhotos = {};
-            try { localPhotos = JSON.parse(localStorage.getItem("miseon_local_photos") || "{}"); } catch(e){}
-
+        // 오직 시트 실시간 데이터를 기준으로만 표시 (로컬 유령 사진 제거)
+        const parseReportRows = (rawRows) => {
             const reportMap = {};
-
             if (Array.isArray(rawRows)) {
                 rawRows.forEach(r => {
                     let d = "", t = "", b = "", a = "", c = "", auth = "";
@@ -152,22 +138,6 @@
                     reportMap[key] = { date: d, type: t, beforeImg: b, afterImg: a, content: c, author: auth };
                 });
             }
-
-            Object.keys(localPhotos).forEach(key => {
-                const loc = localPhotos[key];
-                if (!loc) return;
-                const parts = key.split('_');
-                const d = parts[0];
-                const t = parts[1];
-
-                if (!reportMap[key]) {
-                    reportMap[key] = { date: d, type: t, beforeImg: loc.beforeImg || "", afterImg: loc.afterImg || "", content: "", author: "" };
-                } else {
-                    if (!reportMap[key].beforeImg && loc.beforeImg) reportMap[key].beforeImg = loc.beforeImg;
-                    if (!reportMap[key].afterImg && loc.afterImg) reportMap[key].afterImg = loc.afterImg;
-                }
-            });
-
             return Object.values(reportMap);
         };
 
@@ -252,7 +222,7 @@
                 .then(res => res.json())
                 .then(liveReports => {
                     if (Array.isArray(liveReports) && liveReports.length > 0) {
-                        setReports(mergeReportsWithLocal(liveReports));
+                        setReports(parseReportRows(liveReports));
                     } else {
                         fetchReportCsv();
                     }
@@ -265,7 +235,7 @@
                     download: true,
                     complete: (res) => {
                         if (res && res.data) {
-                            setReports(mergeReportsWithLocal(res.data));
+                            setReports(parseReportRows(res.data));
                         }
                     }
                 });
@@ -385,6 +355,7 @@
                     const payload = {
                         action: 'upload_photo',
                         type: 'report',
+                        targetSheet: '현장보고',
                         date: selectedDate.date,
                         mealType: activeReportTab,
                         photoType: photoType,
@@ -402,7 +373,6 @@
                     .then(res => res.json())
                     .then(resData => {
                         if (resData.status === 'success' && resData.url) {
-                            saveLocalReportPhoto(selectedDate.date, activeReportTab, photoType, resData.url);
                             setReports(prev => {
                                 const targetDate = normalizeDate(selectedDate.date);
                                 const targetMeal = normalizeMealType(activeReportTab);
