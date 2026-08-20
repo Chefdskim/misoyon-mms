@@ -43,19 +43,20 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // ★ 강력한 날짜 표준화 엔진 (어떤 날짜 형태든 2026-08-20 변환) ★
+        // ★ 만능 날짜 정규화 엔진 (모든 형태의 날짜를 2026-08-20 형태로 완벽 통일) ★
         const normalizeDate = (dStr) => {
             if (!dStr) return "";
             const str = String(dStr).trim();
-            const match = str.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
+            let match = str.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
             if (match) {
-                const y = match[1];
-                const m = String(match[2]).padStart(2, '0');
-                const d = String(match[3]).padStart(2, '0');
-                return `${y}-${m}-${d}`;
+                return `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`;
+            }
+            match = str.match(/(\d{1,2})[^\d]+(\d{1,2})/);
+            if (match) {
+                return `2026-${String(match[1]).padStart(2, '0')}-${String(match[2]).padStart(2, '0')}`;
             }
             const digits = str.replace(/[^\d]/g, "");
-            if (digits.length >= 8) {
+            if (digits.length === 8) {
                 return `${digits.substring(0,4)}-${digits.substring(4,6)}-${digits.substring(6,8)}`;
             }
             return str;
@@ -123,26 +124,29 @@
             } catch(e){}
         };
 
-        const mergeReportsWithLocal = (rawReports) => {
+        const mergeReportsWithLocal = (rawRows) => {
             let localPhotos = {};
             try { localPhotos = JSON.parse(localStorage.getItem("miseon_local_photos") || "{}"); } catch(e){}
 
             const reportMap = {};
 
-            rawReports.forEach(r => {
-                const d = normalizeDate(r.date || r[0]);
-                const t = normalizeMealType(r.type || r[1]);
-                if (!d) return;
-                const key = `${d}_${t}`;
-                reportMap[key] = {
-                    date: d,
-                    type: t,
-                    beforeImg: (r.beforeImg || r[2] || "").trim(),
-                    afterImg: (r.afterImg || r[3] || "").trim(),
-                    content: (r.content || r[4] || "").trim(),
-                    author: (r.author || r[5] || "").trim()
-                };
-            });
+            if (Array.isArray(rawRows)) {
+                rawRows.forEach(r => {
+                    if (!Array.isArray(r) || r.length < 2) return;
+                    const d = normalizeDate(r[0]);
+                    const t = normalizeMealType(r[1]);
+                    if (!d || d.includes("날짜")) return;
+                    const key = `${d}_${t}`;
+                    reportMap[key] = {
+                        date: d,
+                        type: t,
+                        beforeImg: String(r[2] || "").trim(),
+                        afterImg: String(r[3] || "").trim(),
+                        content: String(r[4] || "").trim(),
+                        author: String(r[5] || "").trim()
+                    };
+                });
+            }
 
             Object.keys(localPhotos).forEach(key => {
                 const loc = localPhotos[key];
@@ -262,8 +266,9 @@
                 Papa.parse(`${REPORT_URL}&t=${new Date().getTime()}`, {
                     download: true,
                     complete: (res) => {
-                        const raw = res.data.filter(row => row.length >= 3 && row[0] && !row[0].includes("날짜"));
-                        setReports(mergeReportsWithLocal(raw));
+                        if (res && res.data) {
+                            setReports(mergeReportsWithLocal(res.data));
+                        }
                     }
                 });
             };
