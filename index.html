@@ -83,7 +83,10 @@
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
 
-            const [webAppUrl, setWebAppUrl] = useState(localStorage.getItem("misoyon_webapp_url") || "");
+            // 기본 고정 백엔드 웹앱 URL (모든 기기 자동 연동)
+            const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwgiUhKY0oZiG4g0peqqpHWpOYeuAZN-n0JOvx9NXuLZw2grZCqnNRRab0SuX4Fl2xSXg/exec";
+
+            const [webAppUrl, setWebAppUrl] = useState(localStorage.getItem("misoyon_webapp_url") || DEFAULT_WEB_APP_URL);
             const [urlSettingModal, setUrlSettingModal] = useState(false);
             const [inputUrl, setInputUrl] = useState(webAppUrl);
 
@@ -119,9 +122,9 @@
             };
 
             const fetchInventoryData = () => {
-                if (!webAppUrl) return;
+                const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
                 setIsLoadingInv(true);
-                fetch(`${webAppUrl}?t=${new Date().getTime()}`)
+                fetch(`${targetUrl}?t=${new Date().getTime()}`)
                 .then(res => res.json())
                 .then(data => {
                     setIsLoadingInv(false);
@@ -191,10 +194,7 @@
             const handleLogout = () => { setIsAuthenticated(false); setCurrentUser(""); localStorage.removeItem("misoyon_user"); window.location.reload(); };
 
             const handlePhotoAndSave = async (e) => {
-                if (!webAppUrl) {
-                    alert("관리자에게 URL 연결 설정을 요청해 주세요.");
-                    return;
-                }
+                const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
                 const file = e.target.files[0];
                 if (!file) return;
                 setIsUploading(true);
@@ -203,7 +203,7 @@
                     const base64Data = await compressImage(file, 1000, 0.75);
                     const validItems = inputItems.filter(item => item.name.trim() !== "");
 
-                    fetch(webAppUrl, {
+                    fetch(targetUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify({
@@ -227,7 +227,7 @@
                     })
                     .catch(() => {
                         setIsUploading(false);
-                        alert("전송 실패. URL을 다시 확인해 주세요.");
+                        alert("전송 실패. 네트워크 상태를 확인해 주세요.");
                     });
                 } catch(err) {
                     setIsUploading(false);
@@ -235,8 +235,9 @@
             };
 
             const handleUpdateUsedQty = (item, delta) => {
+                const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
                 const newUsed = Math.max(0, (item.usedQty || 0) + delta);
-                fetch(webAppUrl, {
+                fetch(targetUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({
@@ -298,13 +299,12 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v2.3</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v2.4</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => { setInventoryModal(true); fetchInventoryData(); }} className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm hover:bg-emerald-700">📦 재고 관리</button>
                                 
-                                {/* ★ 관리자 전용 메뉴 ★ */}
                                 {currentUser === ADMIN_NAME && (
                                     <>
                                         <button onClick={() => setUrlSettingModal(true)} className="bg-amber-500 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm">⚙️ URL 연결</button>
@@ -358,7 +358,7 @@
                         </aside>
                     </main>
 
-                    {/* 📦 재고 관리 및 명세서 보관 모달 (일반 사용자 접근) */}
+                    {/* 📦 재고 관리 모달 */}
                     {inventoryModal && (
                         <div className="modal-view bg-slate-100">
                             <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl border shadow-sm">
