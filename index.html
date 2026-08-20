@@ -45,6 +45,14 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
+        const getTodayStr = () => {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        };
+
         const normalizeDate = (dStr) => {
             if (!dStr) return "";
             const str = String(dStr).trim();
@@ -182,11 +190,10 @@
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
             const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
-            const NOTICE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=489171005&single=true&output=csv";
-            const COMMENT_READ_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=918283439&single=true&output=csv";
-            const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbxQt7hG7JaH3HBD0ygYNezSlNFEuqLZJAv-22gDCTMET7z2nZs_MarT47Rxq7GlxBxC-Q/exec";
             const SEASONAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1051704487&single=true&output=csv";
             const REPORT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=949601099&single=true&output=csv";
+            const COMMENT_READ_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=918283439&single=true&output=csv";
+            const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbxQt7hG7JaH3HBD0ygYNezSlNFEuqLZJAv-22gDCTMET7z2nZs_MarT47Rxq7GlxBxC-Q/exec";
             const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzsP6VpbSGKUt6iJr83B7FcJC5MyDZpwVSGzRuj_zJFGWLOicBIByxdLO1-1f8Mn4UFNg/exec";
 
             const [webAppUrl, setWebAppUrl] = useState(() => localStorage.getItem("misoyon_webapp_url") || DEFAULT_WEB_APP_URL);
@@ -306,7 +313,7 @@
                             });
                         }
                         setMenus(temp);
-                        const todayStr = normalizeDate(new Date().toISOString().split('T')[0]);
+                        const todayStr = getTodayStr();
                         setSelectedDate(temp.find(m => m.date === todayStr) || { date: todayStr, morning: "", lunch: "", dinner: "", duty: "", packing: "" });
                     }
                 });
