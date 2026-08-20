@@ -78,13 +78,29 @@
             });
         };
 
+        // 월별 제철 식재료 데이터
+        const SEASONAL_DATA = {
+            1: ["명태", "과메기", "한라봉", "우엉", "더덕"],
+            2: ["바지락", "꼬막", "아귀", "삼치", "취나물"],
+            3: ["주꾸미", "달래", "냉이", "취나물", "소라"],
+            4: ["키조개", "미더덕", "소라", "두릅", "병어"],
+            5: ["장어", "매실", "멍게", "다첩", "갑오징어"],
+            6: ["장어", "소라", "감자", "매실", "참외"],
+            7: ["갈치", "장어", "옥수수", "복숭아", "수박"],
+            8: ["한우꼬리", "전복", "갈치", "감자", "옥수수", "포도"],
+            9: ["대하", "꽃게", "전어", "광어", "석류"],
+            10: ["대하", "홍합", "굴", "삼치", "사과"],
+            11: ["꼬막", "과메기", "고등어", "굴", "무"],
+            12: ["방어", "굴", "과메기", "명태", "한라봉"]
+        };
+
         const MiseOnApp = () => {
             const SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1ipSLhBGgAW1U_RF9Xkez3hUl_Eiklyor-OeQ-DtHV9o/edit?usp=sharing"; 
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
 
-            // 기본 고정 백엔드 웹앱 URL (모든 기기 자동 연동)
-            const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwgiUhKY0oZiG4g0peqqpHWpOYeuAZN-n0JOvx9NXuLZw2grZCqnNRRab0SuX4Fl2xSXg/exec";
+            // 셰프님의 최신 배포 URL 직접 고정
+            const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzsP6VpbSGKUt6iJr83B7FcJC5MyDZpwVSGzRuj_zJFGWLOicBIByxdLO1-1f8Mn4UFNg/exec";
 
             const [webAppUrl, setWebAppUrl] = useState(localStorage.getItem("misoyon_webapp_url") || DEFAULT_WEB_APP_URL);
             const [urlSettingModal, setUrlSettingModal] = useState(false);
@@ -103,6 +119,10 @@
             const [menus, setMenus] = useState([]);
             const [selectedDate, setSelectedDate] = useState(null);
 
+            // 레시피 팝업 State
+            const [selectedRecipeMenu, setSelectedRecipeMenu] = useState(null);
+
+            // 재고 관련 State
             const [inventoryModal, setInventoryModal] = useState(false);
             const [inventoryList, setInventoryList] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
@@ -112,6 +132,9 @@
                 { name: "한우꼬리 반골", inQty: 1 },
                 { name: "잡뼈", inQty: 1 }
             ]);
+
+            const currentMonthNum = new Date().getMonth() + 1;
+            const currentSeasonalList = SEASONAL_DATA[currentMonthNum] || [];
 
             const saveWebAppUrl = () => {
                 if (!inputUrl.trim()) return alert("URL을 입력해 주세요.");
@@ -299,7 +322,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v2.4</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v2.5</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -325,38 +348,101 @@
                                     <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
                                         {d && (<><span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-300'}`}>{d.day}</span>
                                         {d.data && (<div className="flex flex-col gap-[1px] mt-[1px]">
-                                            {d.data.morning && <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>}
-                                            {d.data.lunch && <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>}
-                                            {d.data.dinner && <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>}
+                                            {d.data.morning && <div className="menu-text bg-orange-50 text-orange-600" onClick={(e)=>{e.stopPropagation(); setSelectedRecipeMenu(d.data.morning);}}>조:{d.data.morning}</div>}
+                                            {d.data.lunch && <div className="menu-text bg-blue-50 text-blue-600" onClick={(e)=>{e.stopPropagation(); setSelectedRecipeMenu(d.data.lunch);}}>중:{d.data.lunch}</div>}
+                                            {d.data.dinner && <div className="menu-text bg-purple-50 text-purple-600" onClick={(e)=>{e.stopPropagation(); setSelectedRecipeMenu(d.data.dinner);}}>석:{d.data.dinner}</div>}
                                         </div>)}</>)}
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-h-[45%]">
+                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-h-[45%] flex flex-col justify-between">
                             {selectedDate ? (
-                                <div className="space-y-4">
+                                <div className="space-y-3">
                                     <div className="flex justify-between items-center border-b-2 border-blue-600 pb-1">
                                         <h2 className="text-xl font-black italic">DAILY MENU</h2>
+                                        <span className="text-xs font-bold text-slate-400">{selectedDate.date}</span>
                                     </div>
-                                    <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
-                                    <div className="p-3 bg-slate-50 rounded-xl border mb-2">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase">Morning</div>
-                                        <div className="text-sm font-black text-slate-700">{selectedDate.morning || "일정없음"}</div>
+
+                                    <div className="p-3 bg-slate-50 rounded-xl border flex justify-between items-center">
+                                        <div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase">Morning</div>
+                                            <div className="text-sm font-black text-slate-700">{selectedDate.morning || "일정없음"}</div>
+                                        </div>
+                                        {selectedDate.morning && <button onClick={()=>setSelectedRecipeMenu(selectedDate.morning)} className="bg-blue-600 text-white px-2.5 py-1 rounded-lg text-[11px] font-black shadow-sm">📖 레시피</button>}
                                     </div>
-                                    <div className="p-3 bg-slate-50 rounded-xl border mb-2">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase">Lunch</div>
-                                        <div className="text-sm font-black text-slate-700">{selectedDate.lunch || "일정없음"}</div>
+
+                                    <div className="p-3 bg-slate-50 rounded-xl border flex justify-between items-center">
+                                        <div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase">Lunch</div>
+                                            <div className="text-sm font-black text-slate-700">{selectedDate.lunch || "일정없음"}</div>
+                                        </div>
+                                        {selectedDate.lunch && <button onClick={()=>setSelectedRecipeMenu(selectedDate.lunch)} className="bg-blue-600 text-white px-2.5 py-1 rounded-lg text-[11px] font-black shadow-sm">📖 레시피</button>}
                                     </div>
-                                    <div className="p-3 bg-slate-50 rounded-xl border mb-2">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase">Dinner</div>
-                                        <div className="text-sm font-black text-slate-700">{selectedDate.dinner || "일정없음"}</div>
+
+                                    <div className="p-3 bg-slate-50 rounded-xl border flex justify-between items-center">
+                                        <div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase">Dinner</div>
+                                            <div className="text-sm font-black text-slate-700">{selectedDate.dinner || "일정없음"}</div>
+                                        </div>
+                                        {selectedDate.dinner && <button onClick={()=>setSelectedRecipeMenu(selectedDate.dinner)} className="bg-blue-600 text-white px-2.5 py-1 rounded-lg text-[11px] font-black shadow-sm">📖 레시피</button>}
                                     </div>
                                 </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-300 font-black">SELECT DATE</div>}
+                            ) : <div className="text-center text-slate-300 font-black py-4">SELECT DATE</div>}
+
+                            {/* 🌿 복원된 제철 식재료 카드 */}
+                            <div className="mt-4 p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <span className="text-xs font-black text-emerald-800">🌿 {currentMonthNum}월 추천 제철 식재료</span>
+                                    <span className="text-[10px] bg-emerald-200 text-emerald-800 px-1.5 py-0.5 rounded font-black">Seasonal</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                    {currentSeasonalList.map((item, idx) => (
+                                        <span key={idx} className="bg-white text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded-md text-[11px] font-bold shadow-xs">
+                                            #{item}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
                         </aside>
                     </main>
+
+                    {/* 📖 레시피 상세 조회 모달 */}
+                    {selectedRecipeMenu && (
+                        <div className="recipe-popup" onClick={() => setSelectedRecipeMenu(null)}>
+                            <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center border-b pb-3">
+                                    <div>
+                                        <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Recipe Card</span>
+                                        <h3 className="text-2xl font-black text-slate-800">{selectedRecipeMenu}</h3>
+                                    </div>
+                                    <button onClick={() => setSelectedRecipeMenu(null)} className="text-3xl font-thin text-slate-400">×</button>
+                                </div>
+
+                                <div className="space-y-3 text-xs font-bold text-slate-600">
+                                    <div className="p-3 bg-slate-50 rounded-xl border">
+                                        <span className="text-slate-400 text-[10px] block mb-1">주요 식재료 (Ingredients)</span>
+                                        <p className="text-slate-700 font-black">{selectedRecipeMenu} 전용 원물 표준 배합비 적용 항목</p>
+                                    </div>
+                                    <div className="p-3 bg-slate-50 rounded-xl border">
+                                        <span className="text-slate-400 text-[10px] block mb-1">조리 공정 (Instructions)</span>
+                                        <ol className="list-decimal list-inside space-y-1 text-slate-700">
+                                            <li>전처리 식재료 준비 및 정량 계량</li>
+                                            <li>1차 가열 및 핏물/불순물 제거</li>
+                                            <li>본 육수 추출 및 양념 믹싱 공정 진행</li>
+                                        </ol>
+                                    </div>
+                                    <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800">
+                                        <span className="text-[10px] font-black block mb-0.5">💡 Chef's Kick</span>
+                                        <span>배합비 수치 준수 및 끓임 시간 엄수</span>
+                                    </div>
+                                </div>
+
+                                <button onClick={() => setSelectedRecipeMenu(null)} className="w-full bg-slate-800 text-white py-2.5 rounded-xl font-black text-xs">닫기</button>
+                            </div>
+                        </div>
+                    )}
 
                     {/* 📦 재고 관리 모달 */}
                     {inventoryModal && (
