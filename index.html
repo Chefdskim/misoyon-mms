@@ -153,7 +153,7 @@ const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbxQt7hG7JaH3H
 const SEASONAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1051704487&single=true&output=csv";
 const REPORT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=949601099&single=true&output=csv";
 
-// ★ 셰프님의 최신 백엔드 배포 URL 고정 ★
+// ★ 백엔드 배포 URL ★
 const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzsP6VpbSGKUt6iJr83B7FcJC5MyDZpwVSGzRuj_zJFGWLOicBIByxdLO1-1f8Mn4UFNg/exec";
 const [webAppUrl, setWebAppUrl] = useState(localStorage.getItem("misoyon_webapp_url") || DEFAULT_WEB_APP_URL);
 const [urlSettingModal, setUrlSettingModal] = useState(false);
@@ -192,10 +192,13 @@ const [reports, setReports] = useState([]);
 const [reportModal, setReportModal] = useState(false);
 const [activeReportTab, setActiveReportTab] = useState('아침');
 
-// 재고 관리 State
+// 📷 현장보고 사진 업로드 State
+const [isUploadingReport, setIsUploadingReport] = useState(null); // 'before' or 'after'
+
+// 📦 재고 관리 State
 const [inventoryModal, setInventoryModal] = useState(false);
 const [inventoryList, setInventoryList] = useState([]);
-const [isUploading, setIsUploading] = useState(false);
+const [isUploadingInv, setIsUploadingInv] = useState(false);
 const [isLoadingInv, setIsLoadingInv] = useState(false);
 const [inputItems, setInputItems] = useState([
     { name: "한우꼬리 반골", inQty: 1 },
@@ -235,48 +238,72 @@ const fetchInventoryData = () => {
     })
     .catch(err => {
         setIsLoadingInv(false);
-        console.log(err);
     });
 };
 
-const handlePhotoAndSave = async (e) => {
+const handleInventoryPhotoAndSave = async (e) => {
     const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
     const file = e.target.files[0];
     if (!file) return;
-    setIsUploading(true);
+    setIsUploadingInv(true);
 
     try {
         const base64Data = await compressImage(file, 1000, 0.75);
         const validItems = inputItems.filter(item => item.name.trim() !== "");
-
         fetch(targetUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
-                imageBase64: base64Data,
-                items: validItems
-            })
+            body: JSON.stringify({ imageBase64: base64Data, items: validItems })
         })
         .then(res => res.json())
         .then(resData => {
-            setIsUploading(false);
+            setIsUploadingInv(false);
             if (resData.status === 'success') {
-                alert("구글 시트에 등록이 완료되었습니다!");
-                if (Array.isArray(resData.inventory)) {
-                    setInventoryList(resData.inventory);
-                } else {
-                    fetchInventoryData();
-                }
+                alert("구글 시트에 등록 완료!");
+                if (Array.isArray(resData.inventory)) setInventoryList(resData.inventory);
+                else fetchInventoryData();
             } else {
                 alert("저장 오류: " + (resData.message || "오류 발생"));
             }
         })
-        .catch(() => {
-            setIsUploading(false);
-            alert("전송 실패. 네트워크 상태를 확인해 주세요.");
+        .catch(() => { setIsUploadingInv(false); alert("전송 실패."); });
+    } catch(err) { setIsUploadingInv(false); }
+};
+
+// 📷 현장보고 사진 업로드 핸들러
+const handleReportPhotoUpload = async (mealType, imageType, e) => {
+    const file = e.target.files[0];
+    if (!file || !selectedDate) return;
+    setIsUploadingReport(imageType);
+    
+    try {
+        const base64 = await compressImage(file, 1200, 0.8);
+        fetch(webAppUrl || DEFAULT_WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'upload_report',
+                date: selectedDate.date,
+                reportType: mealType,
+                imageType: imageType,
+                imageBase64: base64,
+                author: currentUser
+            })
+        }).then(res => res.json()).then(data => {
+            setIsUploadingReport(null);
+            if (data.status === 'success') {
+                alert("사진이 성공적으로 등록되었습니다!");
+                fetchData(true); // 시트 새로고침하여 바뀐 사진 불러오기
+            } else {
+                alert("등록 실패: " + data.message);
+            }
+        }).catch(() => {
+            setIsUploadingReport(null);
+            alert("전송 실패. 네트워크 상태를 확인해주세요.");
         });
-    } catch(err) {
-        setIsUploading(false);
+    } catch (err) {
+        setIsUploadingReport(null);
+        alert("업로드 중 오류 발생");
     }
 };
 
@@ -284,28 +311,17 @@ const handleUpdateUsedQty = (item, delta) => {
     const targetUrl = webAppUrl || DEFAULT_WEB_APP_URL;
     const newUsed = Math.max(0, (item.usedQty || 0) + delta);
     fetch(targetUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-            action: 'update_used',
-            rowNum: item.rowNum,
-            usedQty: newUsed
-        })
-    })
-    .then(res => res.json())
-    .then(resData => {
-        if (resData.status === 'success' && Array.isArray(resData.inventory)) {
-            setInventoryList(resData.inventory);
-        }
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'update_used', rowNum: item.rowNum, usedQty: newUsed })
+    }).then(res => res.json()).then(resData => {
+        if (resData.status === 'success' && Array.isArray(resData.inventory)) setInventoryList(resData.inventory);
     });
 };
 
 const handleAddRow = () => setInputItems([...inputItems, { name: "", inQty: 1 }]);
 const handleRemoveRow = (index) => setInputItems(inputItems.filter((_, idx) => idx !== index));
 const handleInputChange = (index, field, value) => {
-    const updated = [...inputItems];
-    updated[index][field] = value;
-    setInputItems(updated);
+    const updated = [...inputItems]; updated[index][field] = value; setInputItems(updated);
 };
 
 const fetchData = (forceFresh = false) => {
@@ -485,7 +501,10 @@ const currentRecipe = popupRecipes[activeRecipeIndex];
 const weeklyData = getWeeklyData();
 const todayComments = selectedDate ? comments.filter(c => c.date === selectedDate.date) : [];
 const todayReports = selectedDate ? reports.filter(r => r.date === selectedDate.date) : [];
-const currentTabReport = todayReports.find(r => r.type === activeReportTab);
+
+// 💡 탭 데이터 매핑 방식 변경 (사진을 올리기 위해 비어있어도 접근 가능하도록)
+const currentTabReport = todayReports.find(r => r.type === activeReportTab) || { type: activeReportTab, beforeImg: '', afterImg: '', content: '', author: currentUser };
+
 const handleExpandMenu = (type, text) => {
 if(!text) return;setExpandedMenu({ type, text });
 };const groupedSeasonal = useMemo(() => {
@@ -518,7 +537,7 @@ return (<div className="flex flex-col h-full w-full">
 {activeBanner && <div className="top-banner"><span className="banner-icon">NOTICE</span><span>{activeBanner}</span></div>}
 <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
 <div className="flex justify-between items-center">
-<div><h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v1.1</span></h1>
+<div><h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v1.2</span></h1>
 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
 </div><div className="flex items-center gap-2">
 
@@ -569,10 +588,13 @@ return (<div className="flex flex-col h-full w-full">
 <h2 className="text-xl font-black italic">DAILY MENU</h2>
 <button onClick={()=>setWeeklyModal(true)} className="bg-slate-800 text-white px-3 py-1 rounded-lg text-xs font-bold shadow-lg hover:bg-slate-700 transition-all">📅 주간표 보기</button>
 </div><div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
-{todayReports.length > 0 && (
+
+{/* 📷 항상 현장 보고서 진입 가능하도록 수정 */}
 <button onClick={() => {setReportModal(true); setActiveReportTab('아침');}} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mb-3">
-<span>📷 현장 보고서 확인 ({todayReports.length}건)</span>
-</button>)}{selectedDate.duty && <div className="p-4 rounded-xl border mb-3 bg-slate-50 border-slate-200"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Schedule</div><div className="text-sm font-black text-slate-800">👨‍🍳 {selectedDate.duty}</div></div>}
+<span>📷 현장 보고서 확인 및 촬영 ({todayReports.length}건)</span>
+</button>
+
+{selectedDate.duty && <div className="p-4 rounded-xl border mb-3 bg-slate-50 border-slate-200"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Schedule</div><div className="text-sm font-black text-slate-800">👨‍🍳 {selectedDate.duty}</div></div>}
 <MenuCard text={selectedDate.morning} type="Morning" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
 <MenuCard text={selectedDate.lunch} type="Lunch" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
 <MenuCard text={selectedDate.dinner} type="Dinner" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
@@ -596,7 +618,7 @@ return (<div className="flex flex-col h-full w-full">
 </div></div></div>) : <div className="h-full flex items-center justify-center text-slate-300 font-black">SELECT DATE</div>}
 </aside></main>
 
-{/* 📦 추가된 재고 관리 모달 */}
+{/* 📦 재고 관리 모달 */}
 {inventoryModal && (
     <div className="modal-view bg-slate-100">
         <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl border shadow-sm">
@@ -615,7 +637,6 @@ return (<div className="flex flex-col h-full w-full">
                 <span className="text-xs font-black text-slate-700">오늘 입고할 식재료 목록</span>
                 <button onClick={handleAddRow} className="bg-slate-800 text-white px-2 py-1 rounded-lg text-xs font-black">+ 품목 추가</button>
             </div>
-            
             <div className="space-y-2">
                 {inputItems.map((item, idx) => (
                     <div key={idx} className="flex gap-2 items-center">
@@ -625,10 +646,9 @@ return (<div className="flex flex-col h-full w-full">
                     </div>
                 ))}
             </div>
-
             <label className="block w-full bg-emerald-600 text-white text-center py-3 rounded-xl font-black text-sm cursor-pointer shadow-md hover:bg-emerald-700">
-                {isUploading ? "구글 드라이브 및 시트 저장 중..." : "📷 명세서 사진 찍고 시트에 자동 저장"}
-                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoAndSave} disabled={isUploading} />
+                {isUploadingInv ? "구글 드라이브 및 시트 저장 중..." : "📷 명세서 사진 찍고 시트에 자동 저장"}
+                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleInventoryPhotoAndSave} disabled={isUploadingInv} />
             </label>
         </div>
 
@@ -640,15 +660,14 @@ return (<div className="flex flex-col h-full w-full">
                         <th className="p-2 text-center">입고량</th>
                         <th className="p-2 text-center">사용량</th>
                         <th className="p-2 text-center">현재재고</th>
-                        <th className="p-2 text-right">최근입고일</th>
                         <th className="p-2 text-right">명세서 원본</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y text-xs font-bold">
                     {isLoadingInv ? (
-                        <tr><td colSpan="6" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
+                        <tr><td colSpan="5" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
                     ) : inventoryList.length === 0 ? (
-                        <tr><td colSpan="6" className="p-4 text-center text-slate-400">등록된 재고 데이터가 없습니다. 상단에서 명세서를 저장해 보세요.</td></tr>
+                        <tr><td colSpan="5" className="p-4 text-center text-slate-400">등록된 재고 데이터가 없습니다. 상단에서 명세서를 저장해 보세요.</td></tr>
                     ) : (
                         inventoryList.map((item, idx) => (
                             <tr key={idx} className="hover:bg-slate-50">
@@ -662,10 +681,9 @@ return (<div className="flex flex-col h-full w-full">
                                     </div>
                                 </td>
                                 <td className="p-2 text-center font-black text-sm text-emerald-600">{item.currentQty}</td>
-                                <td className="p-2 text-right text-[10px] text-slate-400">{item.lastDate}</td>
                                 <td className="p-2 text-right">
                                     {item.note && item.note.includes("http") ? (
-                                        <a href={item.note} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-black text-[10px]">📷 원본 사진</a>
+                                        <a href={item.note} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-black text-[10px]">📷 사진</a>
                                     ) : "-"}
                                 </td>
                             </tr>
@@ -692,6 +710,7 @@ return (<div className="flex flex-col h-full w-full">
     </div>
 )}
 
+{/* 📷 수정된 현장 보고서 모달 (직접 촬영 등록 추가) */}
 {reportModal && (
 <div className="modal-view bg-slate-50">
 <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -702,25 +721,50 @@ return (<div className="flex flex-col h-full w-full">
 <button key={tab} onClick={() => setActiveReportTab(tab)}
 className={`flex-1 py-2 rounded-xl text-sm font-black transition-all ${activeReportTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'}`}
 >{tab === '아침' ? '☀️ 아침' : tab === '점심' ? '🌞 점심' : '🌙 저녁'}
-</button>))}</div><div className="flex-1 overflow-y-auto pb-4 space-y-4">
-{currentTabReport ? (
-<><div className="flex flex-col md:flex-row gap-4">
-<div className="flex-1">
-<div className="text-xs font-black text-slate-400 mb-1">식전 세팅 상태</div>
-{currentTabReport.beforeImg ? (
-<img src={formatImageUrl(currentTabReport.beforeImg)} alt="식전 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
-) : (<div className="w-full h-48 bg-slate-200 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">사진 없음</div>
-)}</div><div className="flex-1">
-<div className="text-xs font-black text-slate-400 mb-1">식후 잔반 상태</div>
-{currentTabReport.afterImg ? (
-<img src={formatImageUrl(currentTabReport.afterImg)} alt="식후 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
-) : (<div className="w-full h-48 bg-slate-200 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">사진 없음</div>
-)}</div></div><div className="bg-white p-4 rounded-xl border shadow-sm mt-4">
-<div className="text-xs text-indigo-600 font-black mb-2">보고내용 | 작성자: {currentTabReport.author}</div>
-<div className="text-sm font-bold text-slate-800 whitespace-pre-wrap leading-relaxed">{currentTabReport.content}</div>
-</div></>) : (<div className="text-center py-10 bg-white rounded-xl border border-dashed border-slate-300 text-slate-400 font-bold">
-해당 끼니의 보고서가 등록되지 않았습니다.
-</div>)}<div className="mt-8 pt-4 border-t-2 border-slate-200">
+</button>))}</div>
+<div className="flex-1 overflow-y-auto pb-4 space-y-4">
+    <div className="flex flex-col md:flex-row gap-4">
+        {/* 식전 사진 영역 */}
+        <div className="flex-1">
+            <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-black text-slate-400">식전 세팅 상태</span>
+                <label className="text-[10px] bg-indigo-500 text-white px-2 py-1.5 rounded shadow-sm font-bold cursor-pointer hover:bg-indigo-600">
+                    {isUploadingReport === 'before' ? "업로드 중..." : "📷 직접 촬영/등록"}
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleReportPhotoUpload(activeReportTab, 'before', e)} disabled={!!isUploadingReport} />
+                </label>
+            </div>
+            {currentTabReport.beforeImg ? (
+                <img src={formatImageUrl(currentTabReport.beforeImg)} alt="식전 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
+            ) : (
+                <div className="w-full h-48 bg-white border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">우측 상단의 카메라 버튼으로<br/>사진을 등록해 주세요.</div>
+            )}
+        </div>
+        
+        {/* 식후 사진 영역 */}
+        <div className="flex-1">
+            <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-black text-slate-400">식후 잔반 상태</span>
+                <label className="text-[10px] bg-indigo-500 text-white px-2 py-1.5 rounded shadow-sm font-bold cursor-pointer hover:bg-indigo-600">
+                    {isUploadingReport === 'after' ? "업로드 중..." : "📷 직접 촬영/등록"}
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleReportPhotoUpload(activeReportTab, 'after', e)} disabled={!!isUploadingReport} />
+                </label>
+            </div>
+            {currentTabReport.afterImg ? (
+                <img src={formatImageUrl(currentTabReport.afterImg)} alt="식후 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
+            ) : (
+                <div className="w-full h-48 bg-white border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400">우측 상단의 카메라 버튼으로<br/>사진을 등록해 주세요.</div>
+            )}
+        </div>
+    </div>
+    
+    {currentTabReport.content && (
+        <div className="bg-white p-4 rounded-xl border shadow-sm mt-4">
+            <div className="text-xs text-indigo-600 font-black mb-2">보고내용 | 작성자: {currentTabReport.author}</div>
+            <div className="text-sm font-bold text-slate-800 whitespace-pre-wrap leading-relaxed">{currentTabReport.content}</div>
+        </div>
+    )}
+
+<div className="mt-8 pt-4 border-t-2 border-slate-200">
 <h3 className="text-sm font-black text-slate-400 uppercase mb-3">💬 통합 피드백 및 코멘트</h3>
 <div className="space-y-3 mb-4">
 {todayComments.length > 0 ? todayComments.map((c, i) => (
@@ -844,7 +888,7 @@ return (<div key={i} className="bg-white p-4 rounded-xl border-2 border-yellow-2
 <div className="font-black text-blue-600 mb-2">{m.date}</div>
 <MenuCard text={m.morning} type="Morning" query={modalSearch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
 <MenuCard text={m.lunch} type="Lunch" query={modalSearch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
-<MenuCard text={m.dinner} type="Dinner" query={modalSearch} queryType="Dinner" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
+<MenuCard text={m.dinner} type="Dinner" query={modalSearch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
 </div>)) : <div className="text-center py-10 text-slate-400 font-bold">결과 없음</div>}
 </div></div>)}
 
