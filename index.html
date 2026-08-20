@@ -112,7 +112,7 @@
             });
         };
 
-        // 오직 시트 실시간 데이터를 기준으로만 표시 (로컬 유령 사진 제거)
+        // 시트 데이터를 읽어서 날짜/식사구분별로 C열(식전)과 D열(식후)을 1개 객체로 자동 병합
         const parseReportRows = (rawRows) => {
             const reportMap = {};
             if (Array.isArray(rawRows)) {
@@ -135,7 +135,15 @@
                     }
                     if (!d || d.includes("날짜")) return;
                     const key = `${d}_${t}`;
-                    reportMap[key] = { date: d, type: t, beforeImg: b, afterImg: a, content: c, author: auth };
+                    if (!reportMap[key]) {
+                        reportMap[key] = { date: d, type: t, beforeImg: b, afterImg: a, content: c, author: auth };
+                    } else {
+                        // 기존에 나눠져 있던 데이터가 오더라도 C열, D열 주소를 1개로 합침
+                        if (b) reportMap[key].beforeImg = b;
+                        if (a) reportMap[key].afterImg = a;
+                        if (c) reportMap[key].content = c;
+                        if (auth) reportMap[key].author = auth;
+                    }
                 });
             }
             return Object.values(reportMap);
