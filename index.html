@@ -42,7 +42,8 @@ body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; }
 <script type="text/babel">
 const { useState, useEffect, useMemo, useRef } = React;
 
-const compressImage = (file, maxWidth = 1000, quality = 0.75) => {
+// 📸 이미지 용량 최적화 압축 함수 (800px / quality 0.5)
+const compressImage = (file, maxWidth = 800, quality = 0.5) => {
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -156,7 +157,7 @@ const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbxQt7hG7JaH3H
 const SEASONAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1051704487&single=true&output=csv";
 const REPORT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=949601099&single=true&output=csv";
 
-// ★ 최신 백엔드 배포 URL 고정 ★
+// ★ 백엔드 배포 URL ★
 const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzsP6VpbSGKUt6iJr83B7FcJC5MyDZpwVSGzRuj_zJFGWLOicBIByxdLO1-1f8Mn4UFNg/exec";
 
 const [webAppUrl, setWebAppUrl] = useState(() => {
@@ -258,7 +259,7 @@ const handleInventoryPhotoAndSave = async (e) => {
     setIsUploadingInv(true);
 
     try {
-        const base64Data = await compressImage(file, 1000, 0.75);
+        const base64Data = await compressImage(file, 800, 0.5);
         const validItems = inputItems.filter(item => item.name.trim() !== "");
         const targetUrl = DEFAULT_WEB_APP_URL;
 
@@ -270,11 +271,18 @@ const handleInventoryPhotoAndSave = async (e) => {
                 items: validItems
             })
         })
-        .then(res => res.json())
-        .then(resData => {
+        .then(res => res.text())
+        .then(text => {
             setIsUploadingInv(false);
+            let resData;
+            try {
+                resData = JSON.parse(text);
+            } catch(eErr) {
+                alert("구글 서버 응답 오류 (1단계 권한 승인 필요):\n\n" + text.substring(0, 150));
+                return;
+            }
             if (resData.status === 'success') {
-                alert("구글 드라이브 보관 및 시트 저장 완료!");
+                alert("구글 드라이브 및 시트에 성공적으로 저장되었습니다!");
                 if (Array.isArray(resData.inventory)) setInventoryList(resData.inventory);
                 else fetchInventoryData();
             } else {
@@ -288,14 +296,14 @@ const handleInventoryPhotoAndSave = async (e) => {
     } catch(err) { setIsUploadingInv(false); }
 };
 
-// 📷 현장보고 사진 촬영 및 구글 드라이브/시트 등록 핸들러 (실시간 반영)
+// 📷 현장보고 사진 촬영 및 구글 드라이브/시트 등록 핸들러 (오류 진단강화)
 const handleReportPhotoUpload = async (mealType, imageType, e) => {
     const file = e.target.files[0];
     if (!file || !selectedDate) return;
     setIsUploadingReport(imageType);
     
     try {
-        const base64 = await compressImage(file, 1000, 0.75);
+        const base64 = await compressImage(file, 800, 0.5);
         const targetUrl = DEFAULT_WEB_APP_URL;
         
         fetch(targetUrl, {
@@ -310,13 +318,21 @@ const handleReportPhotoUpload = async (mealType, imageType, e) => {
                 author: currentUser
             })
         })
-        .then(res => res.json())
-        .then(data => {
+        .then(res => res.text())
+        .then(text => {
             setIsUploadingReport(null);
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch(eErr) {
+                alert("구글 서버 응답 오류 (1단계 권한 승인 진행 필요):\n\n" + text.substring(0, 150));
+                return;
+            }
+            
             if (data.status === 'success') {
                 alert("사진이 구글 드라이브 및 시트에 저장되었습니다!");
                 
-                // 앱 화면 즉시 반영 (실시간)
+                // 앱 화면 즉시 반영
                 setReports(prev => {
                     const existingIdx = prev.findIndex(r => r.date === selectedDate.date && r.type === mealType);
                     if (existingIdx >= 0) {
@@ -342,7 +358,7 @@ const handleReportPhotoUpload = async (mealType, imageType, e) => {
         })
         .catch(() => {
             setIsUploadingReport(null);
-            alert("전송 실패. 네트워크 상태나 연결 URL을 확인해주세요.");
+            alert("전송 실패. 네트워크 상태를 확인해 주세요.");
         });
     } catch (err) {
         setIsUploadingReport(null);
@@ -579,7 +595,7 @@ return (<div className="flex flex-col h-full w-full">
 {activeBanner && <div className="top-banner"><span className="banner-icon">NOTICE</span><span>{activeBanner}</span></div>}
 <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
 <div className="flex justify-between items-center">
-<div><h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v1.2</span></h1>
+<div><h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic align-top">v1.3</span></h1>
 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
 </div><div className="flex items-center gap-2">
 
@@ -749,7 +765,7 @@ return (<div className="flex flex-col h-full w-full">
     </div>
 )}
 
-{/* 📷 현장 보고서 모달 (직접 촬영 등록 + 즉시 출력) */}
+{/* 📷 현장 보고서 모달 */}
 {reportModal && (
 <div className="modal-view bg-slate-50">
 <div className="flex justify-between items-center mb-4 border-b pb-2">
