@@ -190,10 +190,9 @@
 
             const handleLogout = () => { setIsAuthenticated(false); setCurrentUser(""); localStorage.removeItem("misoyon_user"); window.location.reload(); };
 
-            // 명세서 보관 및 재고 자동 업데이트
             const handlePhotoAndSave = async (e) => {
                 if (!webAppUrl) {
-                    alert("상단의 [⚙️ URL 연결] 버튼을 눌러 새 배포 URL을 입력해 주세요.");
+                    alert("관리자에게 URL 연결 설정을 요청해 주세요.");
                     return;
                 }
                 const file = e.target.files[0];
@@ -218,7 +217,7 @@
                         if (resData.status === 'success') {
                             alert("구글 시트에 등록이 완료되었습니다!");
                             if (Array.isArray(resData.inventory)) {
-                                setInventoryList(resData.inventory); // 실시간 표 즉시 갱신
+                                setInventoryList(resData.inventory);
                             } else {
                                 fetchInventoryData();
                             }
@@ -235,7 +234,6 @@
                 }
             };
 
-            // 사용량 조정
             const handleUpdateUsedQty = (item, delta) => {
                 const newUsed = Math.max(0, (item.usedQty || 0) + delta);
                 fetch(webAppUrl, {
@@ -300,13 +298,20 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v2.2</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v2.3</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => { setInventoryModal(true); fetchInventoryData(); }} className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm hover:bg-emerald-700">📦 재고 관리</button>
-                                <button onClick={() => setUrlSettingModal(true)} className="bg-amber-500 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm">⚙️ URL 연결</button>
-                                <a href={SHEET_EDIT_URL} target="_blank" rel="noopener noreferrer" className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 font-black text-xs no-underline">📊 원본 시트</a>
+                                
+                                {/* ★ 관리자 전용 메뉴 ★ */}
+                                {currentUser === ADMIN_NAME && (
+                                    <>
+                                        <button onClick={() => setUrlSettingModal(true)} className="bg-amber-500 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm">⚙️ URL 연결</button>
+                                        <a href={SHEET_EDIT_URL} target="_blank" rel="noopener noreferrer" className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 font-black text-xs no-underline">📊 원본 시트</a>
+                                    </>
+                                )}
+
                                 <button onClick={handleLogout} className="bg-red-500 text-white px-3 py-1.5 rounded-xl font-black text-xs">OUT</button>
                             </div>
                         </div>
@@ -353,7 +358,7 @@
                         </aside>
                     </main>
 
-                    {/* 📦 재고 관리 및 명세서 보관 모달 */}
+                    {/* 📦 재고 관리 및 명세서 보관 모달 (일반 사용자 접근) */}
                     {inventoryModal && (
                         <div className="modal-view bg-slate-100">
                             <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl border shadow-sm">
@@ -389,7 +394,6 @@
                                 </label>
                             </div>
 
-                            {/* 📋 구글 시트 연동 재고 현황 표 */}
                             <div className="flex-1 bg-white rounded-2xl border overflow-y-auto p-2 shadow-sm">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
@@ -435,8 +439,8 @@
                         </div>
                     )}
 
-                    {/* ⚙️ URL 설정 모달 */}
-                    {urlSettingModal && (
+                    {/* ⚙️ URL 설정 모달 (관리자 전용) */}
+                    {urlSettingModal && currentUser === ADMIN_NAME && (
                         <div className="recipe-popup" onClick={() => setUrlSettingModal(false)}>
                             <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
                                 <h3 className="text-lg font-black text-slate-800">⚙️ 구글 시트 웹앱 URL 등록</h3>
