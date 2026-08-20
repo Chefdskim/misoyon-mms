@@ -43,7 +43,6 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // ★ 만능 날짜 정규화 엔진 (모든 형태의 날짜를 2026-08-20 형태로 완벽 통일) ★
         const normalizeDate = (dStr) => {
             if (!dStr) return "";
             const str = String(dStr).trim();
@@ -71,6 +70,7 @@
             return s;
         };
 
+        // 타인 기기 직관적 노출용 고화질 이미지 서버 주소 변환
         const formatImageUrl = (url) => {
             if (!url) return "";
             let cleanUrl = String(url).trim();
@@ -80,7 +80,7 @@
             const match2 = cleanUrl.match(/id=([a-zA-Z0-9_-]+)/);
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
             
-            return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000` : cleanUrl;
+            return fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : cleanUrl;
         };
 
         const compressImage = (file, maxWidth = 1000, quality = 0.75) => {
@@ -132,19 +132,25 @@
 
             if (Array.isArray(rawRows)) {
                 rawRows.forEach(r => {
-                    if (!Array.isArray(r) || r.length < 2) return;
-                    const d = normalizeDate(r[0]);
-                    const t = normalizeMealType(r[1]);
+                    let d = "", t = "", b = "", a = "", c = "", auth = "";
+                    if (Array.isArray(r)) {
+                        d = normalizeDate(r[0]);
+                        t = normalizeMealType(r[1]);
+                        b = String(r[2] || "").trim();
+                        a = String(r[3] || "").trim();
+                        c = String(r[4] || "").trim();
+                        auth = String(r[5] || "").trim();
+                    } else if (typeof r === 'object' && r !== null) {
+                        d = normalizeDate(r.date);
+                        t = normalizeMealType(r.type);
+                        b = String(r.beforeImg || "").trim();
+                        a = String(r.afterImg || "").trim();
+                        c = String(r.content || "").trim();
+                        auth = String(r.author || "").trim();
+                    }
                     if (!d || d.includes("날짜")) return;
                     const key = `${d}_${t}`;
-                    reportMap[key] = {
-                        date: d,
-                        type: t,
-                        beforeImg: String(r[2] || "").trim(),
-                        afterImg: String(r[3] || "").trim(),
-                        content: String(r[4] || "").trim(),
-                        author: String(r[5] || "").trim()
-                    };
+                    reportMap[key] = { date: d, type: t, beforeImg: b, afterImg: a, content: c, author: auth };
                 });
             }
 
@@ -156,14 +162,7 @@
                 const t = parts[1];
 
                 if (!reportMap[key]) {
-                    reportMap[key] = {
-                        date: d,
-                        type: t,
-                        beforeImg: loc.beforeImg || "",
-                        afterImg: loc.afterImg || "",
-                        content: "",
-                        author: ""
-                    };
+                    reportMap[key] = { date: d, type: t, beforeImg: loc.beforeImg || "", afterImg: loc.afterImg || "", content: "", author: "" };
                 } else {
                     if (!reportMap[key].beforeImg && loc.beforeImg) reportMap[key].beforeImg = loc.beforeImg;
                     if (!reportMap[key].afterImg && loc.afterImg) reportMap[key].afterImg = loc.afterImg;
