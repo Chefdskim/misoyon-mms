@@ -70,7 +70,6 @@
             return s;
         };
 
-        // 타인 기기 직관적 노출용 고화질 이미지 서버 주소 변환
         const formatImageUrl = (url) => {
             if (!url) return "";
             let cleanUrl = String(url).trim();
@@ -80,7 +79,7 @@
             const match2 = cleanUrl.match(/id=([a-zA-Z0-9_-]+)/);
             const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
             
-            return fileId ? `https://lh3.googleusercontent.com/d/${fileId}` : cleanUrl;
+            return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000` : cleanUrl;
         };
 
         const compressImage = (file, maxWidth = 1000, quality = 0.75) => {
