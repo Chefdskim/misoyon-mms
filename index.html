@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -45,7 +45,6 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
-        // 서버에서 동적으로 전달된 웹 앱 URL 자동 주입
         const SERVER_WEB_APP_URL = "<?= scriptUrl ?>";
 
         const getTodayStr = () => {
@@ -249,9 +248,9 @@
             const [isUploading, setIsUploading] = useState(false);
             const [isLoadingInv, setIsLoadingInv] = useState(false);
 
+            // 💡 초기 입력 항목을 빈 상태로 설정하여 명세서 내용에 맞게 직접 입력하도록 변경
             const [inputItems, setInputItems] = useState([
-                { name: "한우꼬리 반골", inQty: 1 },
-                { name: "잡뼈", inQty: 1 }
+                { name: "", inQty: 1 }
             ]);
 
             const saveWebAppUrl = () => {
@@ -431,11 +430,18 @@
                 if (!webAppUrl) return alert("관리자에게 URL 연결 설정을 요청해 주세요.");
                 const file = e.target.files[0];
                 if (!file) return;
+                
+                const validItems = inputItems.filter(item => item.name.trim() !== "");
+                if (validItems.length === 0) {
+                    alert("등록할 식재료 품목명을 최소 1개 이상 입력해 주세요.");
+                    e.target.value = "";
+                    return;
+                }
+
                 setIsUploading(true);
 
                 try {
                     const base64Data = await compressImage(file, 800, 0.6);
-                    const validItems = inputItems.filter(item => item.name.trim() !== "");
 
                     fetch(webAppUrl, {
                         method: 'POST',
@@ -449,8 +455,10 @@
                     .then(res => res.json())
                     .then(resData => {
                         setIsUploading(false);
+                        e.target.value = ""; // 파일 선택 초기화
                         if (resData.status === 'success') {
-                            alert("구글 시트 및 드라이브 저장이 완료되었습니다!");
+                            alert("거래명세서 드라이브 보관 및 재고 시트 등록이 완료되었습니다!");
+                            setInputItems([{ name: "", inQty: 1 }]); // 입력창 초기화
                             if (Array.isArray(resData.inventory)) setInventoryList(resData.inventory);
                             else fetchInventoryData();
                         } else {
@@ -459,9 +467,13 @@
                     })
                     .catch((err) => {
                         setIsUploading(false);
+                        e.target.value = "";
                         alert("전송 중 네트워크 오류가 발생했습니다. Apps Script URL을 다시 점검해 주세요.");
                     });
-                } catch(err) { setIsUploading(false); }
+                } catch(err) { 
+                    setIsUploading(false); 
+                    e.target.value = "";
+                }
             };
 
             const handleReportPhotoUpload = async (mealType, imageType, e) => {
@@ -486,6 +498,7 @@
                     .then(res => res.json())
                     .then(data => {
                         setIsUploadingReport(null);
+                        e.target.value = "";
                         if (data.status === 'success') {
                             alert("현장 사진이 저장되었습니다!");
                             fetchData(true);
@@ -493,9 +506,13 @@
                     })
                     .catch(() => {
                         setIsUploadingReport(null);
+                        e.target.value = "";
                         alert("전송 중 오류 발생");
                     });
-                } catch (err) { setIsUploadingReport(null); }
+                } catch (err) { 
+                    setIsUploadingReport(null); 
+                    e.target.value = "";
+                }
             };
 
             const handleUpdateUsedQty = (item, delta) => {
@@ -747,7 +764,7 @@
                             <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl border shadow-sm">
                                 <div>
                                     <h2 className="text-xl font-black text-emerald-700 italic">📦 거래명세서 드라이브 보관 및 재고 관리</h2>
-                                    <p className="text-[10px] font-bold text-slate-400">명세서 촬영 시 '2026년8월21일 거래명세서' 형식으로 드라이브 보관 + 시트 자동 입고</p>
+                                    <p className="text-[10px] font-bold text-slate-400">명세서 촬영 시 'YYYY년M월D일 거래명세서' 형식으로 드라이브 보관 + 시트 자동 입고</p>
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={fetchInventoryData} className="bg-slate-800 text-white px-2.5 py-1.5 rounded-xl text-xs font-black">🔄 새로고침</button>
@@ -757,14 +774,14 @@
 
                             <div className="bg-white p-4 rounded-2xl border shadow-sm mb-4 space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs font-black text-slate-700">오늘 입고할 식재료 목록</span>
+                                    <span className="text-xs font-black text-slate-700">입고할 식재료 품목 및 수량 입력</span>
                                     <button onClick={handleAddRow} className="bg-slate-800 text-white px-2 py-1 rounded-lg text-xs font-black">+ 품목 추가</button>
                                 </div>
                                 
                                 <div className="space-y-2">
                                     {inputItems.map((item, idx) => (
                                         <div key={idx} className="flex gap-2 items-center">
-                                            <input className="flex-1 px-3 py-2 rounded-xl border text-xs font-bold outline-none" placeholder="품목명 (예: 한우꼬리 반골)" value={item.name} onChange={e => handleInputChange(idx, 'name', e.target.value)} />
+                                            <input className="flex-1 px-3 py-2 rounded-xl border text-xs font-bold outline-none" placeholder="품목명 입력 (예: 한우양지)" value={item.name} onChange={e => handleInputChange(idx, 'name', e.target.value)} />
                                             <input type="number" className="w-16 px-2 py-2 rounded-xl border text-xs font-bold text-center outline-none" value={item.inQty} onChange={e => handleInputChange(idx, 'inQty', Number(e.target.value))} />
                                             <button onClick={() => handleRemoveRow(idx)} className="text-red-500 font-bold px-2">×</button>
                                         </div>
@@ -772,7 +789,7 @@
                                 </div>
 
                                 <label className="block w-full bg-emerald-600 text-white text-center py-3 rounded-xl font-black text-sm cursor-pointer shadow-md hover:bg-emerald-700">
-                                    {isUploading ? "구글 드라이브 및 시트 저장 중..." : "📷 명세서 사진 찍고 시트에 자동 저장"}
+                                    {isUploading ? "구글 드라이브 및 시트 저장 중..." : "📷 거래명세서 사진 찍고 시트에 저장"}
                                     <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoAndSave} disabled={isUploading} />
                                 </label>
                             </div>
@@ -793,7 +810,7 @@
                                         {isLoadingInv ? (
                                             <tr><td colSpan="6" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
                                         ) : inventoryList.length === 0 ? (
-                                            <tr><td colSpan="6" className="p-4 text-center text-slate-400">등록된 재고 데이터가 없습니다. 상단에서 명세서를 저장해 보세요.</td></tr>
+                                            <tr><td colSpan="6" className="p-4 text-center text-slate-400">등록된 재고 데이터가 없습니다. 상단에서 품목을 입력하고 명세서를 저장해 보세요.</td></tr>
                                         ) : (
                                             inventoryList.map((item, idx) => (
                                                 <tr key={idx} className="hover:bg-slate-50">
