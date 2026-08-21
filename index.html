@@ -9,8 +9,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <!-- OCR 텍스트 자동인식을 위한 Tesseract.js 라이브러리 추가 -->
-    <script src="https://unpkg.com/tesseract.js@v4/dist/tesseract.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;700;900&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -249,7 +247,6 @@
             const [inventoryList, setInventoryList] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
             const [isLoadingInv, setIsLoadingInv] = useState(false);
-            const [ocrStatus, setOcrStatus] = useState(""); // OCR 판독 상태 메시지
 
             const [inputItems, setInputItems] = useState([
                 { name: "", inQty: 1 }
@@ -428,85 +425,54 @@
 
             const handleLogout = () => { setIsAuthenticated(false); setCurrentUser(""); localStorage.removeItem("misoyon_user"); window.location.reload(); };
 
-            // 💡 OCR 글자 판독 및 자동 입력 + 드라이브 보관/시트 등록 핸들러
+            // 💡 거래명세서 촬영 및 재고 등록 핸들러
             const handlePhotoAndSave = async (e) => {
                 if (!webAppUrl) return alert("관리자에게 URL 연결 설정을 요청해 주세요.");
                 const file = e.target.files[0];
                 if (!file) return;
 
+                const validItems = inputItems.filter(item => item.name.trim() !== "");
+                if (validItems.length === 0) {
+                    alert("등록할 식재료 품목명을 최소 1개 이상 입력해 주세요.");
+                    e.target.value = "";
+                    return;
+                }
+
                 setIsUploading(true);
-                setOcrStatus("🔍 명세서 텍스트 판독 중 (OCR)...");
 
                 try {
-                    // 1. Tesseract.js를 이용해 브라우저에서 이미지 텍스트 추출 (한국어 + 영어 지원)
-                    const { data: { text } } = await Tesseract.recognize(file, 'kor+eng', {
-                        logger: m => {
-                            if (m.status === 'recognizing text') {
-                                setOcrStatus(`🔍 텍스트 판독 중... ${Math.round(m.progress * 100)}%`);
-                            }
-                        }
-                    });
-
-                    // 2. 추출된 텍스트 파싱 (라인별로 나누어 품목명 및 수량 추출 시도)
-                    const lines = text.split('\n');
-                    const parsedItems = [];
-                    lines.forEach(line => {
-                        const clean = line.trim();
-                        if (clean.length < 2) return;
-                        // 숫자 패턴이 뒤에 붙어있는 경우 분리 시도
-                        const match = clean.match(/(.+?)\s+(\d+[\d,.]*)\s*$/);
-                        if (match) {
-                            const name = match[1].trim();
-                            const qty = parseInt(match[2].replace(/,/g, ''), 10) || 1;
-                            if (name && !name.includes('합계') && !name.includes('사업자') && !name.includes('거래명세서') && !name.includes('공급자')) {
-                                parsedItems.push({ name: name, inQty: qty });
-                            }
-                        } else {
-                            if (!clean.includes('거래명세서') && !clean.includes('공급자') && !clean.includes('합계') && !clean.includes('사업자등록번호') && !clean.includes('등록일')) {
-                                parsedItems.push({ name: clean, inQty: 1 });
-                            }
-                        }
-                    });
-
-                    // 판독된 품목이 있으면 입력창에 자동 반영, 없으면 기존 수동 입력값 유지
-                    if (parsedItems.length > 0) {
-                        setInputItems(parsedItems.slice(0, 15)); // 최대 15개까지만 자동 입력
-                    }
-
-                    setOcrStatus("☁️ 구글 드라이브 및 시트 저장 중...");
-
-                    // 3. 이미지 압축 및 서버 전송
                     const base64Data = await compressImage(file, 800, 0.6);
-                    const itemsToSave = parsedItems.length > 0 ? parsedItems.slice(0, 15) : inputItems.filter(item => item.name.trim() !== "");
 
-                    const res = await fetch(webAppUrl, {
+                    fetch(webAppUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify({
                             action: 'upload_inventory',
                             imageBase64: base64Data,
-                            items: itemsToSave
+                            items: validItems
                         })
+                    })
+                    .then(res => res.json())
+                    .then(resData => {
+                        setIsUploading(false);
+                        e.target.value = "";
+                        if (resData.status === 'success') {
+                            alert("거래명세서 드라이브 보관 및 재고 시트 등록이 완료되었습니다!");
+                            setInputItems([{ name: "", inQty: 1 }]);
+                            if (Array.isArray(resData.inventory)) setInventoryList(resData.inventory);
+                            else fetchInventoryData();
+                        } else {
+                            alert("저장 실패 원인: " + (resData.message || "오류 발생"));
+                        }
+                    })
+                    .catch((err) => {
+                        setIsUploading(false);
+                        e.target.value = "";
+                        alert("전송 중 네트워크 오류가 발생했습니다.");
                     });
-                    const resData = await res.json();
-
-                    setIsUploading(false);
-                    setOcrStatus("");
+                } catch(err) { 
+                    setIsUploading(false); 
                     e.target.value = "";
-
-                    if (resData.status === 'success') {
-                        alert("거래명세서 판독, 드라이브 보관 및 재고 시트 등록이 완료되었습니다!");
-                        if (Array.isArray(resData.inventory)) setInventoryList(resData.inventory);
-                        else fetchInventoryData();
-                    } else {
-                        alert("저장 실패: " + (resData.message || "오류 발생"));
-                    }
-
-                } catch (err) {
-                    setIsUploading(false);
-                    setOcrStatus("");
-                    e.target.value = "";
-                    alert("OCR 판독 또는 전송 중 오류가 발생했습니다: " + err.toString());
                 }
             };
 
@@ -797,8 +763,8 @@
                         <div className="modal-view bg-slate-100">
                             <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl border shadow-sm">
                                 <div>
-                                    <h2 className="text-xl font-black text-emerald-700 italic">📦 거래명세서 자동인식(OCR) 및 재고 관리</h2>
-                                    <p className="text-[10px] font-bold text-slate-400">명세서 촬영 시 글자 자동인식 + 드라이브 보관 + 시트 자동 입고</p>
+                                    <h2 className="text-xl font-black text-emerald-700 italic">📦 거래명세서 드라이브 보관 및 재고 관리</h2>
+                                    <p className="text-[10px] font-bold text-slate-400">명세서 촬영 시 '2026년8월21일 거래명세서' 형식으로 드라이브 보관 + 시트 자동 입고</p>
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={fetchInventoryData} className="bg-slate-800 text-white px-2.5 py-1.5 rounded-xl text-xs font-black">🔄 새로고침</button>
@@ -808,14 +774,14 @@
 
                             <div className="bg-white p-4 rounded-2xl border shadow-sm mb-4 space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs font-black text-slate-700">인식된 품목 목록 (필요시 직접 수정 가능)</span>
+                                    <span className="text-xs font-black text-slate-700">입고할 식재료 품목 및 수량 입력</span>
                                     <button onClick={handleAddRow} className="bg-slate-800 text-white px-2 py-1 rounded-lg text-xs font-black">+ 품목 추가</button>
                                 </div>
                                 
                                 <div className="space-y-2">
                                     {inputItems.map((item, idx) => (
                                         <div key={idx} className="flex gap-2 items-center">
-                                            <input className="flex-1 px-3 py-2 rounded-xl border text-xs font-bold outline-none" placeholder="품목명" value={item.name} onChange={e => handleInputChange(idx, 'name', e.target.value)} />
+                                            <input className="flex-1 px-3 py-2 rounded-xl border text-xs font-bold outline-none" placeholder="품목명 입력 (예: 한우양지)" value={item.name} onChange={e => handleInputChange(idx, 'name', e.target.value)} />
                                             <input type="number" className="w-16 px-2 py-2 rounded-xl border text-xs font-bold text-center outline-none" value={item.inQty} onChange={e => handleInputChange(idx, 'inQty', Number(e.target.value))} />
                                             <button onClick={() => handleRemoveRow(idx)} className="text-red-500 font-bold px-2">×</button>
                                         </div>
@@ -823,7 +789,7 @@
                                 </div>
 
                                 <label className="block w-full bg-emerald-600 text-white text-center py-3 rounded-xl font-black text-sm cursor-pointer shadow-md hover:bg-emerald-700">
-                                    {isUploading ? (ocrStatus || "처리 중...") : "📷 거래명세서 촬영 (텍스트 자동인식)"}
+                                    {isUploading ? "구글 드라이브 및 시트 저장 중..." : "📷 거래명세서 사진 찍고 시트에 저장"}
                                     <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoAndSave} disabled={isUploading} />
                                 </label>
                             </div>
@@ -844,7 +810,7 @@
                                         {isLoadingInv ? (
                                             <tr><td colSpan="6" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
                                         ) : inventoryList.length === 0 ? (
-                                            <tr><td colSpan="6" className="p-4 text-center text-slate-400">등록된 재고 데이터가 없습니다. 상단에서 명세서를 촬영해 보세요.</td></tr>
+                                            <tr><td colSpan="6" className="p-4 text-center text-slate-400">등록된 재고 데이터가 없습니다. 상단에서 품목을 입력하고 명세서를 저장해 보세요.</td></tr>
                                         ) : (
                                             inventoryList.map((item, idx) => (
                                                 <tr key={idx} className="hover:bg-slate-50">
