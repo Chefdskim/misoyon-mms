@@ -45,6 +45,9 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
 
+        // 서버에서 동적으로 전달된 웹 앱 URL 자동 주입
+        const SERVER_WEB_APP_URL = "<?= scriptUrl ?>";
+
         const getTodayStr = () => {
             const now = new Date();
             const y = now.getFullYear();
@@ -194,9 +197,12 @@
             const REPORT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=949601099&single=true&output=csv";
             const COMMENT_READ_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=918283439&single=true&output=csv";
             const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbxQt7hG7JaH3HBD0ygYNezSlNFEuqLZJAv-22gDCTMET7z2nZs_MarT47Rxq7GlxBxC-Q/exec";
-            const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzsP6VpbSGKUt6iJr83B7FcJC5MyDZpwVSGzRuj_zJFGWLOicBIByxdLO1-1f8Mn4UFNg/exec";
 
-            const [webAppUrl, setWebAppUrl] = useState(() => localStorage.getItem("misoyon_webapp_url") || DEFAULT_WEB_APP_URL);
+            // 동적 주입된 URL을 최우선 사용하고, 로컬스토리지나 기본값으로 폴백 처리
+            const [webAppUrl, setWebAppUrl] = useState(() => {
+                if (SERVER_WEB_APP_URL && !SERVER_WEB_APP_URL.includes("scriptUrl")) return SERVER_WEB_APP_URL;
+                return localStorage.getItem("misoyon_webapp_url") || "https://script.google.com/macros/s/AKfycbz_7KRW_j6AwOWZOdLhTxfeGSCD1gvuHlb0EKUbwPzstN-kHJDI7KB0Qmy_3h9sqmiZGw/exec";
+            });
             const [urlSettingModal, setUrlSettingModal] = useState(false);
             const [inputUrl, setInputUrl] = useState(webAppUrl);
 
@@ -1107,7 +1113,6 @@
                             </div>
                         </div>
                     )}
-
                 </div>
             );
         };
