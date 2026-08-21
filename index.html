@@ -956,26 +956,29 @@
                                             <tbody className="divide-y text-xs font-bold">
                                                 {isLoadingInv ? (
                                                     <tr><td colSpan="9" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
-                                                ) : inventoryList.length === 0 ? (
+                                                ) : !Array.isArray(inventoryList) || inventoryList.length === 0 ? (
                                                     <tr><td colSpan="9" className="p-4 text-center text-slate-400">등록된 입고 데이터가 없습니다. 상단에서 식재료를 등록해 보세요.</td></tr>
                                                 ) : (
-                                                    inventoryList.map((item, idx) => (
-                                                        <tr key={idx} className="hover:bg-slate-50">
-                                                            <td className="p-2 text-slate-400 text-[10px]">{item.date}</td>
-                                                            <td className="p-2 text-slate-600">{item.section}</td>
-                                                            <td className="p-2 font-black text-slate-800">{item.name}</td>
-                                                            <td className="p-2 text-center font-black text-emerald-600">{item.inQty}</td>
-                                                            <td className="p-2 text-center font-black text-blue-600">{item.invQty}</td>
-                                                            <td className="p-2 text-right text-slate-700">{item.price ? Number(item.price).toLocaleString() + "원" : "-"}</td>
-                                                            <td className="p-2 text-right font-black text-slate-900">{typeof item.supplyPrice === 'number' ? Number(item.supplyPrice).toLocaleString() + "원" : item.supplyPrice || "-"}</td>
-                                                            <td className="p-2 text-right font-black text-emerald-800">{typeof item.invAmount === 'number' ? Number(item.invAmount).toLocaleString() + "원" : item.invAmount || "-"}</td>
-                                                            <td className="p-2 text-center">
-                                                                {item.note && item.note.includes("http") ? (
-                                                                    <a href={item.note} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-black text-[10px]">📷 사진</a>
-                                                                ) : <span className="text-[10px] text-slate-400">{item.note || "수기"}</span>}
-                                                            </td>
-                                                        </tr>
-                                                    ))
+                                                    inventoryList.map((item, idx) => {
+                                                        const itm = (item && typeof item === 'object') ? item : {};
+                                                        return (
+                                                            <tr key={idx} className="hover:bg-slate-50">
+                                                                <td className="p-2 text-slate-400 text-[10px]">{itm.date || "-"}</td>
+                                                                <td className="p-2 text-slate-600">{itm.section || "-"}</td>
+                                                                <td className="p-2 font-black text-slate-800">{itm.name || "-"}</td>
+                                                                <td className="p-2 text-center font-black text-emerald-600">{itm.inQty ?? 0}</td>
+                                                                <td className="p-2 text-center font-black text-blue-600">{itm.invQty ?? 0}</td>
+                                                                <td className="p-2 text-right text-slate-700">{itm.price ? Number(itm.price).toLocaleString() + "원" : "-"}</td>
+                                                                <td className="p-2 text-right font-black text-slate-900">{typeof itm.supplyPrice === 'number' ? Number(itm.supplyPrice).toLocaleString() + "원" : itm.supplyPrice || "-"}</td>
+                                                                <td className="p-2 text-right font-black text-emerald-800">{typeof itm.invAmount === 'number' ? Number(itm.invAmount).toLocaleString() + "원" : itm.invAmount || "-"}</td>
+                                                                <td className="p-2 text-center">
+                                                                    {itm.note && String(itm.note).includes("http") ? (
+                                                                        <a href={itm.note} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-black text-[10px]">📷 사진</a>
+                                                                    ) : <span className="text-[10px] text-slate-400">{itm.note || "수기"}</span>}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
                                                 )}
                                             </tbody>
                                         </table>
@@ -997,12 +1000,12 @@
                                                     <tr><td colSpan="7" className="p-4 text-center text-slate-400">품목 마스터 데이터가 없습니다.</td></tr>
                                                 ) : (
                                                     masterList.map((m, idx) => {
-                                                        const mObj = typeof m === 'object' && m !== null ? m : { id: `M-${idx+1}`, section: "-", name: m, spec: "-", unit: "-", price: 0, convert: 1 };
+                                                        const mObj = (m && typeof m === 'object') ? m : { id: `M-${idx+1}`, section: "-", name: String(m || ""), spec: "-", unit: "-", price: 0, convert: 1 };
                                                         return (
                                                             <tr key={idx} className="hover:bg-slate-50">
                                                                 <td className="p-2 text-slate-400 text-[10px]">{mObj.id || `M-${idx+1}`}</td>
                                                                 <td className="p-2 text-slate-600">{mObj.section || "-"}</td>
-                                                                <td className="p-2 font-black text-slate-800">{mObj.name || m}</td>
+                                                                <td className="p-2 font-black text-slate-800">{mObj.name || "-"}</td>
                                                                 <td className="p-2 text-slate-500 text-[11px]">{mObj.spec || "-"}</td>
                                                                 <td className="p-2 text-center">{mObj.unit || "-"}</td>
                                                                 <td className="p-2 text-right font-black text-emerald-600">{mObj.price ? Number(mObj.price).toLocaleString() + "원" : "-"}</td>
