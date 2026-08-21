@@ -123,10 +123,10 @@
             if (!name || !name.trim()) return "농산";
             const cleanName = name.trim().toLowerCase();
 
-            const matchedMaster = masterList.find(m => {
-                const mName = (typeof m === 'object' ? m.name : m).toLowerCase();
+            const matchedMaster = Array.isArray(masterList) ? masterList.find(m => {
+                const mName = (typeof m === 'object' && m !== null ? m.name : m || "").toLowerCase();
                 return mName === cleanName;
-            });
+            }) : null;
             if (matchedMaster && typeof matchedMaster === 'object' && matchedMaster.section) {
                 return matchedMaster.section;
             }
@@ -143,7 +143,7 @@
             if (!menuName || menuName === "일정없음" || !recipeMap) return [];
             const cleanMenu = menuName.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
             return Object.values(recipeMap).filter(recipe => {
-                if (!recipe.key) return false;
+                if (!recipe || !recipe.key) return false;
                 const fullKey = recipe.key.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
                 const coreKey = recipe.key.toLowerCase().replace(/\(.*\)/g, "").replace(/[^가-힣a-zA-Z0-9]/g, "");
                 return cleanMenu.includes(fullKey) || (coreKey.length > 1 && cleanMenu.includes(coreKey));
@@ -203,7 +203,6 @@
             const SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1ipSLhBGgAW1U_RF9Xkez3hUl_Eiklyor-OeQ-DtHV9o/edit?usp=sharing"; 
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
-            const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
             const SEASONAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1051704487&single=true&output=csv";
             const REPORT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=949601099&single=true&output=csv";
             const COMMENT_READ_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=918283439&single=true&output=csv";
@@ -299,6 +298,15 @@
                     setIsLoadingInv(false);
                     if (data.inventory) setInventoryList(data.inventory);
                     if (data.master) setMasterList(data.master);
+                    if (data.recipesFromSheet && data.recipesFromSheet.length > 0) {
+                        const newMap = {};
+                        data.recipesFromSheet.forEach(r => {
+                            if (r.key) {
+                                newMap[r.key] = r;
+                            }
+                        });
+                        setRecipeMap(prev => ({ ...prev, ...newMap }));
+                    }
                 })
                 .catch(() => setIsLoadingInv(false));
             };
@@ -347,29 +355,6 @@
                         setMenus(temp);
                         const todayStr = getTodayStr();
                         setSelectedDate(temp.find(m => m.date === todayStr) || { date: todayStr, morning: "", lunch: "", dinner: "", duty: "", packing: "" });
-                    }
-                });
-
-                Papa.parse(getUrl(RECIPE_URL), {
-                    download: true, complete: (res) => {
-                        const newRecipes = {};
-                        if (res && res.data) {
-                            res.data.forEach(row => {
-                                if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
-                                const key = row[0].trim();
-                                const rowString = row.join(" ");
-                                let foundImage = "";
-                                const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
-                                if(urlMatch) { foundImage = urlMatch[0].trim().replace(/["']$/, ""); }
-                                newRecipes[key] = {
-                                    key: key, name: row[1] || key,
-                                    ingredients: row[2] || "", process: row[3] || "",
-                                    tip: row[4] || "", nutrition: row[5] || "",
-                                    image: foundImage
-                                };
-                            });
-                        }
-                        setRecipeMap(newRecipes);
                     }
                 });
 
@@ -445,7 +430,7 @@
             useEffect(() => { const saved = localStorage.getItem("misoyon_user"); if (saved) { setIsAuthenticated(true); setCurrentUser(saved); } }, []);
 
             const handleLogin = () => {
-                const foundUser = userList.find(u => u.name === inputName.trim() && u.code === inputCode.trim());
+                const foundUser = Array.isArray(userList) ? userList.find(u => u.name === inputName.trim() && u.code === inputCode.trim()) : null;
                 if (foundUser) { setIsAuthenticated(true); setCurrentUser(foundUser.name); localStorage.setItem("misoyon_user", foundUser.name); }
                 else if (inputName.trim() === ADMIN_NAME && inputCode.trim() === ADMIN_CODE) { setIsAuthenticated(true); setCurrentUser("관리자"); localStorage.setItem("misoyon_user", "관리자"); }
                 else { setLoginError("이름 또는 코드를 확인하세요."); }
@@ -575,7 +560,7 @@
                 updated[index][field] = value;
                 if (field === 'name') {
                     const cleanName = value.trim().toLowerCase();
-                    const matched = masterList.find(m => (typeof m === 'object' ? m.name : m).toLowerCase() === cleanName);
+                    const matched = Array.isArray(masterList) ? masterList.find(m => (typeof m === 'object' && m !== null ? m.name : m || "").toLowerCase() === cleanName) : null;
                     if (matched && typeof matched === 'object') {
                         updated[index].section = matched.section || autoClassifySection(value, masterList);
                         updated[index].unit = matched.unit || "kg";
@@ -804,7 +789,7 @@
                             <div className="flex justify-between items-center mb-3 bg-white p-4 rounded-2xl border shadow-sm shrink-0">
                                 <div>
                                     <h2 className="text-lg font-black text-emerald-700 italic">📦 식재료 등록 및 입고 관리</h2>
-                                    <p className="text-[10px] font-bold text-slate-400">품목명을 입력하면 마스터 DB 단가와 단위가 자동 적용됩니다.</p>
+                                    <p className="text-[10px] font-bold text-slate-400">품목명을 입력하면 마스터 DB 단가와 환산계수가 자동 적용됩니다.</p>
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={fetchInventoryData} className="bg-slate-800 text-white px-2.5 py-1.5 rounded-xl text-xs font-black">🔄 새로고침</button>
@@ -822,10 +807,10 @@
                                 <div className="space-y-3 p-1">
                                     {inputItems.map((item, idx) => {
                                         const query = (item.name || "").toLowerCase().trim();
-                                        const filteredMaster = masterList.filter(m => {
-                                            const mName = (typeof m === 'object' ? m.name : m).toLowerCase();
+                                        const filteredMaster = Array.isArray(masterList) ? masterList.filter(m => {
+                                            const mName = (typeof m === 'object' && m !== null ? m.name : m || "").toLowerCase();
                                             return query && mName.includes(query);
-                                        }).slice(0, 10);
+                                        }).slice(0, 10) : [];
 
                                         return (
                                             <div key={idx} className="flex gap-1.5 items-center bg-slate-50 p-2.5 rounded-xl border relative z-10">
@@ -853,7 +838,7 @@
                                                                     e.preventDefault();
                                                                     if (highlightedDropdownIdx >= 0 && highlightedDropdownIdx < filteredMaster.length) {
                                                                         const m = filteredMaster[highlightedDropdownIdx];
-                                                                        const mObj = typeof m === 'object' ? m : { name: m, section: "농산", unit: "kg", price: 0 };
+                                                                        const mObj = typeof m === 'object' && m !== null ? m : { name: m, section: "농산", unit: "kg", price: 0 };
                                                                         handleSelectMasterItem(idx, mObj);
                                                                     }
                                                                 } else if (e.key === 'Escape') {
@@ -866,7 +851,7 @@
                                                     {focusedRowIdx === idx && filteredMaster.length > 0 && (
                                                         <div className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-emerald-500 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto divide-y">
                                                             {filteredMaster.map((m, mIdx) => {
-                                                                const mObj = typeof m === 'object' ? m : { name: m, section: "농산", unit: "kg", price: 0 };
+                                                                const mObj = typeof m === 'object' && m !== null ? m : { name: m, section: "농산", unit: "kg", price: 0, convert: 1 };
                                                                 const isHighlighted = mIdx === highlightedDropdownIdx;
                                                                 return (
                                                                     <div 
@@ -881,7 +866,7 @@
                                                                     >
                                                                         <span className="font-black">{mObj.name}</span>
                                                                         <span className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-bold">
-                                                                            {mObj.section} | {mObj.unit} | {mObj.price ? Number(mObj.price).toLocaleString() + "원" : "단가없음"}
+                                                                            {mObj.section} | {mObj.unit} | 환산:{mObj.convert || 1} | {mObj.price ? Number(mObj.price).toLocaleString() + "원" : "단가없음"}
                                                                         </span>
                                                                     </div>
                                                                 );
@@ -948,7 +933,7 @@
                                         📋 등록된 입고 내역 ({inventoryList.length})
                                     </button>
                                     <button onClick={() => setActiveInvTab("master")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "master" ? "bg-white text-emerald-700 border-b-2 border-emerald-600" : "text-slate-400"}`}>
-                                        ⭐ 품목 마스터 DB ({masterList.length})
+                                        ⭐ 품목 마스터 DB ({Array.isArray(masterList) ? masterList.length : 0})
                                     </button>
                                 </div>
 
@@ -1008,11 +993,11 @@
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y text-xs font-bold">
-                                                {masterList.length === 0 ? (
+                                                {!Array.isArray(masterList) || masterList.length === 0 ? (
                                                     <tr><td colSpan="7" className="p-4 text-center text-slate-400">품목 마스터 데이터가 없습니다.</td></tr>
                                                 ) : (
                                                     masterList.map((m, idx) => {
-                                                        const mObj = typeof m === 'object' ? m : { id: `M-${idx+1}`, section: "-", name: m, spec: "-", unit: "-", price: 0, convert: 1 };
+                                                        const mObj = typeof m === 'object' && m !== null ? m : { id: `M-${idx+1}`, section: "-", name: m, spec: "-", unit: "-", price: 0, convert: 1 };
                                                         return (
                                                             <tr key={idx} className="hover:bg-slate-50">
                                                                 <td className="p-2 text-slate-400 text-[10px]">{mObj.id || `M-${idx+1}`}</td>
