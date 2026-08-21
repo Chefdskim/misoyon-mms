@@ -425,7 +425,6 @@
 
             const handleLogout = () => { setIsAuthenticated(false); setCurrentUser(""); localStorage.removeItem("misoyon_user"); window.location.reload(); };
 
-            // 💡 거래명세서 촬영 및 재고 등록 핸들러
             const handlePhotoAndSave = async (e) => {
                 if (!webAppUrl) return alert("관리자에게 URL 연결 설정을 요청해 주세요.");
                 const file = e.target.files[0];
