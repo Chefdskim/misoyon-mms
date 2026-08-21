@@ -263,7 +263,6 @@
             const [isUploading, setIsUploading] = useState(false);
             const [isLoadingInv, setIsLoadingInv] = useState(false);
             
-            // 품목 검색 드롭다운 포커스 및 방향키 인덱스 state
             const [focusedRowIdx, setFocusedRowIdx] = useState(null);
             const [highlightedDropdownIdx, setHighlightedDropdownIdx] = useState(0);
 
@@ -271,7 +270,6 @@
                 { section: "농산", name: "", inQty: "1", unit: "kg", price: 0 }
             ]);
 
-            // 드롭다운 스크롤 자동 이동을 위한 Ref
             const dropdownItemRefs = useRef({});
 
             useEffect(() => {
@@ -460,7 +458,8 @@
                 
                 const validItems = inputItems.filter(item => item.name.trim() !== "").map(item => ({
                     ...item,
-                    inQty: parseFloat(item.inQty) || 0
+                    inQty: parseFloat(item.inQty) || 0,
+                    price: parseFloat(item.price) || 0
                 }));
                 
                 if (validItems.length === 0 && !imageBase64Data) {
@@ -822,12 +821,10 @@
 
                                         return (
                                             <div key={idx} className="flex gap-1.5 items-center bg-slate-50 p-2.5 rounded-xl border relative z-10">
-                                                {/* 부문 표시 */}
                                                 <div className="w-16 px-1 py-1.5 rounded-lg border text-xs font-black text-center bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
                                                     {item.section || "농산"}
                                                 </div>
 
-                                                {/* 품목명 입력 및 자동 스크롤 연동 드롭다운 */}
                                                 <div className="relative flex-1">
                                                     <input 
                                                         type="text"
@@ -885,7 +882,6 @@
                                                     )}
                                                 </div>
 
-                                                {/* 수량 */}
                                                 <input 
                                                     type="number" 
                                                     step="0.1"
@@ -896,7 +892,6 @@
                                                     onChange={e => handleInputChange(idx, 'inQty', e.target.value)} 
                                                 />
                                                 
-                                                {/* 단위 */}
                                                 <select 
                                                     className="w-16 px-1 py-1.5 rounded-lg border text-xs font-bold outline-none bg-white text-center"
                                                     value={item.unit} 
@@ -913,7 +908,6 @@
                                                     <option value="마리">마리</option>
                                                 </select>
 
-                                                {/* 단가 */}
                                                 <input 
                                                     type="number" 
                                                     className="w-20 px-1 py-1.5 rounded-lg border text-xs font-bold text-right outline-none bg-white focus:border-emerald-500" 
@@ -943,7 +937,7 @@
                             <div className="flex-1 bg-white rounded-2xl border overflow-hidden flex flex-col shadow-sm min-h-[250px]">
                                 <div className="flex border-b bg-slate-50">
                                     <button onClick={() => setActiveInvTab("inventory")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "inventory" ? "bg-white text-emerald-700 border-b-2 border-emerald-600" : "text-slate-400"}`}>
-                                        📋 등록된 입고/재고 내역 ({inventoryList.length})
+                                        📋 등록된 입고 내역 ({inventoryList.length})
                                     </button>
                                     <button onClick={() => setActiveInvTab("master")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "master" ? "bg-white text-emerald-700 border-b-2 border-emerald-600" : "text-slate-400"}`}>
                                         ⭐ 품목 마스터 DB ({masterList.length})
@@ -975,9 +969,9 @@
                                                             <td className="p-2 text-slate-400 text-[10px]">{item.date}</td>
                                                             <td className="p-2 text-slate-600">{item.section}</td>
                                                             <td className="p-2 font-black text-slate-800">{item.name}</td>
-                                                            <td className="p-2 text-center font-black text-emerald-600">{item.inQty} {item.unit}</td>
-                                                            <td className="p-2 text-right text-slate-700">{item.price ? item.price.toLocaleString() + "원" : "-"}</td>
-                                                            <td className="p-2 text-right font-black text-slate-900">{item.supplyPrice || "-"}</td>
+                                                            <td className="p-2 text-center font-black text-emerald-600">{item.inQty}</td>
+                                                            <td className="p-2 text-right text-slate-700">{item.price ? Number(item.price).toLocaleString() + "원" : "-"}</td>
+                                                            <td className="p-2 text-right font-black text-slate-900">{item.supplyPrice ? Number(item.supplyPrice).toLocaleString() + "원" : "-"}</td>
                                                             <td className="p-2 text-center">
                                                                 {item.note && item.note.includes("http") ? (
                                                                     <a href={item.note} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-black text-[10px]">📷 사진</a>
@@ -998,22 +992,20 @@
                                                     <th className="p-2">규격</th>
                                                     <th className="p-2 text-center">단위</th>
                                                     <th className="p-2 text-right">최근단가</th>
-                                                    <th className="p-2 text-center">원산지</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y text-xs font-bold">
                                                 {masterList.length === 0 ? (
-                                                    <tr><td colSpan="7" className="p-4 text-center text-slate-400">품목 마스터 데이터가 없습니다.</td></tr>
+                                                    <tr><td colSpan="6" className="p-4 text-center text-slate-400">품목 마스터 데이터가 없습니다.</td></tr>
                                                 ) : (
                                                     masterList.map((m, idx) => (
                                                         <tr key={idx} className="hover:bg-slate-50">
-                                                            <td className="p-2 text-slate-400 text-[10px]">{typeof m === 'object' ? m.id : `M-${idx+1}`}</td>
-                                                            <td className="p-2 text-slate-600">{typeof m === 'object' ? m.section : "-"}</td>
-                                                            <td className="p-2 font-black text-slate-800">{typeof m === 'object' ? m.name : m}</td>
-                                                            <td className="p-2 text-slate-500 text-[11px]">{typeof m === 'object' ? m.spec : "-"}</td>
-                                                            <td className="p-2 text-center">{typeof m === 'object' ? m.unit : "-"}</td>
-                                                            <td className="p-2 text-right font-black text-emerald-600">{typeof m === 'object' && m.price ? m.price.toLocaleString() + "원" : "-"}</td>
-                                                            <td className="p-2 text-center text-slate-500 text-[11px]">{typeof m === 'object' ? m.origin : "-"}</td>
+                                                            <td className="p-2 text-slate-400 text-[10px]">{m.id || `M-${idx+1}`}</td>
+                                                            <td className="p-2 text-slate-600">{m.section || "-"}</td>
+                                                            <td className="p-2 font-black text-slate-800">{m.name || m}</td>
+                                                            <td className="p-2 text-slate-500 text-[11px]">{m.spec || "-"}</td>
+                                                            <td className="p-2 text-center">{m.unit || "-"}</td>
+                                                            <td className="p-2 text-right font-black text-emerald-600">{m.price ? Number(m.price).toLocaleString() + "원" : "-"}</td>
                                                         </tr>
                                                     ))
                                                 )}
