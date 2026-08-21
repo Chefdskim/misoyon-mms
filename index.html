@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -198,7 +198,6 @@
             const COMMENT_READ_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=918283439&single=true&output=csv";
             const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbxQt7hG7JaH3HBD0ygYNezSlNFEuqLZJAv-22gDCTMET7z2nZs_MarT47Rxq7GlxBxC-Q/exec";
 
-            // 동적 주입된 URL을 최우선 사용하고, 로컬스토리지나 기본값으로 폴백 처리
             const [webAppUrl, setWebAppUrl] = useState(() => {
                 if (SERVER_WEB_APP_URL && !SERVER_WEB_APP_URL.includes("scriptUrl")) return SERVER_WEB_APP_URL;
                 return localStorage.getItem("misoyon_webapp_url") || "https://script.google.com/macros/s/AKfycbz_7KRW_j6AwOWZOdLhTxfeGSCD1gvuHlb0EKUbwPzstN-kHJDI7KB0Qmy_3h9sqmiZGw/exec";
@@ -266,7 +265,8 @@
             const fetchInventoryData = () => {
                 if (!webAppUrl) return;
                 setIsLoadingInv(true);
-                fetch(`${webAppUrl}?t=${new Date().getTime()}`)
+                const separator = webAppUrl.includes('?') ? '&' : '?';
+                fetch(`${webAppUrl}${separator}mode=inventory&t=${new Date().getTime()}`)
                 .then(res => res.json())
                 .then(data => {
                     setIsLoadingInv(false);
@@ -441,6 +441,7 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
                         body: JSON.stringify({
+                            action: 'upload_inventory',
                             imageBase64: base64Data,
                             items: validItems
                         })
@@ -745,8 +746,8 @@
                         <div className="modal-view bg-slate-100">
                             <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl border shadow-sm">
                                 <div>
-                                    <h2 className="text-xl font-black text-emerald-700 italic">📦 명세서 드라이브 보관 및 재고 관리</h2>
-                                    <p className="text-[10px] font-bold text-slate-400">명세서 촬영 시 구글 드라이브 보관 + 시트 자동 입고</p>
+                                    <h2 className="text-xl font-black text-emerald-700 italic">📦 거래명세서 드라이브 보관 및 재고 관리</h2>
+                                    <p className="text-[10px] font-bold text-slate-400">명세서 촬영 시 '2026년8월21일 거래명세서' 형식으로 드라이브 보관 + 시트 자동 입고</p>
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={fetchInventoryData} className="bg-slate-800 text-white px-2.5 py-1.5 rounded-xl text-xs font-black">🔄 새로고침</button>
