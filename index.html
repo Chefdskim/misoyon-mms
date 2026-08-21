@@ -43,28 +43,13 @@
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo } = React;
 
         const SERVER_WEB_APP_URL = "<?= scriptUrl ?>";
 
         const getTodayStr = () => {
             const now = new Date();
-            const y = now.getFullYear();
-            const m = String(now.getMonth() + 1).padStart(2, '0');
-            const d = String(now.getDate()).padStart(2, '0');
-            return `${y}-${m}-${d}`;
-        };
-
-        const normalizeDate = (dStr) => {
-            if (!dStr) return "";
-            const str = String(dStr).trim();
-            let match = str.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
-            if (match) return `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`;
-            match = str.match(/(\d{1,2})[^\d]+(\d{1,2})/);
-            if (match) return `2026-${String(match[1]).padStart(2, '0')}-${String(match[2]).padStart(2, '0')}`;
-            const digits = str.replace(/[^\d]/g, "");
-            if (digits.length === 8) return `${digits.substring(0,4)}-${digits.substring(4,6)}-${digits.substring(6,8)}`;
-            return str;
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         };
 
         const compressImage = (file, maxWidth = 800, quality = 0.6) => {
@@ -74,18 +59,12 @@
                     const img = new Image();
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        let width = img.width;
-                        let height = img.height;
-                        if (width > maxWidth) {
-                            height = Math.round((height * maxWidth) / width);
-                            width = maxWidth;
-                        }
-                        canvas.width = width;
-                        canvas.height = height;
+                        let width = img.width, height = img.height;
+                        if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
+                        canvas.width = width; canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-                        resolve(dataUrl.split(',')[1]);
+                        resolve(canvas.toDataURL('image/jpeg', quality).split(',')[1]);
                     };
                     img.onerror = () => resolve(null);
                     img.src = e.target.result;
@@ -95,114 +74,11 @@
             });
         };
 
-        const getFoodEmoji = (name, category) => {
-            if(!name) return '✨';
-            const n = name.replace(/\s+/g, '');
-            if(n.includes('딸기')) return '🍓';
-            if(n.includes('당근')) return '🥕';
-            if(n.includes('한라봉') || n.includes('귤')) return '🍊';
-            if(n.includes('다래') || n.includes('키위')) return '🥝';
-            if(n.includes('콜리플라워') || n.includes('방울양배추') || n.includes('양배추')) return '🥦';
-            if(n.includes('꼬막') || n.includes('굴') || n.includes('새조개') || n.includes('조개')) return '🦪';
-            if(n.includes('게') || n.includes('대게')) return '🦀';
-            if(n.includes('문어') || n.includes('낙지') || n.includes('호래기') || n.includes('오징어')) return '🐙';
-            if(n.includes('복어') || n.includes('아귀')) return '🐡';
-            if(n.includes('새우')) return '🦐';
-            if(n.includes('가자미') || n.includes('방어') || n.includes('대구') || n.includes('명태') || n.includes('삼치') || n.includes('도미') || n.includes('빙어') || n.includes('과메기')) return '🐟';
-            if(n.includes('우엉') || n.includes('연근') || n.includes('더덕')) return '🥔';
-            if(n.includes('봄동') || n.includes('시금치') || n.includes('파래') || n.includes('매생이') || n.includes('미역')) return '🌿';
-            if(category && category.includes('수산')) return '🐟';
-            if(category && (category.includes('과일') || category.includes('채소'))) return '🥬';
-            return '🍽️';
-        };
-
-        const formatImageUrl = (url) => {
-            if (!url) return "";
-            const match1 = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-            const match2 = url.match(/id=([a-zA-Z0-9_-]+)/);
-            const fileId = match1 ? match1[1] : (match2 ? match2[1] : null);
-            if (fileId) {
-                return `https://lh3.googleusercontent.com/d/${fileId}`;
-            }
-            return url;
-        };
-
-        const findMatchedRecipes = (menuName, recipeMap) => {
-            if (!menuName || menuName === "일정없음" || !recipeMap) return [];
-            const cleanMenu = menuName.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
-            return Object.values(recipeMap).filter(recipe => {
-                if (!recipe.key) return false;
-                const fullKey = recipe.key.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
-                const coreKey = recipe.key.toLowerCase().replace(/\(.*\)/g, "").replace(/[^가-힣a-zA-Z0-9]/g, "");
-                return cleanMenu.includes(fullKey) || (coreKey.length > 1 && cleanMenu.includes(coreKey));
-            });
-        };
-
-        const highlightText = (text, query) => {
-            if (!query || !text || !isNaN(query)) return text;
-            const parts = text.split(new RegExp(`(${query})`, 'gi'));
-            return parts.map((p, i) => p.toLowerCase() === query.toLowerCase() ? <span key={i} className="hl-red">{p}</span> : p);
-        };
-
-        const MenuCard = ({text, type, query, recipeMap, setPopupRecipes, setActiveRecipeIndex, onExpand}) => {
-            const matched = findMatchedRecipes(text, recipeMap);
-            return (
-                <div onClick={() => onExpand && onExpand(type, text)} className={`p-4 rounded-xl border mb-3 transition-all cursor-pointer ${matched.length > 0 ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}>
-                    <div className="text-[10px] font-black text-slate-400 uppercase mb-1 flex justify-between">
-                        <span>{type}</span>
-                        <span className="text-xs text-slate-300">🔍 확대</span>
-                        {matched.length > 0 && <span className="text-blue-500">Found: {matched.length}</span>}
-                    </div>
-                    <div className="text-sm font-black text-slate-700 mb-2 leading-relaxed whitespace-pre-wrap">
-                        {highlightText(text || "일정없음", query)}
-                    </div>
-                    {matched.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-blue-100">
-                            {matched.map((r, idx) => (
-                                <span key={idx} className="recipe-tag" onClick={(e) => { e.stopPropagation(); setPopupRecipes(matched); setActiveRecipeIndex(idx); }}>📖 {r.name}</span>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const WeeklyMenuRow = ({ label, colorClass, text, recipeMap, setPopupRecipes, setActiveRecipeIndex }) => {
-            if(!text) return <div className="flex gap-2 text-sm"><span className={`w-8 font-bold ${colorClass}`}>{label}</span><span className="text-slate-300">-</span></div>;
-            const matched = findMatchedRecipes(text, recipeMap);
-            return (
-                <div className="flex gap-2 text-sm items-start">
-                    <span className={`w-8 font-bold ${colorClass} shrink-0`}>{label}</span>
-                    <div className="flex-1">
-                        <span className="font-bold text-slate-700">{text}</span>
-                        {matched.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                                {matched.map((r, idx) => (
-                                    <span key={idx} className="recipe-tag" onClick={(e) => { e.stopPropagation(); setPopupRecipes(matched); setActiveRecipeIndex(idx); }}>📖 {r.name}</span>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        };
-
         const MiseOnApp = () => {
-            const SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1ipSLhBGgAW1U_RF9Xkez3hUl_Eiklyor-OeQ-DtHV9o/edit?usp=sharing"; 
-            const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
-            const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
-            const RECIPE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQoOE5m6eIgIRn6Pt09QvLjBFIokFX-hk04n1XOTX89eRg-3-eQSgv4QlJjdUyrpsYNtc9Y-q5uqv9n/pub?gid=949808515&single=true&output=csv";
-            const SEASONAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1051704487&single=true&output=csv";
-            const REPORT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=949601099&single=true&output=csv";
-            const COMMENT_READ_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=918283439&single=true&output=csv";
-            const COMMENT_WRITE_URL = "https://script.google.com/macros/s/AKfycbxQt7hG7JaH3HBD0ygYNezSlNFEuqLZJAv-22gDCTMET7z2nZs_MarT47Rxq7GlxBxC-Q/exec";
-
             const [webAppUrl, setWebAppUrl] = useState(() => {
                 if (SERVER_WEB_APP_URL && !SERVER_WEB_APP_URL.includes("scriptUrl")) return SERVER_WEB_APP_URL;
                 return localStorage.getItem("misoyon_webapp_url") || "https://script.google.com/macros/s/AKfycbz_7KRW_j6AwOWZOdLhTxfeGSCD1gvuHlb0EKUbwPzstN-kHJDI7KB0Qmy_3h9sqmiZGw/exec";
             });
-            const [urlSettingModal, setUrlSettingModal] = useState(false);
-            const [inputUrl, setInputUrl] = useState(webAppUrl);
 
             const ADMIN_NAME = "관리자";
             const ADMIN_CODE = "2026";
@@ -212,53 +88,21 @@
             const [inputName, setInputName] = useState("");
             const [inputCode, setInputCode] = useState("");
             const [loginError, setLoginError] = useState("");
-            const [userList, setUserList] = useState([]);
-            
-            const [menus, setMenus] = useState([]);
-            const [selectedDate, setSelectedDate] = useState(null);
-            const [recipeMap, setRecipeMap] = useState({});
-
-            const [comments, setComments] = useState([]);
-            const [newComment, setNewComment] = useState("");
-            const [isSubmitting, setIsSubmitting] = useState(false);
-            const [isRefreshing, setIsRefreshing] = useState(false);
-            const [currentMonth, setCurrentMonth] = useState(new Date());
-
-            const [searchTerm, setSearchTerm] = useState("");
-            const [modalSearch, setModalSearch] = useState("");
-            const [activeModal, setActiveModal] = useState(false);
-
-            const [weeklyModal, setWeeklyModal] = useState(false);
-            const [importantModal, setImportantModal] = useState(false);
-
-            const [popupRecipes, setPopupRecipes] = useState([]);
-            const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
-            const [expandedMenu, setExpandedMenu] = useState(null);
-
-            const [seasonalModal, setSeasonalModal] = useState(false);
-            const [seasonalData, setSeasonalData] = useState([]);
-
-            const [reports, setReports] = useState([]);
-            const [reportModal, setReportModal] = useState(false);
-            const [activeReportTab, setActiveReportTab] = useState('아침');
-            const [isUploadingReport, setIsUploadingReport] = useState(null);
 
             const [inventoryModal, setInventoryModal] = useState(false);
             const [inventoryList, setInventoryList] = useState([]);
+            const [masterList, setMasterList] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
             const [isLoadingInv, setIsLoadingInv] = useState(false);
 
             const [inputItems, setInputItems] = useState([
-                { name: "", inQty: 1 }
+                { name: "", inQty: 1, price: 0 }
             ]);
 
-            const saveWebAppUrl = () => {
-                if (!inputUrl.trim()) return alert("URL을 입력해 주세요.");
-                localStorage.setItem("misoyon_webapp_url", inputUrl.trim());
-                setWebAppUrl(inputUrl.trim());
-                setUrlSettingModal(false);
-                alert("웹앱 URL 연결 저장 완료!");
-            };
+            useEffect(() => {
+                const saved = localStorage.getItem("misoyon_user");
+                if (saved) { setIsAuthenticated(true); setCurrentUser(saved); }
+            }, []);
 
             const fetchInventoryData = () => {
                 if (!webAppUrl) return;
@@ -268,175 +112,21 @@
                 .then(res => res.json())
                 .then(data => {
                     setIsLoadingInv(false);
-                    if (Array.isArray(data)) setInventoryList(data);
+                    if (data.inventory) setInventoryList(data.inventory);
+                    if (data.master) setMasterList(data.master);
                 })
-                .catch(err => {
-                    setIsLoadingInv(false);
-                });
+                .catch(() => setIsLoadingInv(false));
             };
-
-            const fetchData = (forceFresh = false) => {
-                if(forceFresh) setIsRefreshing(true);
-                const getUrl = (url) => forceFresh ? `${url}&t=${new Date().getTime()}` : url;
-
-                Papa.parse(getUrl(USER_URL), { 
-                    download: true, header: false,
-                    complete: (res) => {
-                        const users = [];
-                        if (res && res.data) {
-                            res.data.forEach(row => { if (row.length >= 2 && row[1]) users.push({ name: (row[0]||"").trim(), code: (row[1]||"").trim() }); });
-                        }
-                        setUserList(users);
-                    }
-                });
-
-                Papa.parse(getUrl(MENU_URL), { 
-                    download: true, 
-                    complete: (res) => {
-                        let temp = []; let headers = [];
-                        if (res && res.data) {
-                            res.data.forEach(row => {
-                                const label = (row[0] || "").replace(/\s/g, "");
-                                const vals = row.slice(1);
-                                if (label === "날짜") {
-                                    headers = vals.map(v => normalizeDate(v));
-                                    headers.forEach(d => { if(d) temp.push({ date: d, morning: "", lunch: "", dinner: "", duty: "", packing: "" }); });
-                                } else if (headers.length > 0) {
-                                    vals.forEach((v, i) => {
-                                        if (!headers[i]) return;
-                                        const t = temp.find(m => m.date === headers[i]);
-                                        if (t && v && String(v).trim() !== "") {
-                                            if (label.includes("아침")) t.morning = v;
-                                            else if (label.includes("점심")) t.lunch = v;
-                                            else if (label.includes("저녁")) t.dinner = v;
-                                            else if (label.includes("근무") || label.includes("당직") || label.match(/\d/)) t.duty = t.duty ? t.duty + " / " + v : v;
-                                            else if (label.includes("포장") || label.includes("Takeout")) t.packing = v;
-                                        }
-                                    });
-                                }
-                            });
-                        }
-                        setMenus(temp);
-                        const todayStr = getTodayStr();
-                        setSelectedDate(temp.find(m => m.date === todayStr) || { date: todayStr, morning: "", lunch: "", dinner: "", duty: "", packing: "" });
-                    }
-                });
-
-                Papa.parse(getUrl(RECIPE_URL), {
-                    download: true, complete: (res) => {
-                        const newRecipes = {};
-                        if (res && res.data) {
-                            res.data.forEach(row => {
-                                if (row.length < 2 || !row[0] || row[0].includes("메뉴명") || row[0].includes("Key")) return;
-                                const key = row[0].trim();
-                                const rowString = row.join(" ");
-                                let foundImage = "";
-                                const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
-                                if(urlMatch) { foundImage = urlMatch[0].trim().replace(/["']$/, ""); }
-                                newRecipes[key] = {
-                                    key: key, name: row[1] || key,
-                                    ingredients: row[2] || "", process: row[3] || "",
-                                    tip: row[4] || "", nutrition: row[5] || "",
-                                    image: foundImage
-                                };
-                            });
-                        }
-                        setRecipeMap(newRecipes);
-                    }
-                });
-
-                Papa.parse(getUrl(SEASONAL_URL), {
-                    download: true, complete: (res) => {
-                        const data = [];
-                        if (res && res.data) {
-                            res.data.forEach(row => {
-                                const monthStr = row[0] ? row[0].toString().replace(/[^0-9]/g, '') : '';
-                                const m = parseInt(monthStr);
-                                if(row.length >= 3 && !isNaN(m) && m >= 1 && m <= 12) {
-                                    const rowString = row.join(" ");
-                                    let foundImage = "";
-                                    const urlMatch = rowString.match(/(https?:\/\/[^\s,]+)/);
-                                    if(urlMatch) { foundImage = urlMatch[0].trim().replace(/["']$/, ""); }
-                                    data.push({
-                                        month: m, category: row[1]?.trim() || "기타",
-                                        name: row[2]?.trim() || "", desc: row[3]?.trim() || "",
-                                        pairing: row[4]?.trim() || "", menu: row[5]?.trim() || "",
-                                        image: foundImage
-                                    });
-                                }
-                            });
-                        }
-                        setSeasonalData(data);
-                    }
-                });
-
-                Papa.parse(getUrl(REPORT_URL), {
-                    download: true, complete: (res) => {
-                        const data = [];
-                        if (res && res.data) {
-                            res.data.forEach(row => {
-                                if(row.length >= 5 && row[0] !== "날짜") {
-                                    data.push({
-                                        date: normalizeDate(row[0]),
-                                        type: row[1]?.trim() || "아침",
-                                        beforeImg: row[2]?.trim() || "",
-                                        afterImg: row[3]?.trim() || "",
-                                        content: row[4]?.trim() || "",
-                                        author: row[5]?.trim() || ""
-                                    });
-                                }
-                            });
-                        }
-                        setReports(data);
-                    }
-                });
-
-                Papa.parse(getUrl(COMMENT_READ_URL), {
-                    download: true, complete: (res) => {
-                        const loadedComments = [];
-                        if (res && res.data) {
-                            res.data.forEach(row => {
-                                if(row.length >= 4 && row[0] !== "날짜") {
-                                    const isImportant = row[4] && row[4].trim() !== "";
-                                    loadedComments.push({
-                                        date: normalizeDate(row[0]), name: row[1], content: row[2], time: row[3], important: isImportant
-                                    });
-                                }
-                            });
-                        }
-                        loadedComments.sort((a,b) => new Date(b.date) - new Date(a.date));
-                        setComments(loadedComments);
-                        if(forceFresh) setTimeout(() => setIsRefreshing(false), 500);
-                    }
-                });
-
-                fetchInventoryData();
-            };
-
-            useEffect(() => { if (isAuthenticated) fetchData(); }, [isAuthenticated, webAppUrl]);
-            useEffect(() => { const saved = localStorage.getItem("misoyon_user"); if (saved) { setIsAuthenticated(true); setCurrentUser(saved); } }, []);
-
-            const handleLogin = () => {
-                const foundUser = userList.find(u => u.name === inputName.trim() && u.code === inputCode.trim());
-                if (foundUser) { setIsAuthenticated(true); setCurrentUser(foundUser.name); localStorage.setItem("misoyon_user", foundUser.name); }
-                else if (inputName.trim() === ADMIN_NAME && inputCode.trim() === ADMIN_CODE) { setIsAuthenticated(true); setCurrentUser("관리자"); localStorage.setItem("misoyon_user", "관리자"); }
-                else { setLoginError("이름 또는 코드를 확인하세요."); }
-            };
-
-            const handleLogout = () => { setIsAuthenticated(false); setCurrentUser(""); localStorage.removeItem("misoyon_user"); window.location.reload(); };
 
             const handlePhotoAndSave = async (e) => {
-                if (!webAppUrl) return alert("관리자에게 URL 연결 설정을 요청해 주세요.");
                 const file = e.target.files[0];
                 if (!file) return;
 
                 const validItems = inputItems.filter(item => item.name.trim() !== "");
-
                 setIsUploading(true);
 
                 try {
                     const base64Data = await compressImage(file, 800, 0.6);
-
                     fetch(webAppUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/plain' },
@@ -451,187 +141,42 @@
                         setIsUploading(false);
                         e.target.value = "";
                         if (resData.status === 'success') {
-                            alert("거래명세서 드라이브 보관 및 재고 시트 등록이 완료되었습니다!");
-                            setInputItems([{ name: "", inQty: 1 }]);
-                            if (Array.isArray(resData.inventory)) setInventoryList(resData.inventory);
-                            else fetchInventoryData();
-                        } else {
-                            alert("저장 실패 원인: " + (resData.message || "오류 발생"));
-                        }
-                    })
-                    .catch((err) => {
-                        setIsUploading(false);
-                        e.target.value = "";
-                        alert("전송 중 네트워크 오류가 발생했습니다.");
-                    });
-                } catch(err) { 
-                    setIsUploading(false); 
-                    e.target.value = "";
-                }
-            };
-
-            const handleReportPhotoUpload = async (mealType, imageType, e) => {
-                const file = e.target.files[0];
-                if (!file || !selectedDate) return;
-                setIsUploadingReport(imageType);
-
-                try {
-                    const base64 = await compressImage(file, 800, 0.6);
-                    fetch(webAppUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'text/plain' },
-                        body: JSON.stringify({
-                            action: 'upload_report',
-                            date: selectedDate.date,
-                            reportType: mealType,
-                            imageType: imageType,
-                            imageBase64: base64,
-                            author: currentUser
-                        })
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        setIsUploadingReport(null);
-                        e.target.value = "";
-                        if (data.status === 'success') {
-                            alert("현장 사진이 저장되었습니다!");
-                            fetchData(true);
-                        } else alert("등록 실패: " + (data.message || "오류"));
+                            alert("거래명세서 드라이브 보관 및 [입고 및 재고 관리] 시트 등록이 완료되었습니다!");
+                            setInputItems([{ name: "", inQty: 1, price: 0 }]);
+                            if (resData.inventory) setInventoryList(resData.inventory);
+                            if (resData.master) setMasterList(resData.master);
+                        } else alert("저장 실패: " + (resData.message || "오류"));
                     })
                     .catch(() => {
-                        setIsUploadingReport(null);
+                        setIsUploading(false);
                         e.target.value = "";
-                        alert("전송 중 오류 발생");
+                        alert("네트워크 오류가 발생했습니다.");
                     });
-                } catch (err) { 
-                    setIsUploadingReport(null); 
-                    e.target.value = "";
-                }
+                } catch(err) { setIsUploading(false); e.target.value = ""; }
             };
 
-            const handleUpdateUsedQty = (item, delta) => {
-                const newUsed = Math.max(0, (item.usedQty || 0) + delta);
-                fetch(webAppUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify({ action: 'update_used', rowNum: item.rowNum, usedQty: newUsed })
-                })
-                .then(res => res.json())
-                .then(resData => {
-                    if (resData.status === 'success' && Array.isArray(resData.inventory)) {
-                        setInventoryList(resData.inventory);
-                    }
-                });
-            };
-
-            const handleCommentSubmit = () => {
-                if (!newComment.trim() || !selectedDate) return;
-                setIsSubmitting(true);
-                const prefix = reportModal ? `[보고서/${activeReportTab}] ` : "";
-                const commentData = { date: selectedDate.date, name: currentUser, content: prefix + newComment.trim(), action: 'write' };
-                fetch(COMMENT_WRITE_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(commentData) })
-                .then(() => {
-                    setComments([{ ...commentData, time: new Date().toLocaleString("ko-KR"), important: false }, ...comments]);
-                    setNewComment("");
-                    setIsSubmitting(false);
-                })
-                .catch(() => {
-                    alert("전송 실패.");
-                    setIsSubmitting(false);
-                });
-            };
-
-            const handleToggleImportant = (targetComment) => {
-                if (currentUser !== ADMIN_NAME) return;
-                const updatedComments = comments.map(c => c === targetComment ? { ...c, important: !c.important } : c);
-                setComments(updatedComments);
-                fetch(COMMENT_WRITE_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'toggle', date: targetComment.date, name: targetComment.name, content: targetComment.content }) });
-            };
-
-            const handleAddRow = () => setInputItems([...inputItems, { name: "", inQty: 1 }]);
-            const handleRemoveRow = (index) => setInputItems(inputItems.filter((_, idx) => idx !== index));
-            const handleInputChange = (index, field, value) => {
+            const handleAddRow = () => setInputItems([...inputItems, { name: "", inQty: 1, price: 0 }]);
+            const handleRemoveRow = (idx) => setInputItems(inputItems.filter((_, i) => i !== idx));
+            const handleInputChange = (idx, field, val) => {
                 const updated = [...inputItems];
-                updated[index][field] = value;
+                updated[idx][field] = val;
                 setInputItems(updated);
             };
 
-            const handleExpandMenu = (type, text) => {
-                if(!text) return;
-                setExpandedMenu({ type, text });
+            const handleLogin = () => {
+                if (inputName.trim() === ADMIN_NAME && inputCode.trim() === ADMIN_CODE) {
+                    setIsAuthenticated(true); setCurrentUser("관리자"); localStorage.setItem("misoyon_user", "관리자");
+                } else setLoginError("이름 또는 코드를 확인하세요.");
             };
-
-            const getWeeklyData = () => {
-                if (!selectedDate || !selectedDate.date) return [];
-                try {
-                    const [y, m, d] = selectedDate.date.split('-').map(Number);
-                    const target = new Date(y, m - 1, d);
-                    const day = target.getDay();
-                    const weekData = [];
-                    for(let i=0; i<7; i++) {
-                        const tempDate = new Date(y, m - 1, d - day + i);
-                        const dateStr = normalizeDate(`${tempDate.getFullYear()}-${String(tempDate.getMonth() + 1).padStart(2, '0')}-${String(tempDate.getDate()).padStart(2, '0')}`);
-                        const menu = menus.find(m => m.date === dateStr);
-                        weekData.push({ date: dateStr, dayIdx: i, menu: menu });
-                    }
-                    return weekData;
-                } catch (e) { return []; }
-            };
-
-            const calDays = useMemo(() => {
-                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
-                const firstDay = new Date(year, month, 1).getDay();
-                const lastDate = new Date(year, month + 1, 0).getDate();
-                const days = [];
-                for (let i = 0; i < firstDay; i++) days.push(null);
-                for (let i = 1; i <= lastDate; i++) {
-                    const ds = normalizeDate(`${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`);
-                    days.push({ day: i, dateStr: ds, data: menus.find(m => m.date === ds) });
-                }
-                while (days.length < 42) days.push(null);
-                return days;
-            }, [currentMonth, menus]);
-
-            const currentSearchResults = useMemo(() => {
-                const q = (activeModal ? modalSearch : searchTerm).trim();
-                if (!q) return [];
-                const query = q.toLowerCase().replace(/\s+/g, "");
-                const isMonthSearch = q.endsWith("월") || (!isNaN(q) && parseInt(q) <= 12);
-                return menus.filter(m => {
-                    if (isMonthSearch) return String(new Date(m.date).getMonth() + 1).padStart(2, '0') === q.replace("월","").padStart(2,'0');
-                    return (m.morning + m.lunch + m.dinner + (m.duty||"") + (m.packing||"")).toLowerCase().replace(/\s+/g, "").includes(query);
-                }).sort((a,b) => new Date(b.date) - new Date(a.date));
-            }, [modalSearch, searchTerm, activeModal, menus]);
-
-            const groupedSeasonal = useMemo(() => {
-                const thisMonth = currentMonth.getMonth() + 1;
-                const thisMonthData = seasonalData.filter(d => d.month === thisMonth);
-                return thisMonthData.reduce((acc, item) => {
-                    const cat = item.category || '기타';
-                    if(!acc[cat]) acc[cat] = [];
-                    acc[cat].push(item);
-                    return acc;
-                }, {});
-            }, [seasonalData, currentMonth]);
-
-            const importantComments = comments.filter(c => c.important);
-            const weekDays = ['일','월','화','수','목','금','토'];
-            const yearOptions = Array.from({length: 16}, (_, i) => 2020 + i);
-            const currentRecipe = popupRecipes[activeRecipeIndex];
-            const weeklyData = getWeeklyData();
-            const todayComments = selectedDate ? comments.filter(c => c.date === selectedDate.date) : [];
-            const todayReports = selectedDate ? reports.filter(r => r.date === selectedDate.date) : [];
-            const currentTabReport = todayReports.find(r => r.type === activeReportTab) || { type: activeReportTab, beforeImg: '', afterImg: '', content: '', author: currentUser };
 
             if (!isAuthenticated) {
                 return (
                     <div className="login-screen">
                         <div className="login-box">
                             <h1 className="text-3xl font-black italic tracking-tighter mb-2">Mise-On</h1>
-                            <p className="text-xs text-blue-600 font-bold mb-1 uppercase tracking-widest">Digital Mise-en-place</p>
-                            <p className="text-[10px] text-slate-400 font-bold mb-6">Powered by Chef D.S. Kim</p>
-                            <input type="text" className="login-input" placeholder="이름 (Name)" value={inputName} onChange={e => setInputName(e.target.value)} />
-                            <input type="password" inputMode="numeric" className="login-input" placeholder="비밀번호 (Code)" value={inputCode} onChange={e => setInputCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+                            <p className="text-xs text-blue-600 font-bold mb-6">Smart Kitchen Inventory System</p>
+                            <input type="text" className="login-input" placeholder="이름" value={inputName} onChange={e => setInputName(e.target.value)} />
+                            <input type="password" className="login-input" placeholder="코드" value={inputCode} onChange={e => setInputCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
                             <button onClick={handleLogin} className="login-btn">LOGIN</button>
                             {loginError && <p className="text-red-500 text-xs font-bold mt-3">{loginError}</p>}
                         </div>
@@ -640,150 +185,49 @@
             }
 
             return (
-                <div className="flex flex-col h-full w-full">
-                    <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v2.3</span></h1>
-                                <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => { setInventoryModal(true); fetchInventoryData(); }} className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm hover:bg-emerald-700">📦 재고 관리</button>
-                                
-                                {currentUser === ADMIN_NAME && (
-                                    <>
-                                        <button onClick={() => setUrlSettingModal(true)} className="bg-amber-500 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm">⚙️ URL 연결</button>
-                                        <a href={SHEET_EDIT_URL} target="_blank" rel="noopener noreferrer" className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 font-black text-xs no-underline">📊 원본 시트</a>
-                                    </>
-                                )}
+                <div className="p-4 flex flex-col h-full bg-slate-50">
+                    {/* 품목 마스터 드롭다운 데이터리스트 */}
+                    <datalist id="master-item-list">
+                        {masterList.map((m, idx) => <option key={idx} value={m} />)}
+                    </datalist>
 
-                                <button onClick={handleLogout} className="bg-red-500 text-white px-3 py-1.5 rounded-xl font-black text-xs">OUT</button>
-                            </div>
+                    <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl border shadow-sm">
+                        <div>
+                            <h1 className="text-xl font-black italic text-emerald-700">Mise-On : 재고관리 & 식수 차감 연동</h1>
+                            <p className="text-xs text-slate-400 font-bold">통합 스프레드시트 스마트 자동화 시스템</p>
                         </div>
+                        <button onClick={() => { setInventoryModal(true); fetchInventoryData(); }} className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-black text-sm shadow-md hover:bg-emerald-700">📦 재고 관리 열기</button>
+                    </div>
 
-                        <div className="flex gap-2">
-                            <div className="flex-1 flex items-center justify-center bg-slate-100 px-3 py-2 rounded-xl border font-bold text-sm">
-                                <select className="bg-transparent" value={currentMonth.getFullYear()} onChange={(e)=>setCurrentMonth(new Date(e.target.value, currentMonth.getMonth()))}>{yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}</select>
-                                <span className="mx-1">/</span>
-                                <select className="bg-transparent" value={currentMonth.getMonth() + 1} onChange={(e)=>setCurrentMonth(new Date(currentMonth.getFullYear(), e.target.value - 1))}>{Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}월</option>)}</select>
-                            </div>
-                            <button onClick={() => fetchData(true)} className="bg-slate-800 text-white px-3 py-2 rounded-xl font-black text-xs flex items-center gap-1">
-                                <span className={isRefreshing ? "spin-anim" : ""}>🔄</span> <span>{isRefreshing ? "갱신중" : "갱신"}</span>
-                            </button>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <input className="flex-1 bg-slate-100 px-3 py-2 rounded-xl text-xs font-bold border outline-none" placeholder="검색어를 입력하세요 (예: 제육, 1월)" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} onKeyDown={e=>e.key==='Enter' && (setModalSearch(searchTerm), setActiveModal(true))}/>
-                            <button onClick={()=>{setModalSearch(searchTerm); setActiveModal(true);}} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs">GO</button>
-                        </div>
-                    </header>
-
-                    <main className="flex flex-col lg:flex-row flex-1 overflow-hidden">
-                        <div className="flex-[2] flex flex-col min-h-[55%] lg:min-h-full border-b lg:border-b-0 lg:border-r overflow-hidden">
-                            <div className="calendar-grid">
-                                {weekDays.map(d=><div key={d} className="calendar-header">{d}</div>)}
-                                {calDays.map((d,i)=>(
-                                    <div key={i} className={`calendar-day ${d?.dateStr === selectedDate?.date ? 'selected' : ''}`} onClick={()=>d?.data && setSelectedDate(d.data)}>
-                                        {d && (<><span className={`text-[10px] font-black ${d.data ? 'text-slate-800' : 'text-slate-300'}`}>{d.day}</span>
-                                        {d.data && (<div className="flex flex-col gap-[1px] mt-[1px]">
-                                            {d.data.morning && <div className="menu-text bg-orange-50 text-orange-600">조:{d.data.morning}</div>}
-                                            {d.data.lunch && <div className="menu-text bg-blue-50 text-blue-600">중:{d.data.lunch}</div>}
-                                            {d.data.dinner && <div className="menu-text bg-purple-50 text-purple-600">석:{d.data.dinner}</div>}
-                                        </div>)}</>)}
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="p-2 bg-white border-t space-y-2">
-                                <button onClick={()=>setSeasonalModal(true)} className="w-full bg-green-500 text-white py-3 rounded-xl font-black text-sm shadow-sm hover:bg-green-600 transition-colors flex items-center justify-center gap-2">
-                                    <span>🌿 {currentMonth.getMonth()+1}월의 제철 식재료</span>
-                                    {Object.keys(groupedSeasonal).length > 0 && <span className="bg-white text-green-700 text-xs px-2 py-0.5 rounded-full">{Object.values(groupedSeasonal).flat().length}</span>}
-                                </button>
-                                <button onClick={()=>setImportantModal(true)} className="w-full bg-yellow-400 text-yellow-900 py-3 rounded-xl font-black text-sm shadow-sm hover:bg-yellow-500 transition-colors flex items-center justify-center gap-2">
-                                    <span>⭐ 중요 리뷰 모아보기</span><span className="bg-white text-yellow-800 text-xs px-2 py-0.5 rounded-full">{importantComments.length}</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <aside className="flex-1 bg-white p-4 overflow-y-auto min-h-[45%]">
-                            {selectedDate ? (
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center border-b-2 border-blue-600 pb-1">
-                                        <h2 className="text-xl font-black italic">DAILY MENU</h2>
-                                        <button onClick={()=>setWeeklyModal(true)} className="bg-slate-800 text-white px-3 py-1 rounded-lg text-xs font-bold shadow-lg hover:bg-slate-700 transition-all">📅 주간표 보기</button>
-                                    </div>
-                                    <div className="font-bold text-slate-500 text-sm mb-2">{selectedDate.date}</div>
-
-                                    <button onClick={() => {setReportModal(true); setActiveReportTab('아침');}} className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black text-sm shadow-md hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mb-3">
-                                        <span>📷 현장 보고서 확인 및 촬영 ({todayReports.length}건)</span>
-                                    </button>
-
-                                    {selectedDate.duty && <div className="p-4 rounded-xl border mb-3 bg-slate-50 border-slate-200"><div className="text-[10px] font-black text-slate-400 uppercase mb-1">Schedule</div><div className="text-sm font-black text-slate-800">👨‍🍳 {selectedDate.duty}</div></div>}
-                                    
-                                    <MenuCard text={selectedDate.morning} type="Morning" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
-                                    <MenuCard text={selectedDate.lunch} type="Lunch" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
-                                    <MenuCard text={selectedDate.dinner} type="Dinner" recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
-                                    
-                                    {selectedDate.packing && <div className="p-4 rounded-xl border mb-3 bg-green-50 border-green-200"><div className="text-[10px] font-black text-green-700 uppercase mb-1">Takeout</div><div className="text-sm font-black text-green-900">🎁 {selectedDate.packing}</div></div>}
-
-                                    <div className="mt-8 pt-4 border-t-2 border-slate-100">
-                                        <h3 className="text-sm font-black text-slate-400 uppercase mb-3">💬 오늘의 한마디</h3>
-                                        <div className="space-y-3 mb-4">
-                                            {todayComments.length > 0 ? todayComments.map((c, i) => (
-                                                <div key={i} className={`p-3 rounded-xl border transition-all ${c.important ? 'bg-yellow-50 border-yellow-200 ring-2 ring-yellow-100' : 'bg-slate-50'}`}>
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <div className="flex items-center gap-1">
-                                                            {currentUser === ADMIN_NAME && <input type="checkbox" className="imp-check mr-1" checked={c.important} onChange={()=>handleToggleImportant(c)} />}
-                                                            {c.important && <span className="text-xs">⭐</span>}
-                                                            <span className={`text-xs font-black ${c.important ? 'text-yellow-700' : 'text-blue-600'}`}>{c.name}</span>
-                                                        </div>
-                                                        <span className="text-[10px] text-slate-400">{c.time}</span>
-                                                    </div>
-                                                    <div className={`text-xs font-bold whitespace-pre-wrap ${c.important ? 'text-slate-800' : 'text-slate-700'}`}>{c.content}</div>
-                                                </div>
-                                            )) : <div className="text-center text-xs text-slate-300 py-2">아직 댓글이 없습니다.</div>}
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <input className="flex-1 bg-slate-100 px-3 py-2 rounded-xl text-xs font-bold outline-none border focus:border-blue-500" placeholder="메세지를 입력하세요..." value={newComment} onChange={e=>setNewComment(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleCommentSubmit()} disabled={isSubmitting}/>
-                                            <button onClick={handleCommentSubmit} disabled={isSubmitting} className="bg-slate-800 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-slate-700 disabled:opacity-50">{isSubmitting ? "..." : "전송"}</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : <div className="h-full flex items-center justify-center text-slate-300 font-black">SELECT DATE</div>}
-                        </aside>
-                    </main>
-
-                    {/* 1. 재고 관리 모달 */}
                     {inventoryModal && (
                         <div className="modal-view bg-slate-100">
                             <div className="flex justify-between items-center mb-4 bg-white p-4 rounded-2xl border shadow-sm">
                                 <div>
-                                    <h2 className="text-xl font-black text-emerald-700 italic">📦 거래명세서 드라이브 보관 및 재고 관리</h2>
-                                    <p className="text-[10px] font-bold text-slate-400">사진만 바로 찍어도 드라이브 보관 및 시트 등록이 완료됩니다.</p>
+                                    <h2 className="text-lg font-black text-emerald-700">📦 입고 및 재고 관리 (드롭다운 & 자동등록 지원)</h2>
+                                    <p className="text-xs text-slate-400 font-bold">초성/품목명 입력 시 품목 마스터에서 자동 검색되며, 신규 품목은 마스터에 자동 추가됩니다.</p>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={fetchInventoryData} className="bg-slate-800 text-white px-2.5 py-1.5 rounded-xl text-xs font-black">🔄 새로고침</button>
-                                    <button onClick={() => setInventoryModal(false)} className="text-2xl font-bold text-slate-400 px-2">×</button>
-                                </div>
+                                <button onClick={() => setInventoryModal(false)} className="text-3xl font-bold text-slate-400 px-2">×</button>
                             </div>
 
                             <div className="bg-white p-4 rounded-2xl border shadow-sm mb-4 space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-xs font-black text-slate-700">식재료 품목 입력 (선택사항)</span>
-                                    <button onClick={handleAddRow} className="bg-slate-800 text-white px-2 py-1 rounded-lg text-xs font-black">+ 품목 추가</button>
+                                    <span className="text-xs font-black text-slate-700">식재료 입고 품목 입력 (품목 마스터 연동)</span>
+                                    <button onClick={handleAddRow} className="bg-slate-800 text-white px-2.5 py-1 rounded-lg text-xs font-black">+ 품목 추가</button>
                                 </div>
                                 
                                 <div className="space-y-2">
                                     {inputItems.map((item, idx) => (
                                         <div key={idx} className="flex gap-2 items-center">
-                                            <input className="flex-1 px-3 py-2 rounded-xl border text-xs font-bold outline-none" placeholder="품목명 입력 (비워두어도 사진 등록 가능)" value={item.name} onChange={e => handleInputChange(idx, 'name', e.target.value)} />
-                                            <input type="number" className="w-16 px-2 py-2 rounded-xl border text-xs font-bold text-center outline-none" value={item.inQty} onChange={e => handleInputChange(idx, 'inQty', Number(e.target.value))} />
+                                            <input list="master-item-list" className="flex-1 px-3 py-2 rounded-xl border text-xs font-bold outline-none focus:border-emerald-500" placeholder="품목명 검색/선택 (초성 또는 단어)" value={item.name} onChange={e => handleInputChange(idx, 'name', e.target.value)} />
+                                            <input type="number" className="w-16 px-2 py-2 rounded-xl border text-xs font-bold text-center outline-none" placeholder="수량" value={item.inQty} onChange={e => handleInputChange(idx, 'inQty', Number(e.target.value))} />
+                                            <input type="number" className="w-24 px-2 py-2 rounded-xl border text-xs font-bold text-right outline-none" placeholder="단가(원)" value={item.price} onChange={e => handleInputChange(idx, 'price', Number(e.target.value))} />
                                             <button onClick={() => handleRemoveRow(idx)} className="text-red-500 font-bold px-2">×</button>
                                         </div>
                                     ))}
                                 </div>
 
                                 <label className="block w-full bg-emerald-600 text-white text-center py-3 rounded-xl font-black text-sm cursor-pointer shadow-md hover:bg-emerald-700">
-                                    {isUploading ? "구글 드라이브 및 시트 저장 중..." : "📷 거래명세서 사진 찍고 시트에 바로 저장"}
+                                    {isUploading ? "드라이브 보관 및 시트 저장 중..." : "📷 거래명세서 사진 촬영 및 시트에 자동 저장"}
                                     <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoAndSave} disabled={isUploading} />
                                 </label>
                             </div>
@@ -792,36 +236,32 @@
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b bg-slate-50 text-[11px] font-black text-slate-500">
+                                            <th className="p-2">입고일자</th>
+                                            <th className="p-2">부문</th>
                                             <th className="p-2">품목명</th>
                                             <th className="p-2 text-center">입고량</th>
-                                            <th className="p-2 text-center">사용량</th>
-                                            <th className="p-2 text-center">현재재고</th>
-                                            <th className="p-2 text-right">최근입고일</th>
+                                            <th className="p-2 text-right">단가</th>
+                                            <th className="p-2 text-right">공급가액(자동)</th>
                                             <th className="p-2 text-right">명세서 원본</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y text-xs font-bold">
                                         {isLoadingInv ? (
-                                            <tr><td colSpan="6" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
+                                            <tr><td colSpan="7" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
                                         ) : inventoryList.length === 0 ? (
-                                            <tr><td colSpan="6" className="p-4 text-center text-slate-400">등록된 재고 데이터가 없습니다. 상단에서 명세서 사진을 찍어보세요.</td></tr>
+                                            <tr><td colSpan="7" className="p-4 text-center text-slate-400">등록된 입고 데이터가 없습니다. 명세서 사진을 촬영해 보세요.</td></tr>
                                         ) : (
                                             inventoryList.map((item, idx) => (
                                                 <tr key={idx} className="hover:bg-slate-50">
+                                                    <td className="p-2 text-slate-400 text-[11px]">{item.date}</td>
+                                                    <td className="p-2 text-slate-600">{item.section}</td>
                                                     <td className="p-2 font-black text-slate-800">{item.name}</td>
-                                                    <td className="p-2 text-center font-black text-slate-700">{item.inQty}</td>
-                                                    <td className="p-2 text-center">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <button onClick={() => handleUpdateUsedQty(item, -1)} className="w-5 h-5 bg-slate-200 rounded font-black text-xs">-</button>
-                                                            <span className="w-6 text-center text-indigo-600 font-black">{item.usedQty}</span>
-                                                            <button onClick={() => handleUpdateUsedQty(item, 1)} className="w-5 h-5 bg-slate-200 rounded font-black text-xs">+</button>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-2 text-center font-black text-sm text-emerald-600">{item.currentQty}</td>
-                                                    <td className="p-2 text-right text-[10px] text-slate-400">{item.lastDate}</td>
+                                                    <td className="p-2 text-center font-black text-emerald-600">{item.inQty} {item.unit}</td>
+                                                    <td className="p-2 text-right text-slate-700">{item.price ? item.price.toLocaleString() + "원" : "-"}</td>
+                                                    <td className="p-2 text-right font-black text-slate-900">{item.supplyPrice || "-"}</td>
                                                     <td className="p-2 text-right">
                                                         {item.note && item.note.includes("http") ? (
-                                                            <a href={item.note} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-black text-[10px]">📷 원본 사진</a>
+                                                            <a href={item.note} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-black text-[10px]">📷 사진 원본</a>
                                                         ) : "-"}
                                                     </td>
                                                 </tr>
@@ -829,299 +269,6 @@
                                         )}
                                     </tbody>
                                 </table>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 2. URL 설정 모달 */}
-                    {urlSettingModal && currentUser === ADMIN_NAME && (
-                        <div className="recipe-popup" onClick={() => setUrlSettingModal(false)}>
-                            <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
-                                <h3 className="text-lg font-black text-slate-800">⚙️ 구글 시트 웹앱 URL 등록</h3>
-                                <p className="text-xs text-slate-500 font-bold">새로 배포하신 Apps Script 웹앱 URL을 입력해 주십시오.</p>
-                                <input className="w-full p-3 border rounded-xl text-xs font-bold outline-none" placeholder="https://script.google.com/macros/s/.../exec" value={inputUrl} onChange={e => setInputUrl(e.target.value)} />
-                                <div className="flex gap-2">
-                                    <button onClick={saveWebAppUrl} className="flex-1 bg-blue-600 text-white py-2.5 rounded-xl font-black text-xs">저장 및 연결</button>
-                                    <button onClick={() => setUrlSettingModal(false)} className="px-4 bg-slate-200 text-slate-700 py-2.5 rounded-xl font-black text-xs">취소</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 3. 현장 보고서 모달 */}
-                    {reportModal && (
-                        <div className="modal-view bg-slate-50">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h2 className="text-xl font-black italic text-indigo-600">📷 현장 보고서</h2>
-                                <button onClick={()=>setReportModal(false)} className="text-3xl">×</button>
-                            </div>
-                            <div className="flex gap-2 mb-4 shrink-0">
-                                {['아침', '점심', '저녁'].map(tab => (
-                                    <button key={tab} onClick={() => setActiveReportTab(tab)} className={`flex-1 py-2 rounded-xl text-sm font-black transition-all ${activeReportTab === tab ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-200 text-slate-500 hover:bg-slate-300'}`}>
-                                        {tab === '아침' ? '☀️ 아침' : tab === '점심' ? '🌞 점심' : '🌙 저녁'}
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="flex-1 overflow-y-auto pb-4 space-y-4">
-                                <div className="flex flex-col md:flex-row gap-4">
-                                    <div className="flex-1">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="text-xs font-black text-slate-400">식전 세팅 상태</span>
-                                            <label className="text-[10px] bg-indigo-500 text-white px-2 py-1.5 rounded shadow-sm font-bold cursor-pointer hover:bg-indigo-600">
-                                                {isUploadingReport === 'before' ? "업로드 중..." : "📷 직접 촬영/등록"}
-                                                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleReportPhotoUpload(activeReportTab, 'before', e)} disabled={!!isUploadingReport} />
-                                            </label>
-                                        </div>
-                                        {currentTabReport.beforeImg ? (
-                                            <img src={formatImageUrl(currentTabReport.beforeImg)} alt="식전 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
-                                        ) : (
-                                            <div className="w-full h-48 bg-white border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400 text-center">우측 상단의 카메라 버튼으로<br/>사진을 등록해 주세요.</div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="text-xs font-black text-slate-400">식후 잔반 상태</span>
-                                            <label className="text-[10px] bg-indigo-500 text-white px-2 py-1.5 rounded shadow-sm font-bold cursor-pointer hover:bg-indigo-600">
-                                                {isUploadingReport === 'after' ? "업로드 중..." : "📷 직접 촬영/등록"}
-                                                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleReportPhotoUpload(activeReportTab, 'after', e)} disabled={!!isUploadingReport} />
-                                            </label>
-                                        </div>
-                                        {currentTabReport.afterImg ? (
-                                            <img src={formatImageUrl(currentTabReport.afterImg)} alt="식후 사진" className="w-full h-auto max-h-[400px] object-contain rounded-xl border bg-slate-200 shadow-sm" />
-                                        ) : (
-                                            <div className="w-full h-48 bg-white border-2 border-dashed border-slate-300 rounded-xl flex items-center justify-center text-xs font-bold text-slate-400 text-center">우측 상단의 카메라 버튼으로<br/>사진을 등록해 주세요.</div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {currentTabReport.content && (
-                                    <div className="bg-white p-4 rounded-xl border shadow-sm mt-4">
-                                        <div className="text-xs text-indigo-600 font-black mb-2">보고내용 | 작성자: {currentTabReport.author}</div>
-                                        <div className="text-sm font-bold text-slate-800 whitespace-pre-wrap leading-relaxed">{currentTabReport.content}</div>
-                                    </div>
-                                )}
-
-                                <div className="mt-8 pt-4 border-t-2 border-slate-200">
-                                    <h3 className="text-sm font-black text-slate-400 uppercase mb-3">💬 통합 피드백 및 코멘트</h3>
-                                    <div className="space-y-3 mb-4">
-                                        {todayComments.length > 0 ? todayComments.map((c, i) => (
-                                            <div key={i} className={`p-3 rounded-xl border transition-all ${c.important ? 'bg-yellow-50 border-yellow-200' : 'bg-white'}`}>
-                                                <div className="flex justify-between items-center mb-1">
-                                                    <span className={`text-xs font-black ${c.important ? 'text-yellow-700' : 'text-blue-600'}`}>{c.name}</span>
-                                                    <span className="text-[10px] text-slate-400">{c.time}</span>
-                                                </div>
-                                                <div className="text-xs font-bold text-slate-700 whitespace-pre-wrap">{c.content}</div>
-                                            </div>
-                                        )) : <div className="text-center text-xs text-slate-300 py-4">아직 코멘트가 없습니다.</div>}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <input className="flex-1 bg-white px-3 py-2 rounded-xl text-xs font-bold outline-none border focus:border-indigo-500" placeholder="보고서에 대한 피드백을 남겨주세요..." value={newComment} onChange={e=>setNewComment(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleCommentSubmit()} disabled={isSubmitting}/>
-                                        <button onClick={handleCommentSubmit} disabled={isSubmitting} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-indigo-700 disabled:opacity-50">{isSubmitting ? "..." : "등록"}</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 4. 제철 식재료 모달 */}
-                    {seasonalModal && (
-                        <div className="modal-view">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h2 className="text-xl font-black italic text-green-600">🌿 {currentMonth.getMonth()+1}월의 제철 식재료</h2>
-                                <button onClick={()=>setSeasonalModal(false)} className="text-3xl">×</button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto pb-10 px-1">
-                                {Object.keys(groupedSeasonal).length > 0 ? (
-                                    Object.keys(groupedSeasonal).map(cat => (
-                                        <div key={cat} className="mb-8">
-                                            <div className="flex items-center gap-2 mb-3 border-b-2 border-green-500 pb-1 w-max">
-                                                <span className="text-lg font-black text-green-800">
-                                                    {cat.includes('수산') ? '🐟' : cat.includes('과일') || cat.includes('채소') ? '🥬' : '✨'} {cat}
-                                                </span>
-                                            </div>
-                                            <div className="space-y-3">
-                                                {groupedSeasonal[cat].map((item, i) => (
-                                                    <div key={i} className="bg-white p-4 rounded-xl border border-green-200 shadow-sm relative overflow-hidden flex gap-4">
-                                                        <div className="absolute top-0 left-0 w-1 h-full bg-green-400"></div>
-                                                        {item.image ? (
-                                                            <div className="w-16 h-16 shrink-0 relative rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 cursor-pointer" onClick={() => window.open(item.image, '_blank')}>
-                                                                <img src={formatImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
-                                                            </div>
-                                                        ) : (
-                                                            <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center text-4xl shrink-0 shadow-inner border border-slate-100">
-                                                                {getFoodEmoji(item.name, item.category)}
-                                                            </div>
-                                                        )}
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="font-black text-green-900 text-lg mb-1">{item.name}</div>
-                                                            <div className="text-sm text-slate-700 font-bold leading-relaxed mb-2">{item.desc}</div>
-                                                            <div className="flex flex-col gap-1.5 mt-2">
-                                                                {item.menu && (
-                                                                    <div className="bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 text-xs font-bold text-blue-900 inline-flex items-start gap-2 max-w-full">
-                                                                        <span className="shrink-0">🍳 추천요리:</span>
-                                                                        <span className="break-words whitespace-pre-wrap leading-tight">{item.menu}</span>
-                                                                    </div>
-                                                                )}
-                                                                {item.pairing && (
-                                                                    <div className="bg-orange-50 px-2.5 py-1.5 rounded-lg border border-orange-100 text-xs font-bold text-orange-950 inline-flex items-start gap-2 max-w-full">
-                                                                        <span className="shrink-0 text-orange-600">🤝 찰떡궁합:</span>
-                                                                        <span className="break-words whitespace-pre-wrap leading-tight">{item.pairing}</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="text-center py-10 text-slate-400 font-bold">등록된 제철 재료가 없습니다.</div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 5. 메뉴 확대 모달 */}
-                    {expandedMenu && (
-                        <div className="zoom-popup" onClick={() => setExpandedMenu(null)}>
-                            <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                <div>
-                                    <div className="text-sm font-black text-slate-400 uppercase mb-1">{selectedDate.date}</div>
-                                    <div className="text-3xl font-black italic text-blue-600">{expandedMenu.type}</div>
-                                </div>
-                                <button onClick={() => setExpandedMenu(null)} className="text-4xl text-slate-300">×</button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto flex items-center justify-center">
-                                <div className="text-2xl md:text-4xl font-black text-slate-800 leading-relaxed text-center whitespace-pre-wrap">
-                                    {expandedMenu.text}
-                                </div>
-                            </div>
-                            <div className="text-center text-xs text-slate-400 mt-6 font-bold">화면을 터치하면 닫힙니다</div>
-                        </div>
-                    )}
-
-                    {/* 6. 중요 리뷰 모달 */}
-                    {importantModal && (
-                        <div className="modal-view">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h2 className="text-xl font-black italic text-yellow-600">⭐ IMPORTANT REVIEWS</h2>
-                                <button onClick={()=>setImportantModal(false)} className="text-3xl">×</button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto pb-10 space-y-6">
-                                {importantComments.length > 0 ? importantComments.map((c, i) => {
-                                    const menu = menus.find(m => m.date === c.date);
-                                    return (
-                                        <div key={i} className="bg-white p-4 rounded-xl border-2 border-yellow-200 shadow-md">
-                                            <div className="bg-slate-50 p-3 rounded-lg border mb-3">
-                                                <div className="font-black text-blue-600 mb-2 border-b pb-1">{c.date}</div>
-                                                {menu ? (
-                                                    <div className="text-xs font-bold space-y-1">
-                                                        <div className="flex gap-2"><span className="text-orange-500 w-6">아침</span> <span className="text-slate-600">{menu.morning}</span></div>
-                                                        <div className="flex gap-2"><span className="text-blue-500 w-6">점심</span> <span className="text-slate-600">{menu.lunch}</span></div>
-                                                        <div className="flex gap-2"><span className="text-purple-500 w-6">저녁</span> <span className="text-slate-600">{menu.dinner}</span></div>
-                                                    </div>
-                                                ) : <div className="text-xs text-slate-300">메뉴 정보 없음</div>}
-                                            </div>
-                                            <div className="flex justify-between items-center mb-1 px-1">
-                                                <div className="flex items-center gap-1"><span className="text-xs">⭐</span><span className="text-xs font-black text-yellow-800">{c.name}</span></div>
-                                                <span className="text-[10px] text-slate-400">{c.time}</span>
-                                            </div>
-                                            <div className="text-sm font-bold text-slate-800 bg-yellow-50 p-3 rounded-lg">{c.content}</div>
-                                        </div>
-                                    );
-                                }) : <div className="text-center py-10 text-slate-400 font-bold">중요한 피드백이 없습니다.</div>}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 7. 주간 메뉴표 모달 */}
-                    {weeklyModal && selectedDate && (
-                        <div className="modal-view">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h2 className="text-xl font-black italic">WEEKLY MENU PLAN</h2>
-                                <button onClick={()=>setWeeklyModal(false)} className="text-3xl">×</button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto pb-10">
-                                {weeklyData.map((d, i) => (
-                                    <div key={i} className={`mb-4 p-3 border rounded-xl ${d.date === selectedDate.date ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'bg-slate-50'}`}>
-                                        <div className={`font-black mb-2 flex justify-between ${d.date === selectedDate.date ? 'text-blue-600' : 'text-slate-600'}`}>
-                                            <span>{d.date} ({weekDays[d.dayIdx]})</span>
-                                            {d.date === selectedDate.date && <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded">선택됨</span>}
-                                        </div>
-                                        {d.menu ? (
-                                            <div className="grid grid-cols-1 gap-3">
-                                                <WeeklyMenuRow label="아침" colorClass="text-orange-500" text={d.menu.morning} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} />
-                                                <WeeklyMenuRow label="점심" colorClass="text-blue-500" text={d.menu.lunch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} />
-                                                <WeeklyMenuRow label="저녁" colorClass="text-purple-500" text={d.menu.dinner} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} />
-                                            </div>
-                                        ) : <div className="text-slate-400 text-xs font-bold">등록된 메뉴 없음</div>}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 8. 검색 결과 모달 */}
-                    {activeModal && (
-                        <div className="modal-view">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h2 className="text-xl font-black italic">SEARCH RESULT</h2>
-                                <button onClick={()=>setActiveModal(false)} className="text-3xl">×</button>
-                            </div>
-                            <input className="bg-slate-100 px-4 py-3 rounded-xl w-full font-bold mb-4 border-2 border-blue-500 outline-none" placeholder="검색어..." autoFocus value={modalSearch} onChange={e=>setModalSearch(e.target.value)}/>
-                            <div className="flex-1 overflow-y-auto space-y-4 pb-10">
-                                {currentSearchResults.length > 0 ? currentSearchResults.map((m, i) => (
-                                    <div key={i} className="bg-slate-50 p-4 rounded-xl border">
-                                        <div className="font-black text-blue-600 mb-2">{m.date}</div>
-                                        <MenuCard text={m.morning} type="Morning" query={modalSearch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
-                                        <MenuCard text={m.lunch} type="Lunch" query={modalSearch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
-                                        <MenuCard text={m.dinner} type="Dinner" query={modalSearch} recipeMap={recipeMap} setPopupRecipes={setPopupRecipes} setActiveRecipeIndex={setActiveRecipeIndex} onExpand={handleExpandMenu} />
-                                    </div>
-                                )) : <div className="text-center py-10 text-slate-400 font-bold">결과 없음</div>}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 9. 레시피 팝업 모달 */}
-                    {popupRecipes.length > 0 && currentRecipe && (
-                        <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
-                            <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
-                                <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                    <h3 className="text-xl font-black uppercase italic text-blue-600">Recipe Master</h3>
-                                    <button onClick={() => setPopupRecipes([])} className="text-4xl font-thin">×</button>
-                                </div>
-                                {popupRecipes.length > 1 && (
-                                    <div className="flex overflow-x-auto border-b mb-4 no-scrollbar">
-                                        {popupRecipes.map((r, i) => <div key={i} onClick={() => setActiveRecipeIndex(i)} className={`px-3 py-2 text-xs font-bold border-b-2 cursor-pointer ${i === activeRecipeIndex ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>{r.name}</div>)}
-                                    </div>
-                                )}
-                                <div className="animate-in fade-in zoom-in-95 duration-200">
-                                    <div className="flex gap-4 items-start mb-4">
-                                        <div className="flex-1">
-                                            <div className="bg-blue-600 text-white px-3 py-1 rounded-full inline-block text-xs font-black mb-3 uppercase">{currentRecipe.name}</div>
-                                            <div>
-                                                <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Ingredients</div>
-                                                <div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.ingredients}</div>
-                                            </div>
-                                        </div>
-                                        {currentRecipe.image ? (
-                                            <img src={formatImageUrl(currentRecipe.image)} alt={currentRecipe.name} className="w-24 h-24 object-cover rounded-xl shrink-0 border border-slate-200 shadow-sm bg-slate-100" />
-                                        ) : (
-                                            <div className="w-24 h-24 flex flex-col items-center justify-center rounded-xl shrink-0 border-2 border-dashed border-slate-300 bg-slate-50 p-1 text-center">
-                                                <span className="text-[10px] font-bold text-slate-400 mb-1">사진 없음</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Instructions</div>
-                                            <div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.process}</div>
-                                        </div>
-                                        {currentRecipe.tip && <div className="bg-orange-50 p-3 rounded-xl border border-orange-100 font-bold text-orange-950 text-xs">💡 {currentRecipe.tip}</div>}
-                                        {currentRecipe.nutrition && <div className="bg-teal-50 p-3 rounded-xl border border-teal-100 font-bold text-teal-900 text-xs">📊 {currentRecipe.nutrition}</div>}
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     )}
