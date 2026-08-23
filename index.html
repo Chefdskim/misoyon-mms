@@ -139,15 +139,61 @@
             return "기타";
         };
 
-        const findMatchedRecipes = (menuName, recipeMap) => {
-            if (!menuName || menuName === "일정없음" || !recipeMap) return [];
-            const cleanMenu = menuName.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
-            return Object.values(recipeMap).filter(recipe => {
-                if (!recipe || !recipe.key) return false;
-                const fullKey = recipe.key.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
-                const coreKey = recipe.key.toLowerCase().replace(/\(.*\)/g, "").replace(/[^가-힣a-zA-Z0-9]/g, "");
-                return cleanMenu.includes(fullKey) || (coreKey.length > 1 && cleanMenu.includes(coreKey));
+        // 스마트 부분/양방향 레시피 매칭 함수 (개편됨)
+        const findMatchedRecipes = (menuText, recipeMap) => {
+            if (!menuText || menuText === "일정없음" || !recipeMap) return [];
+            
+            const recipes = Object.values(recipeMap);
+            if (recipes.length === 0) return [];
+
+            const dishItems = menuText.split(/[\/\n,]/).map(s => s.trim()).filter(Boolean);
+            const cleanFullMenu = menuText.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
+
+            const matched = [];
+
+            recipes.forEach(recipe => {
+                if (!recipe) return;
+                const rawKey = String(recipe.key || "").trim();
+                const rawName = String(recipe.name || "").trim();
+                if (!rawKey && !rawName) return;
+
+                const cleanKey = rawKey.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
+                const cleanName = rawName.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
+
+                // 언더바, 대시, 괄호 이전의 순수 핵심 단어 추출
+                const coreKey = rawKey.replace(/\(.*\)/g, "").split(/[_ -]/)[0].toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
+                const coreName = rawName.replace(/\(.*\)/g, "").split(/[_ -]/)[0].toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
+
+                let isMatch = false;
+
+                // 1. 전체 메뉴 문자열에 레시피 Key/Name이 부분 포함되거나 포함하는지 체크
+                if (cleanKey && cleanKey.length >= 2 && (cleanFullMenu.includes(cleanKey) || cleanKey.includes(cleanFullMenu))) isMatch = true;
+                if (!isMatch && coreKey && coreKey.length >= 2 && cleanFullMenu.includes(coreKey)) isMatch = true;
+                if (!isMatch && cleanName && cleanName.length >= 2 && (cleanFullMenu.includes(cleanName) || cleanName.includes(cleanFullMenu))) isMatch = true;
+                if (!isMatch && coreName && coreName.length >= 2 && cleanFullMenu.includes(coreName)) isMatch = true;
+
+                // 2. / 나 줄바꿈으로 구분된 개별 요리명과 비교
+                if (!isMatch) {
+                    for (let item of dishItems) {
+                        const cleanItem = item.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
+                        if (cleanItem.length < 2) continue;
+
+                        if ((cleanKey && (cleanItem.includes(cleanKey) || cleanKey.includes(cleanItem))) ||
+                            (coreKey && (cleanItem.includes(coreKey) || coreKey.includes(cleanItem))) ||
+                            (cleanName && (cleanItem.includes(cleanName) || cleanName.includes(cleanItem))) ||
+                            (coreName && (cleanItem.includes(coreName) || coreName.includes(cleanItem)))) {
+                            isMatch = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (isMatch && !matched.some(m => m.key === recipe.key)) {
+                    matched.push(recipe);
+                }
             });
+
+            return matched;
         };
 
         const highlightText = (text, query) => {
@@ -163,7 +209,7 @@
                     <div className="text-[10px] font-black text-slate-400 uppercase mb-1 flex justify-between">
                         <span>{type}</span>
                         <span className="text-xs text-slate-300">🔍 확대</span>
-                        {matched.length > 0 && <span className="text-blue-500">Found: {matched.length}</span>}
+                        {matched.length > 0 && <span className="text-blue-500 font-bold">📖 레시피 {matched.length}건 연동됨</span>}
                     </div>
                     <div className="text-sm font-black text-slate-700 mb-2 leading-relaxed whitespace-pre-wrap">
                         {highlightText(text || "일정없음", query)}
@@ -171,7 +217,7 @@
                     {matched.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-blue-100">
                             {matched.map((r, idx) => (
-                                <span key={idx} className="recipe-tag" onClick={(e) => { e.stopPropagation(); setPopupRecipes(matched); setActiveRecipeIndex(idx); }}>📖 {r.name}</span>
+                                <span key={idx} className="recipe-tag" onClick={(e) => { e.stopPropagation(); setPopupRecipes(matched); setActiveRecipeIndex(idx); }}>📖 {r.name || r.key}</span>
                             ))}
                         </div>
                     )}
@@ -190,7 +236,7 @@
                         {matched.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                                 {matched.map((r, idx) => (
-                                    <span key={idx} className="recipe-tag" onClick={(e) => { e.stopPropagation(); setPopupRecipes(matched); setActiveRecipeIndex(idx); }}>📖 {r.name}</span>
+                                    <span key={idx} className="recipe-tag" onClick={(e) => { e.stopPropagation(); setPopupRecipes(matched); setActiveRecipeIndex(idx); }}>📖 {r.name || r.key}</span>
                                 ))}
                             </div>
                         )}
@@ -254,7 +300,6 @@
             const [activeReportTab, setActiveReportTab] = useState('아침');
             const [isUploadingReport, setIsUploadingReport] = useState(null);
 
-            // 재고관리 state
             const [inventoryModal, setInventoryModal] = useState(false);
             const [activeInvTab, setActiveInvTab] = useState("inventory");
             const [inventoryList, setInventoryList] = useState([]);
@@ -681,7 +726,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v3.0</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v3.1</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1006,7 +1051,7 @@
                                                 <div className="space-y-3">
                                                     {todayRecipes.map((r, rIdx) => (
                                                         <div key={rIdx} className="bg-slate-50 p-3 rounded-xl border">
-                                                            <div className="font-black text-slate-800 text-sm mb-1">🍳 {r.name}</div>
+                                                            <div className="font-black text-slate-800 text-sm mb-1">🍳 {r.name || r.key}</div>
                                                             <div className="text-xs font-semibold text-slate-600 bg-white p-2.5 rounded-lg border">
                                                                 <span className="text-blue-600 font-black block mb-1">필요 식재료 및 배합비:</span>
                                                                 {r.ingredients}
@@ -1316,13 +1361,13 @@
                                 </div>
                                 {popupRecipes.length > 1 && (
                                     <div className="flex overflow-x-auto border-b mb-4 no-scrollbar">
-                                        {popupRecipes.map((r, i) => <div key={i} onClick={() => setActiveRecipeIndex(i)} className={`px-3 py-2 text-xs font-bold border-b-2 cursor-pointer ${i === activeRecipeIndex ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>{r.name}</div>)}
+                                        {popupRecipes.map((r, i) => <div key={i} onClick={() => setActiveRecipeIndex(i)} className={`px-3 py-2 text-xs font-bold border-b-2 cursor-pointer ${i === activeRecipeIndex ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400'}`}>{r.name || r.key}</div>)}
                                     </div>
                                 )}
                                 <div className="animate-in fade-in zoom-in-95 duration-200">
                                     <div className="flex gap-4 items-start mb-4">
                                         <div className="flex-1">
-                                            <div className="bg-blue-600 text-white px-3 py-1 rounded-full inline-block text-xs font-black mb-3 uppercase">{currentRecipe.name}</div>
+                                            <div className="bg-blue-600 text-white px-3 py-1 rounded-full inline-block text-xs font-black mb-3 uppercase">{currentRecipe.name || currentRecipe.key}</div>
                                             <div>
                                                 <div className="text-[10px] font-black text-slate-400 uppercase mb-1">Ingredients</div>
                                                 <div className="recipe-content bg-slate-50 p-3 rounded-xl border">{currentRecipe.ingredients}</div>
