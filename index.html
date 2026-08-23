@@ -139,55 +139,97 @@
             return "기타";
         };
 
-        // 정밀 제한 레시피 매칭 함수 (오매칭 완전히 차단)
+        // 메뉴명(Key) 및 요리명(Display Name) 기반 정밀 매칭 함수
         const findMatchedRecipes = (menuText, recipeMap) => {
             if (!menuText || menuText === "일정없음" || !recipeMap) return [];
             
             const recipes = Object.values(recipeMap);
             if (recipes.length === 0) return [];
 
-            // 식단표를 / , + 줄바꿈 단위로 정밀 분리
+            // 식단표를 / , + 줄바꿈 단위로 분리 (개별 요리 항목)
             const dishItems = menuText.split(/[\/\n,\+&]/).map(s => s.trim()).filter(Boolean);
             if (dishItems.length === 0) return [];
 
-            const matched = [];
+            const matchedRecipes = [];
 
-            recipes.forEach(recipe => {
-                if (!recipe) return;
-                const rawKey = String(recipe.key || "").trim();
-                const rawName = String(recipe.name || "").trim();
-                if (!rawKey && !rawName) return;
+            dishItems.forEach(dish => {
+                const cleanDish = dish.replace(/[^가-힣a-zA-Z0-9]/g, "").toLowerCase();
+                if (cleanDish.length < 2) return;
 
-                const cleanKey = rawKey.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
-                const cleanName = rawName.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
+                let exactMatches = [];
+                let candidateMatches = [];
 
-                // 특수문자 전 핵심어 (예: "금태이이무시_미소" -> "금태이이무시")
-                const coreKey = rawKey.replace(/\(.*\)/g, "").split(/[_ -]/)[0].toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
-                const coreName = rawName.replace(/\(.*\)/g, "").split(/[_ -]/)[0].toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
+                recipes.forEach(recipe => {
+                    if (!recipe) return;
+                    const rawKey = String(recipe.key || "").trim();
+                    const rawName = String(recipe.name || "").trim();
+                    if (!rawKey && !rawName) return;
 
-                let isMatch = false;
+                    const cleanKey = rawKey.replace(/[^가-힣a-zA-Z0-9]/g, "").toLowerCase();
+                    const cleanName = rawName.replace(/[^가-힣a-zA-Z0-9]/g, "").toLowerCase();
 
-                for (let item of dishItems) {
-                    const cleanItem = item.toLowerCase().replace(/[^가-힣a-zA-Z0-9]/g, "");
-                    if (cleanItem.length < 2) continue; // 1글자 단어 매칭 제외
+                    // 괄호 및 구분자 제거한 순수 단어
+                    const coreKey = rawKey.replace(/\(.*\)/g, "").split(/[_ -]/)[0].replace(/[^가-힣a-zA-Z0-9]/g, "").toLowerCase();
+                    const coreName = rawName.replace(/\(.*\)/g, "").split(/[_ -]/)[0].replace(/[^가-힣a-zA-Z0-9]/g, "").toLowerCase();
 
-                    // 1. 개별 요리명과 레시피 Key/Name이 완전 일치하는 경우
-                    if (cleanKey && cleanItem === cleanKey) { isMatch = true; break; }
-                    if (cleanName && cleanItem === cleanName) { isMatch = true; break; }
-                    if (coreKey && coreKey.length >= 2 && cleanItem === coreKey) { isMatch = true; break; }
-                    if (coreName && coreName.length >= 2 && cleanItem === coreName) { isMatch = true; break; }
+                    // 1. 완전 일치 (Exact Match) - 최우선선택
+                    if ((cleanKey && cleanDish === cleanKey) || 
+                        (cleanName && cleanDish === cleanName) || 
+                        (coreKey && coreKey.length >= 2 && cleanDish === coreKey) || 
+                        (coreName && coreName.length >= 2 && cleanDish === coreName)) {
+                        exactMatches.push(recipe);
+                        return;
+                    }
 
-                    // 2. 레시피 Key/Name이 3글자 이상인 명확한 고유 키인 경우에만 요리명에 포함되는지 확인 (역방향 매칭 제외)
-                    if (cleanKey && cleanKey.length >= 3 && cleanItem.includes(cleanKey)) { isMatch = true; break; }
-                    if (cleanName && cleanName.length >= 3 && cleanItem.includes(cleanName)) { isMatch = true; break; }
-                }
+                    // 2. 부분 일치 점수 계산 (Longest Match / Specificity)
+                    let maxMatchedLen = 0;
 
-                if (isMatch && !matched.some(m => m.key === recipe.key)) {
-                    matched.push(recipe);
+                    [cleanKey, cleanName, coreKey, coreName].forEach(target => {
+                        if (!target || target.length < 2) return;
+                        
+                        // target이 cleanDish에 포함되는 경우
+                        if (cleanDish.includes(target)) {
+                            if (target.length > maxMatchedLen) maxMatchedLen = target.length;
+                        }
+                        // cleanDish가 target에 포함되는 경우
+                        if (target.includes(cleanDish)) {
+                            if (cleanDish.length > maxMatchedLen) maxMatchedLen = cleanDish.length;
+                        }
+                    });
+
+                    if (maxMatchedLen >= 2) {
+                        const ratio = maxMatchedLen / Math.max(cleanDish.length, maxMatchedLen);
+                        candidateMatches.push({ recipe, matchLen: maxMatchedLen, ratio });
+                    }
+                });
+
+                // 매칭 결과 반영
+                if (exactMatches.length > 0) {
+                    // 정확히 일치하는 전용 레시피가 있으면 그것만 선택 (일반 꽃게찜 등 오매칭 배제)
+                    exactMatches.forEach(r => {
+                        if (!matchedRecipes.some(m => m.key === r.key)) {
+                            matchedRecipes.push(r);
+                        }
+                    });
+                } else if (candidateMatches.length > 0) {
+                    // 완전 일치가 없을 때만 매칭 길이가 가장 긴 (가장 구체적인) 레시피선택
+                    candidateMatches.sort((a, b) => b.matchLen - a.matchLen || b.ratio - a.ratio);
+                    
+                    const topMatch = candidateMatches[0];
+                    if (topMatch.ratio >= 0.5 || topMatch.matchLen >= 3) {
+                        const bestLen = topMatch.matchLen;
+                        candidateMatches.forEach(c => {
+                            if (c.matchLen === bestLen && c.ratio >= 0.5) {
+                                if (!matchedRecipes.some(m => m.key === c.recipe.key)) {
+                                    matchedRecipes.push(c.recipe);
+                                }
+                            }
+                        });
+                    }
                 }
             });
 
-            return matched;
+            return matchedRecipes;
         };
 
         const highlightText = (text, query) => {
@@ -720,7 +762,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v3.2</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v3.3</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
                             </div>
                             <div className="flex items-center gap-2">
