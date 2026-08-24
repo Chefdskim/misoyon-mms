@@ -263,7 +263,10 @@
             const [isUploadingReport, setIsUploadingReport] = useState(null);
 
             const [inventoryModal, setInventoryModal] = useState(false);
-            const [activeInvTab, setActiveInvTab] = useState("inventory");
+            const [activeInvTab, setActiveInvTab] = useState("summary"); // summary | history | recipeReq | receipts
+            const [historyFilter, setHistoryFilter] = useState("all"); // all | today | week | month
+            const [showZeroStock, setShowZeroStock] = useState(false);
+
             const [inventoryList, setInventoryList] = useState([]);
             const [receiptList, setReceiptList] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
@@ -689,6 +692,64 @@
                 return findMatchedRecipes(combinedText, recipeMap);
             }, [selectedDate, recipeMap]);
 
+            // 📌 [핵심] 품목별 현재고 요약 계산 (Name 기준 합산)
+            const summaryInventory = useMemo(() => {
+                const map = {};
+                inventoryList.forEach(item => {
+                    const nameKey = (item.name || "").trim();
+                    if (!nameKey) return;
+                    if (!map[nameKey]) {
+                        map[nameKey] = {
+                            section: item.section || "기타",
+                            name: nameKey,
+                            unit: item.unit || "kg",
+                            totalInQty: 0,
+                            totalInvQty: 0,
+                            totalInvAmount: 0,
+                            lastDate: item.date,
+                            latestRowIdx: item.rowIdx
+                        };
+                    }
+                    map[nameKey].totalInQty += (Number(item.inQty) || 0);
+                    map[nameKey].totalInvQty += (Number(item.invQty) || 0);
+                    map[nameKey].totalInvAmount += (Number(item.invAmount) || 0);
+                    if (item.date > map[nameKey].lastDate) {
+                        map[nameKey].lastDate = item.date;
+                        map[nameKey].latestRowIdx = item.rowIdx;
+                    }
+                });
+                let result = Object.values(map);
+                if (!showZeroStock) {
+                    result = result.filter(i => i.totalInvQty > 0);
+                }
+                return result;
+            }, [inventoryList, showZeroStock]);
+
+            // 📌 [핵심] 입고 이력 기간별 필터링
+            const filteredHistoryList = useMemo(() => {
+                if (historyFilter === "all") return inventoryList;
+                const todayStr = getTodayStr();
+                const now = new Date();
+                
+                return inventoryList.filter(item => {
+                    const dStr = normalizeDate(item.date);
+                    if (historyFilter === "today") return dStr === todayStr;
+                    
+                    const itemDate = new Date(dStr);
+                    if (isNaN(itemDate.getTime())) return false;
+
+                    if (historyFilter === "week") {
+                        const diffTime = Math.abs(now - itemDate);
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        return diffDays <= 7;
+                    }
+                    if (historyFilter === "month") {
+                        return itemDate.getFullYear() === now.getFullYear() && itemDate.getMonth() === now.getMonth();
+                    }
+                    return true;
+                });
+            }, [inventoryList, historyFilter]);
+
             if (!isAuthenticated) {
                 return (
                     <div className="login-screen">
@@ -908,66 +969,116 @@
                             </div>
 
                             <div className="flex-1 bg-white rounded-2xl border overflow-hidden flex flex-col shadow-sm min-h-[300px]">
+                                {/* 상단 뷰 구분 탭 */}
                                 <div className="flex border-b bg-slate-50">
-                                    <button onClick={() => setActiveInvTab("inventory")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "inventory" ? "bg-white text-emerald-700 border-b-2 border-emerald-600" : "text-slate-400"}`}>
-                                        📋 등록된 입고 내역 ({inventoryList.length})
+                                    <button onClick={() => setActiveInvTab("summary")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "summary" ? "bg-white text-emerald-700 border-b-2 border-emerald-600" : "text-slate-400"}`}>
+                                        📊 현재고 요약 ({summaryInventory.length}종)
                                     </button>
-                                    <button onClick={() => setActiveInvTab("recipeReq")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "recipeReq" ? "bg-white text-blue-700 border-b-2 border-blue-600" : "text-slate-400"}`}>
-                                        📖 메뉴별 레시피 소요 분석 ({todayRecipes.length})
+                                    <button onClick={() => setActiveInvTab("history")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "history" ? "bg-white text-blue-700 border-b-2 border-blue-600" : "text-slate-400"}`}>
+                                        📜 과거 입고 이력 ({filteredHistoryList.length}건)
                                     </button>
-                                    <button onClick={() => setActiveInvTab("receipts")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "receipts" ? "bg-white text-indigo-700 border-b-2 border-indigo-600" : "text-slate-400"}`}>
+                                    <button onClick={() => setActiveInvTab("recipeReq")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "recipeReq" ? "bg-white text-indigo-700 border-b-2 border-indigo-600" : "text-slate-400"}`}>
+                                        📖 레시피 소요 분석 ({todayRecipes.length})
+                                    </button>
+                                    <button onClick={() => setActiveInvTab("receipts")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "receipts" ? "bg-white text-slate-700 border-b-2 border-slate-600" : "text-slate-400"}`}>
                                         📄 거래명세서 내역 ({receiptList.length})
                                     </button>
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto p-2">
-                                    {activeInvTab === "inventory" ? (
-                                        <table className="w-full text-left border-collapse">
-                                            <thead>
-                                                <tr className="border-b bg-slate-50 text-[10px] font-black text-slate-500">
-                                                    <th className="p-2">입고일자</th>
-                                                    <th className="p-2">부문</th>
-                                                    <th className="p-2">품목명</th>
-                                                    <th className="p-2 text-center">입고량</th>
-                                                    <th className="p-2 text-center">재고량</th>
-                                                    <th className="p-2 text-right">단가</th>
-                                                    <th className="p-2 text-right">공급가액</th>
-                                                    <th className="p-2 text-right">재고금액</th>
-                                                    <th className="p-2">비고/소요이력</th>
-                                                    <th className="p-2 text-center">관리</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y text-xs font-bold">
-                                                {isLoadingInv ? (
-                                                    <tr><td colSpan="10" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
-                                                ) : !Array.isArray(inventoryList) || inventoryList.length === 0 ? (
-                                                    <tr><td colSpan="10" className="p-4 text-center text-slate-400">'입고 및 재고 관리' 시트에 등록된 데이터가 없습니다.</td></tr>
-                                                ) : (
-                                                    inventoryList.map((item, idx) => {
-                                                        const itm = (item && typeof item === 'object') ? item : {};
-                                                        return (
+                                    {/* 1. 현재고 요약 뷰 */}
+                                    {activeInvTab === "summary" ? (
+                                        <div>
+                                            <div className="flex justify-between items-center p-2 bg-slate-50 rounded-xl mb-2 border text-xs font-bold">
+                                                <span className="text-slate-600">품목별로 합산된 실시간 총 재고입니다.</span>
+                                                <label className="flex items-center gap-1 cursor-pointer text-slate-700 font-black">
+                                                    <input type="checkbox" checked={showZeroStock} onChange={e => setShowZeroStock(e.target.checked)} className="accent-emerald-600" />
+                                                    <span>소진 항목(재고 0) 포함 보기</span>
+                                                </label>
+                                            </div>
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="border-b bg-slate-50 text-[10px] font-black text-slate-500">
+                                                        <th className="p-2">부문</th>
+                                                        <th className="p-2">품목명</th>
+                                                        <th className="p-2 text-center">총 입고량</th>
+                                                        <th className="p-2 text-center">현재 잔여 재고</th>
+                                                        <th className="p-2 text-right">총 재고 금액</th>
+                                                        <th className="p-2 text-center">최근 입고일</th>
+                                                        <th className="p-2 text-center">수기 보정</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y text-xs font-bold">
+                                                    {isLoadingInv ? (
+                                                        <tr><td colSpan="7" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
+                                                    ) : summaryInventory.length === 0 ? (
+                                                        <tr><td colSpan="7" className="p-4 text-center text-slate-400">표시할 재고 품목이 없습니다.</td></tr>
+                                                    ) : (
+                                                        summaryInventory.map((item, idx) => (
                                                             <tr key={idx} className="hover:bg-slate-50">
-                                                                <td className="p-2 text-slate-500 font-bold text-[11px]">{itm.date || "-"}</td>
-                                                                <td className="p-2 text-slate-600">{itm.section || "-"}</td>
-                                                                <td className="p-2 font-black text-slate-800">{itm.name || "-"}</td>
-                                                                <td className="p-2 text-center font-black text-emerald-600">{itm.inQty ?? 0} {itm.unit || ''}</td>
-                                                                <td className="p-2 text-center font-black text-blue-600">{itm.invQty ?? 0} {itm.unit || ''}</td>
-                                                                <td className="p-2 text-right text-slate-700">{itm.price ? Number(itm.price).toLocaleString() + "원" : "-"}</td>
-                                                                <td className="p-2 text-right font-black text-slate-900">{typeof itm.supplyPrice === 'number' ? Number(itm.supplyPrice).toLocaleString() + "원" : itm.supplyPrice || "-"}</td>
-                                                                <td className="p-2 text-right font-black text-emerald-800">{typeof itm.invAmount === 'number' ? Number(itm.invAmount).toLocaleString() + "원" : itm.invAmount || "-"}</td>
-                                                                <td className="p-2 text-[10px] text-slate-500 max-w-[150px] truncate">{itm.note || "-"}</td>
+                                                                <td className="p-2 text-slate-600">{item.section}</td>
+                                                                <td className="p-2 font-black text-slate-800">{item.name}</td>
+                                                                <td className="p-2 text-center text-slate-500">{item.totalInQty} {item.unit}</td>
+                                                                <td className={`p-2 text-center font-black ${item.totalInvQty > 0 ? "text-blue-600 text-sm" : "text-red-500"}`}>
+                                                                    {item.totalInvQty} {item.unit}
+                                                                </td>
+                                                                <td className="p-2 text-right font-black text-emerald-800">{Number(item.totalInvAmount).toLocaleString()}원</td>
+                                                                <td className="p-2 text-center text-slate-400 text-[11px]">{item.lastDate}</td>
                                                                 <td className="p-2 text-center">
-                                                                    <div className="flex justify-center gap-1">
-                                                                        <button onClick={() => handleManualQtyUpdate(itm)} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-[10px] font-black hover:bg-slate-300 shrink-0">✏️ 재고 수정</button>
-                                                                        <button onClick={() => handleManualNoteUpdate(itm)} className="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-1 rounded text-[10px] font-black hover:bg-amber-200 shrink-0">📝 비고 작성</button>
-                                                                    </div>
+                                                                    <button onClick={() => handleManualQtyUpdate({ name: item.name, invQty: item.totalInvQty, unit: item.unit, rowIdx: item.latestRowIdx })} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-[10px] font-black hover:bg-slate-300">
+                                                                        ✏️ 보정
+                                                                    </button>
                                                                 </td>
                                                             </tr>
-                                                        );
-                                                    })
-                                                )}
-                                            </tbody>
-                                        </table>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : activeInvTab === "history" ? (
+                                        /* 2. 과거 입고 이력 뷰 (기간별 필터 지원) */
+                                        <div>
+                                            <div className="flex gap-2 mb-2 p-1 bg-slate-100 rounded-xl">
+                                                <button onClick={() => setHistoryFilter("all")} className={`flex-1 py-1.5 rounded-lg text-xs font-black ${historyFilter === "all" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}>전체</button>
+                                                <button onClick={() => setHistoryFilter("today")} className={`flex-1 py-1.5 rounded-lg text-xs font-black ${historyFilter === "today" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}>오늘</button>
+                                                <button onClick={() => setHistoryFilter("week")} className={`flex-1 py-1.5 rounded-lg text-xs font-black ${historyFilter === "week" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}>최근 7일</button>
+                                                <button onClick={() => setHistoryFilter("month")} className={`flex-1 py-1.5 rounded-lg text-xs font-black ${historyFilter === "month" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}>이번 달</button>
+                                            </div>
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="border-b bg-slate-50 text-[10px] font-black text-slate-500">
+                                                        <th className="p-2">입고일자</th>
+                                                        <th className="p-2">부문</th>
+                                                        <th className="p-2">품목명</th>
+                                                        <th className="p-2 text-center">입고량</th>
+                                                        <th className="p-2 text-center">당시재고</th>
+                                                        <th className="p-2 text-right">단가</th>
+                                                        <th className="p-2 text-right">공급가액</th>
+                                                        <th className="p-2">비고/소요이력</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y text-xs font-bold">
+                                                    {isLoadingInv ? (
+                                                        <tr><td colSpan="8" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
+                                                    ) : filteredHistoryList.length === 0 ? (
+                                                        <tr><td colSpan="8" className="p-4 text-center text-slate-400">해당 기간의 입고 기록이 없습니다.</td></tr>
+                                                    ) : (
+                                                        filteredHistoryList.map((item, idx) => (
+                                                            <tr key={idx} className="hover:bg-slate-50">
+                                                                <td className="p-2 text-slate-500 font-bold text-[11px]">{item.date || "-"}</td>
+                                                                <td className="p-2 text-slate-600">{item.section || "-"}</td>
+                                                                <td className="p-2 font-black text-slate-800">{item.name || "-"}</td>
+                                                                <td className="p-2 text-center font-black text-emerald-600">{item.inQty ?? 0} {item.unit || ''}</td>
+                                                                <td className="p-2 text-center font-black text-blue-600">{item.invQty ?? 0} {item.unit || ''}</td>
+                                                                <td className="p-2 text-right text-slate-700">{item.price ? Number(item.price).toLocaleString() + "원" : "-"}</td>
+                                                                <td className="p-2 text-right font-black text-slate-900">{typeof item.supplyPrice === 'number' ? Number(item.supplyPrice).toLocaleString() + "원" : item.supplyPrice || "-"}</td>
+                                                                <td className="p-2 text-[10px] text-slate-500 max-w-[150px] truncate">{item.note || "-"}</td>
+                                                            </tr>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     ) : activeInvTab === "recipeReq" ? (
                                         <div className="p-3 space-y-4">
                                             <div className="bg-blue-50 border border-blue-200 p-3 rounded-xl">
