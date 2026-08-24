@@ -39,8 +39,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // 📌 깃허브 전용 기본 Apps Script API URL
-        const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbz_7KRW_j6AwOWZOdLhTxfeGSCD1gvuHlb0EKUbwPzstN-kHJDI7KB0Qmy_3h9sqmiZGw/exec";
+        const SERVER_WEB_APP_URL = "<?= scriptUrl ?>";
 
         const getTodayStr = () => {
             const now = new Date();
@@ -66,9 +65,9 @@
         const cleanStr = (s) => {
             if (!s) return "";
             return String(s)
-                .replace(/\([^)]*\)/g, "")
-                .replace(/\[[^\]]*\]/g, "")
-                .replace(/[^가-힣a-zA-Z0-9]/g, "")
+                .replace(/\([^)]*\)/g, "")  // 괄호 () 및 내부 문자 제거
+                .replace(/\[[^\]]*\]/g, "") // 대괄호 [] 및 내부 문자 제거
+                .replace(/[^가-힣a-zA-Z0-9]/g, "") // 공백 및 특수문자 제거
                 .toLowerCase();
         };
 
@@ -124,7 +123,7 @@
             const USER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=1190342038&single=true&output=csv";
             const MENU_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSnsej-xGogyedNPYTs2iqEMFKAwIL3tipLoSiDDKxKHot-PITnmxYETDseGckqpb6EMiQm39Sfol0-/pub?gid=0&single=true&output=csv";
 
-            const [webAppUrl, setWebAppUrl] = useState(() => localStorage.getItem("misoyon_webapp_url") || DEFAULT_GAS_URL);
+            const [webAppUrl, setWebAppUrl] = useState(() => localStorage.getItem("misoyon_webapp_url") || SERVER_WEB_APP_URL || "");
             const ADMIN_NAME = "관리자";
             const ADMIN_CODE = "2026";
 
@@ -148,13 +147,16 @@
             const [activeInvTab, setActiveInvTab] = useState("inventory");
             const [inventoryList, setInventoryList] = useState([]);
             const [receiptList, setReceiptList] = useState([]);
+            const [isLoadingInv, setIsLoadingInv] = useState(false);
 
             const fetchInventoryData = () => {
                 if (!webAppUrl) return;
+                setIsLoadingInv(true);
                 const separator = webAppUrl.includes('?') ? '&' : '?';
                 fetch(`${webAppUrl}${separator}mode=inventory&t=${new Date().getTime()}`)
                 .then(res => res.json())
                 .then(data => {
+                    setIsLoadingInv(false);
                     if (data.inventory) setInventoryList(data.inventory);
                     if (data.receipts) setReceiptList(data.receipts);
                     if (data.recipesFromSheet && data.recipesFromSheet.length > 0) {
@@ -166,7 +168,7 @@
                         setRecipeMap(newMap);
                     }
                 })
-                .catch(() => {});
+                .catch(() => setIsLoadingInv(false));
             };
 
             const fetchData = () => {
@@ -216,7 +218,7 @@
             useEffect(() => { if (isAuthenticated) fetchData(); }, [isAuthenticated, webAppUrl]);
             useEffect(() => { const saved = localStorage.getItem("misoyon_user"); if (saved) { setIsAuthenticated(true); setCurrentUser(saved); } }, []);
 
-            // 📌 [핵심] 아침, 점심, 저녁 + 테이크아웃(포장) 메뉴까지 분석 대상 포함
+            // 📌 [핵심] 아침, 점심, 저녁 + 테이크아웃(포장) 메뉴까지 재고 분석 대상 포함
             const todayRecipes = useMemo(() => {
                 if (!selectedDate) return [];
                 const combinedText = `${selectedDate.morning || ""} ${selectedDate.lunch || ""} ${selectedDate.dinner || ""} ${selectedDate.packing || ""}`;
