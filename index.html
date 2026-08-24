@@ -565,9 +565,9 @@
                 });
             };
 
-            // 📌 3. 오늘 메뉴 로스율 12% 적용 수동 차감 실행 버튼
+            // 📌 3. 오늘 메뉴(포장 포함) 로스율 12% 적용 수동 차감 실행 버튼
             const handleTriggerAutoDeduct = () => {
-                if (!confirm("오늘 메뉴(아침, 점심, 저녁, 포장) 소요량에 평균 로스율 12%를 가산하여 즉시 차감하시겠습니까?")) return;
+                if (!confirm("오늘 메뉴(아침, 점심, 저녁, 포장 포함) 소요량에 평균 로스율 12%를 가산하여 즉시 차감하시겠습니까?")) return;
                 fetch(webAppUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain' },
@@ -576,7 +576,7 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        alert("오늘 메뉴 식재료 차감이 로스율(12%) 포함하여 반영되었습니다.");
+                        alert("오늘 메뉴 식재료 및 포장재 차감이 로스율(12%) 포함하여 반영되었습니다.");
                         fetchInventoryData();
                     } else alert("차감 실패: " + (data.message || "오류"));
                 });
@@ -685,7 +685,7 @@
             const todayReports = selectedDate ? reports.filter(r => r.date === selectedDate.date) : [];
             const currentTabReport = todayReports.find(r => r.type === activeReportTab) || { type: activeReportTab, beforeImg: '', afterImg: '', content: '', author: currentUser };
 
-            // 📌 [핵심] 조식, 중식, 석식, 테이크아웃(포장) 메뉴까지 통째로 포함한 레시피 소요 분석
+            // 📌 [핵심] 조식, 중식, 석식, 테이크아웃(포장) 메뉴 레시피 연동
             const todayRecipes = useMemo(() => {
                 if (!selectedDate) return [];
                 const combinedText = `${selectedDate.morning || ""} ${selectedDate.lunch || ""} ${selectedDate.dinner || ""} ${selectedDate.packing || ""}`;
@@ -828,10 +828,10 @@
                             <div className="flex justify-between items-center mb-3 bg-white p-4 rounded-2xl border shadow-sm shrink-0">
                                 <div>
                                     <h2 className="text-lg font-black text-emerald-700 italic">📦 입고 및 재고 관리</h2>
-                                    <p className="text-[10px] font-bold text-slate-400">매일 아침 09:00에 당일 레시피 소요량(로스율 12% 가산)이 시트에 자동 차감됩니다.</p>
+                                    <p className="text-[10px] font-bold text-slate-400">매일 아침 09:00에 포장 포함 당일 레시피 소요량(로스율 12% 가산)이 시트에 자동 차감됩니다.</p>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={handleTriggerAutoDeduct} className="bg-blue-600 text-white px-2.5 py-1.5 rounded-xl text-xs font-black hover:bg-blue-700 shadow-sm">⚡ 오늘 메뉴 차감(로스12%) 즉시 실행</button>
+                                    <button onClick={handleTriggerAutoDeduct} className="bg-blue-600 text-white px-2.5 py-1.5 rounded-xl text-xs font-black hover:bg-blue-700 shadow-sm">⚡ 오늘 메뉴 차감(포장포함/로스12%) 즉시 실행</button>
                                     <button onClick={fetchInventoryData} className="bg-slate-800 text-white px-2.5 py-1.5 rounded-xl text-xs font-black">🔄 새로고침</button>
                                     <button onClick={() => setInventoryModal(false)} className="text-2xl font-bold text-slate-400 px-2">×</button>
                                 </div>
@@ -976,7 +976,7 @@
                                     ) : activeInvTab === "recipeReq" ? (
                                         <div className="p-3 space-y-4">
                                             <div className="bg-blue-50 border border-blue-200 p-3 rounded-xl">
-                                                <div className="text-xs font-black text-blue-800 mb-1">📅 선택된 날짜 ({selectedDate?.date || "날짜 미선택"}) 전체 메뉴 소요 식재료 분석</div>
+                                                <div className="text-xs font-black text-blue-800 mb-1">📅 선택된 날짜 ({selectedDate?.date || "날짜 미선택"}) 전체 메뉴 소요 식재료 및 부자재 분석</div>
                                                 <div className="text-[11px] text-blue-600 font-bold leading-relaxed">
                                                     조식: {selectedDate?.morning || "없음"} / 중식: {selectedDate?.lunch || "없음"} / 석식: {selectedDate?.dinner || "없음"} / 포장: {selectedDate?.packing || "없음"}
                                                 </div>
