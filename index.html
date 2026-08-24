@@ -119,34 +119,20 @@
             return url;
         };
 
-        const autoClassifySection = (name, masterList = []) => {
+        const autoClassifySection = (name) => {
             if (!name || !name.trim()) return "농산";
             const cleanName = name.trim().toLowerCase();
-
-            const matchedMaster = Array.isArray(masterList) ? masterList.find(m => {
-                const mName = (typeof m === 'object' && m !== null ? m.name : m || "").toLowerCase();
-                return mName === cleanName;
-            }) : null;
-            if (matchedMaster && typeof matchedMaster === 'object' && matchedMaster.section) {
-                return matchedMaster.section;
-            }
-
             if (/돼지|소|고기|삼겹|목살|갈비|닭|오리|차돌|양지|등심|안심|돈육|우육|계육|족발|보쌈|베이컨|햄|소시지|한우/.test(cleanName)) return "축산";
             if (/생선|고등어|갈치|오징어|문어|낙지|새우|굴|조개|전복|명태|동태|대구|멸치|다시마|미역|김|게|꽃게|골뱅이|홍합|가자미|광어|연어|바지락|농어|덕자/.test(cleanName)) return "수산";
             if (/간장|된장|고추장|식용유|참기름|굴소스|설탕|소금|미원|식초|당면|국수|파스타|통조림|두부|떡|튀김가루|부침가루|케찹|마요네즈|소스|시럽|케첩/.test(cleanName)) return "가공";
             if (/파|마늘|양파|배추|무|당근|감자|고구마|버섯|상추|깻잎|호박|가지|오이|토마토|고추|콩나물|숙주|사과|배|귤|쌀|부추|시금치|브로콜리|양배추/.test(cleanName)) return "농산";
-
             return "기타";
         };
 
-        // 정밀 범용 레시피 연동 알고리즘
         const findMatchedRecipes = (menuText, recipeMap) => {
             if (!menuText || menuText === "일정없음" || !recipeMap) return [];
-            
             const recipes = Object.values(recipeMap);
             if (recipes.length === 0) return [];
-
-            // 식단표 텍스트를 / \n , + 등 구분자로 개별 요리 항목 분리
             const dishTokens = menuText.split(/[\/\n,\+&]/).map(s => s.trim()).filter(Boolean);
             if (dishTokens.length === 0) return [];
 
@@ -165,11 +151,9 @@
                     if (!recipe) return;
                     const keyNorm = cleanStr(recipe.key);
                     const nameNorm = cleanStr(recipe.name);
-
                     const coreKeyNorm = cleanStr(String(recipe.key || "").replace(/\(.*\)/g, "").split(/[_ -]/)[0]);
                     const coreNameNorm = cleanStr(String(recipe.name || "").replace(/\(.*\)/g, "").split(/[_ -]/)[0]);
 
-                    // 1순위: 완전 일치 (Exact Match)
                     if ((keyNorm && dishNorm === keyNorm) || 
                         (nameNorm && dishNorm === nameNorm) || 
                         (coreKeyNorm && coreKeyNorm.length >= 2 && dishNorm === coreKeyNorm) || 
@@ -178,7 +162,6 @@
                         return;
                     }
 
-                    // 2순위: 부분 일치 (가장 많은 글자가 겹치는 구체적 레시피)
                     [keyNorm, nameNorm, coreKeyNorm, coreNameNorm].forEach(target => {
                         if (!target || target.length < 2) return;
                         if (dishNorm.includes(target) || target.includes(dishNorm)) {
@@ -307,27 +290,13 @@
             const [inventoryModal, setInventoryModal] = useState(false);
             const [activeInvTab, setActiveInvTab] = useState("inventory");
             const [inventoryList, setInventoryList] = useState([]);
-            const [masterList, setMasterList] = useState([]);
+            const [receiptList, setReceiptList] = useState([]);
             const [isUploading, setIsUploading] = useState(false);
             const [isLoadingInv, setIsLoadingInv] = useState(false);
-            
-            const [focusedRowIdx, setFocusedRowIdx] = useState(null);
-            const [highlightedDropdownIdx, setHighlightedDropdownIdx] = useState(0);
 
             const [inputItems, setInputItems] = useState([
                 { section: "농산", name: "", inQty: "1", unit: "kg", price: 0 }
             ]);
-
-            const dropdownItemRefs = useRef({});
-
-            useEffect(() => {
-                if (focusedRowIdx !== null && dropdownItemRefs.current[highlightedDropdownIdx]) {
-                    dropdownItemRefs.current[highlightedDropdownIdx].scrollIntoView({
-                        block: 'nearest',
-                        behavior: 'smooth'
-                    });
-                }
-            }, [highlightedDropdownIdx, focusedRowIdx]);
 
             const saveWebAppUrl = () => {
                 if (!inputUrl.trim()) return alert("URL을 입력해 주세요.");
@@ -346,13 +315,11 @@
                 .then(data => {
                     setIsLoadingInv(false);
                     if (data.inventory) setInventoryList(data.inventory);
-                    if (data.master) setMasterList(data.master);
+                    if (data.receipts) setReceiptList(data.receipts);
                     if (data.recipesFromSheet && data.recipesFromSheet.length > 0) {
                         const newMap = {};
                         data.recipesFromSheet.forEach(r => {
-                            if (r.key) {
-                                newMap[r.key] = r;
-                            }
+                            if (r.key) newMap[r.key] = r;
                         });
                         setRecipeMap(prev => ({ ...prev, ...newMap }));
                     }
@@ -514,7 +481,7 @@
                 .then(resData => {
                     setIsUploading(false);
                     if (resData.status === 'success') {
-                        alert("구글 드라이브 업로드 및 시트 등록 완료!");
+                        alert("구글 드라이브 및 시트 등록 완료!");
                         setInputItems([{ section: "농산", name: "", inQty: "1", unit: "kg", price: 0 }]);
                         fetchInventoryData();
                     } else {
@@ -607,32 +574,9 @@
                 const updated = [...inputItems];
                 updated[index][field] = value;
                 if (field === 'name') {
-                    const cleanName = value.trim().toLowerCase();
-                    const matched = Array.isArray(masterList) ? masterList.find(m => (typeof m === 'object' && m !== null ? m.name : m || "").toLowerCase() === cleanName) : null;
-                    if (matched && typeof matched === 'object') {
-                        updated[index].section = matched.section || autoClassifySection(value, masterList);
-                        updated[index].unit = matched.unit || "kg";
-                        updated[index].price = matched.price || 0;
-                    } else {
-                        updated[index].section = autoClassifySection(value, masterList);
-                    }
-                    setHighlightedDropdownIdx(0);
+                    updated[index].section = autoClassifySection(value);
                 }
                 setInputItems(updated);
-            };
-
-            const handleSelectMasterItem = (rowIdx, masterObj) => {
-                const updated = [...inputItems];
-                updated[rowIdx] = {
-                    section: masterObj.section || autoClassifySection(masterObj.name, masterList),
-                    name: masterObj.name || "",
-                    inQty: updated[rowIdx].inQty || "1",
-                    unit: masterObj.unit || "kg",
-                    price: masterObj.price || 0
-                };
-                setInputItems(updated);
-                setFocusedRowIdx(null);
-                setHighlightedDropdownIdx(0);
             };
 
             const handleExpandMenu = (type, text) => {
@@ -729,11 +673,11 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v3.4</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v3.5</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button onClick={() => { setInventoryModal(true); fetchInventoryData(); }} className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm hover:bg-emerald-700">📦 재고 관리</button>
+                                <button onClick={() => { setInventoryModal(true); fetchInventoryData(); }} className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl font-black text-xs shadow-sm hover:bg-emerald-700">📦 입고 및 재고 관리</button>
                                 
                                 {currentUser === ADMIN_NAME && (
                                     <>
@@ -842,8 +786,8 @@
                         <div className="modal-view bg-slate-100 overflow-y-auto">
                             <div className="flex justify-between items-center mb-3 bg-white p-4 rounded-2xl border shadow-sm shrink-0">
                                 <div>
-                                    <h2 className="text-lg font-black text-emerald-700 italic">📦 식재료 등록 및 입고 관리</h2>
-                                    <p className="text-[10px] font-bold text-slate-400">명세서를 촬영하면 구글 드라이브에 자동 저장되고 사진 링크가 시트에 등록됩니다.</p>
+                                    <h2 className="text-lg font-black text-emerald-700 italic">📦 입고 및 재고 관리</h2>
+                                    <p className="text-[10px] font-bold text-slate-400">명세서를 촬영하면 지정 폴더에 저장되며 '거래명세서 내역' 시트로 자동 연동됩니다.</p>
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={fetchInventoryData} className="bg-slate-800 text-white px-2.5 py-1.5 rounded-xl text-xs font-black">🔄 새로고침</button>
@@ -851,7 +795,7 @@
                                 </div>
                             </div>
 
-                            {/* 식재료 및 명세서 촬영 입력 폼 */}
+                            {/* 식재료 입력 및 촬영 폼 */}
                             <div className="bg-white p-4 rounded-2xl border shadow-sm mb-4 space-y-3 shrink-0">
                                 <div className="flex justify-between items-center border-b pb-2">
                                     <span className="text-xs font-black text-slate-700">식재료 입고 품목 입력</span>
@@ -859,114 +803,59 @@
                                 </div>
                                 
                                 <div className="space-y-3 p-1">
-                                    {inputItems.map((item, idx) => {
-                                        const query = (item.name || "").toLowerCase().trim();
-                                        const filteredMaster = Array.isArray(masterList) ? masterList.filter(m => {
-                                            const mName = (typeof m === 'object' && m !== null ? m.name : m || "").toLowerCase();
-                                            return query && mName.includes(query);
-                                        }).slice(0, 10) : [];
-
-                                        return (
-                                            <div key={idx} className="flex gap-1.5 items-center bg-slate-50 p-2.5 rounded-xl border relative z-10">
-                                                <div className="w-16 px-1 py-1.5 rounded-lg border text-xs font-black text-center bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
-                                                    {item.section || "농산"}
-                                                </div>
-
-                                                <div className="relative flex-1">
-                                                    <input 
-                                                        type="text"
-                                                        className="w-full px-2.5 py-1.5 rounded-lg border text-xs font-bold outline-none focus:border-emerald-500 bg-white" 
-                                                        placeholder="품목명 입력 (단가 자동 연동)" 
-                                                        value={item.name} 
-                                                        onFocus={() => { setFocusedRowIdx(idx); setHighlightedDropdownIdx(0); }}
-                                                        onChange={e => handleInputChange(idx, 'name', e.target.value)} 
-                                                        onKeyDown={e => {
-                                                            if (focusedRowIdx === idx && filteredMaster.length > 0) {
-                                                                if (e.key === 'ArrowDown') {
-                                                                    e.preventDefault();
-                                                                    setHighlightedDropdownIdx(prev => (prev < filteredMaster.length - 1 ? prev + 1 : 0));
-                                                                } else if (e.key === 'ArrowUp') {
-                                                                    e.preventDefault();
-                                                                    setHighlightedDropdownIdx(prev => (prev > 0 ? prev - 1 : filteredMaster.length - 1));
-                                                                } else if (e.key === 'Enter') {
-                                                                    e.preventDefault();
-                                                                    if (highlightedDropdownIdx >= 0 && highlightedDropdownIdx < filteredMaster.length) {
-                                                                        const m = filteredMaster[highlightedDropdownIdx];
-                                                                        const mObj = typeof m === 'object' && m !== null ? m : { name: m, section: "농산", unit: "kg", price: 0 };
-                                                                        handleSelectMasterItem(idx, mObj);
-                                                                    }
-                                                                } else if (e.key === 'Escape') {
-                                                                    setFocusedRowIdx(null);
-                                                                }
-                                                            }
-                                                        }}
-                                                    />
-
-                                                    {focusedRowIdx === idx && filteredMaster.length > 0 && (
-                                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-emerald-500 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto divide-y">
-                                                            {filteredMaster.map((m, mIdx) => {
-                                                                const mObj = typeof m === 'object' && m !== null ? m : { name: m, section: "농산", unit: "kg", price: 0, convert: 1 };
-                                                                const isHighlighted = mIdx === highlightedDropdownIdx;
-                                                                return (
-                                                                    <div 
-                                                                        key={mIdx}
-                                                                        ref={el => dropdownItemRefs.current[mIdx] = el}
-                                                                        className={`p-2.5 text-xs font-bold cursor-pointer flex justify-between items-center transition-colors ${isHighlighted ? 'bg-emerald-100 text-emerald-900 font-black border-l-4 border-emerald-600' : 'hover:bg-emerald-50 text-slate-800'}`}
-                                                                        onMouseDown={(e) => {
-                                                                            e.preventDefault();
-                                                                            handleSelectMasterItem(idx, mObj);
-                                                                        }}
-                                                                        onMouseEnter={() => setHighlightedDropdownIdx(mIdx)}
-                                                                    >
-                                                                        <span className="font-black">{mObj.name}</span>
-                                                                        <span className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-bold">
-                                                                            {mObj.section} | {mObj.unit} | 환산:{mObj.convert || 1} | {mObj.price ? Number(mObj.price).toLocaleString() + "원" : "단가없음"}
-                                                                        </span>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <input 
-                                                    type="number" 
-                                                    step="0.1"
-                                                    min="0"
-                                                    className="w-16 px-1 py-1.5 rounded-lg border text-xs font-bold text-center outline-none bg-white focus:border-emerald-500" 
-                                                    placeholder="수량" 
-                                                    value={item.inQty} 
-                                                    onChange={e => handleInputChange(idx, 'inQty', e.target.value)} 
-                                                />
-                                                
-                                                <select 
-                                                    className="w-16 px-1 py-1.5 rounded-lg border text-xs font-bold outline-none bg-white text-center"
-                                                    value={item.unit} 
-                                                    onChange={e => handleInputChange(idx, 'unit', e.target.value)}
-                                                >
-                                                    <option value="kg">kg</option>
-                                                    <option value="g">g</option>
-                                                    <option value="L">L</option>
-                                                    <option value="ml">ml</option>
-                                                    <option value="개">개</option>
-                                                    <option value="봉">봉</option>
-                                                    <option value="판">판</option>
-                                                    <option value="박스">박스</option>
-                                                    <option value="마리">마리</option>
-                                                </select>
-
-                                                <input 
-                                                    type="number" 
-                                                    className="w-20 px-1 py-1.5 rounded-lg border text-xs font-bold text-right outline-none bg-white focus:border-emerald-500" 
-                                                    placeholder="단가" 
-                                                    value={item.price} 
-                                                    onChange={e => handleInputChange(idx, 'price', e.target.value)} 
-                                                />
-
-                                                <button onClick={() => handleRemoveRow(idx)} className="text-red-500 font-bold px-1 text-sm">×</button>
+                                    {inputItems.map((item, idx) => (
+                                        <div key={idx} className="flex gap-1.5 items-center bg-slate-50 p-2.5 rounded-xl border relative z-10">
+                                            <div className="w-16 px-1 py-1.5 rounded-lg border text-xs font-black text-center bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0">
+                                                {item.section || "농산"}
                                             </div>
-                                        );
-                                    })}
+
+                                            <div className="relative flex-1">
+                                                <input 
+                                                    type="text"
+                                                    className="w-full px-2.5 py-1.5 rounded-lg border text-xs font-bold outline-none focus:border-emerald-500 bg-white" 
+                                                    placeholder="품목명 입력" 
+                                                    value={item.name} 
+                                                    onChange={e => handleInputChange(idx, 'name', e.target.value)} 
+                                                />
+                                            </div>
+
+                                            <input 
+                                                type="number" 
+                                                step="0.1"
+                                                min="0"
+                                                className="w-16 px-1 py-1.5 rounded-lg border text-xs font-bold text-center outline-none bg-white focus:border-emerald-500" 
+                                                placeholder="수량" 
+                                                value={item.inQty} 
+                                                onChange={e => handleInputChange(idx, 'inQty', e.target.value)} 
+                                            />
+                                            
+                                            <select 
+                                                className="w-16 px-1 py-1.5 rounded-lg border text-xs font-bold outline-none bg-white text-center"
+                                                value={item.unit} 
+                                                onChange={e => handleInputChange(idx, 'unit', e.target.value)}
+                                            >
+                                                <option value="kg">kg</option>
+                                                <option value="g">g</option>
+                                                <option value="L">L</option>
+                                                <option value="ml">ml</option>
+                                                <option value="개">개</option>
+                                                <option value="봉">봉</option>
+                                                <option value="판">판</option>
+                                                <option value="박스">박스</option>
+                                                <option value="마리">마리</option>
+                                            </select>
+
+                                            <input 
+                                                type="number" 
+                                                className="w-20 px-1 py-1.5 rounded-lg border text-xs font-bold text-right outline-none bg-white focus:border-emerald-500" 
+                                                placeholder="단가" 
+                                                value={item.price} 
+                                                onChange={e => handleInputChange(idx, 'price', e.target.value)} 
+                                            />
+
+                                            <button onClick={() => handleRemoveRow(idx)} className="text-red-500 font-bold px-1 text-sm">×</button>
+                                        </div>
+                                    ))}
                                 </div>
 
                                 <div className="flex gap-2 pt-1">
@@ -980,7 +869,7 @@
                                 </div>
                             </div>
 
-                            {/* 등록 목록 테이블 */}
+                            {/* 등록 목록 테이블 탭 */}
                             <div className="flex-1 bg-white rounded-2xl border overflow-hidden flex flex-col shadow-sm min-h-[300px]">
                                 <div className="flex border-b bg-slate-50">
                                     <button onClick={() => setActiveInvTab("inventory")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "inventory" ? "bg-white text-emerald-700 border-b-2 border-emerald-600" : "text-slate-400"}`}>
@@ -989,8 +878,8 @@
                                     <button onClick={() => setActiveInvTab("recipeReq")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "recipeReq" ? "bg-white text-blue-700 border-b-2 border-blue-600" : "text-slate-400"}`}>
                                         📖 메뉴별 레시피 소요 분석 ({todayRecipes.length})
                                     </button>
-                                    <button onClick={() => setActiveInvTab("master")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "master" ? "bg-white text-emerald-700 border-b-2 border-emerald-600" : "text-slate-400"}`}>
-                                        ⭐ 품목 마스터 DB ({Array.isArray(masterList) ? masterList.length : 0})
+                                    <button onClick={() => setActiveInvTab("receipts")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "receipts" ? "bg-white text-indigo-700 border-b-2 border-indigo-600" : "text-slate-400"}`}>
+                                        📄 거래명세서 내역 ({receiptList.length})
                                     </button>
                                 </div>
 
@@ -999,7 +888,7 @@
                                         <table className="w-full text-left border-collapse">
                                             <thead>
                                                 <tr className="border-b bg-slate-50 text-[10px] font-black text-slate-500">
-                                                    <th className="p-2">날짜</th>
+                                                    <th className="p-2">입고일자</th>
                                                     <th className="p-2">부문</th>
                                                     <th className="p-2">품목명</th>
                                                     <th className="p-2 text-center">입고량</th>
@@ -1007,32 +896,32 @@
                                                     <th className="p-2 text-right">단가</th>
                                                     <th className="p-2 text-right">공급가액</th>
                                                     <th className="p-2 text-right">재고금액</th>
-                                                    <th className="p-2 text-center">드라이브 사진 링크</th>
+                                                    <th className="p-2 text-center">비고/사진</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y text-xs font-bold">
                                                 {isLoadingInv ? (
                                                     <tr><td colSpan="9" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
                                                 ) : !Array.isArray(inventoryList) || inventoryList.length === 0 ? (
-                                                    <tr><td colSpan="9" className="p-4 text-center text-slate-400">등록된 입고 데이터가 없습니다.</td></tr>
+                                                    <tr><td colSpan="9" className="p-4 text-center text-slate-400">'입고 및 재고 관리' 시트에 등록된 데이터가 없습니다.</td></tr>
                                                 ) : (
                                                     inventoryList.map((item, idx) => {
                                                         const itm = (item && typeof item === 'object') ? item : {};
                                                         const linkUrl = itm.photoUrl || (itm.note && itm.note.includes("http") ? itm.note : null);
                                                         return (
                                                             <tr key={idx} className="hover:bg-slate-50">
-                                                                <td className="p-2 text-slate-400 text-[10px]">{itm.date || "-"}</td>
+                                                                <td className="p-2 text-slate-500 font-bold text-[11px]">{itm.date || "-"}</td>
                                                                 <td className="p-2 text-slate-600">{itm.section || "-"}</td>
                                                                 <td className="p-2 font-black text-slate-800">{itm.name || "-"}</td>
-                                                                <td className="p-2 text-center font-black text-emerald-600">{itm.inQty ?? 0}</td>
-                                                                <td className="p-2 text-center font-black text-blue-600">{itm.invQty ?? 0}</td>
+                                                                <td className="p-2 text-center font-black text-emerald-600">{itm.inQty ?? 0} {itm.unit || ''}</td>
+                                                                <td className="p-2 text-center font-black text-blue-600">{itm.invQty ?? 0} {itm.unit || ''}</td>
                                                                 <td className="p-2 text-right text-slate-700">{itm.price ? Number(itm.price).toLocaleString() + "원" : "-"}</td>
                                                                 <td className="p-2 text-right font-black text-slate-900">{typeof itm.supplyPrice === 'number' ? Number(itm.supplyPrice).toLocaleString() + "원" : itm.supplyPrice || "-"}</td>
                                                                 <td className="p-2 text-right font-black text-emerald-800">{typeof itm.invAmount === 'number' ? Number(itm.invAmount).toLocaleString() + "원" : itm.invAmount || "-"}</td>
                                                                 <td className="p-2 text-center">
                                                                     {linkUrl ? (
                                                                         <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded font-black text-[10px] no-underline hover:bg-blue-100">📷 사진 보기</a>
-                                                                    ) : <span className="text-[10px] text-slate-300">없음</span>}
+                                                                    ) : <span className="text-[10px] text-slate-400">{itm.note || "수기"}</span>}
                                                                 </td>
                                                             </tr>
                                                         );
@@ -1069,30 +958,32 @@
                                         <table className="w-full text-left border-collapse">
                                             <thead>
                                                 <tr className="border-b bg-slate-50 text-[10px] font-black text-slate-500">
-                                                    <th className="p-2">ID</th>
-                                                    <th className="p-2">부문</th>
-                                                    <th className="p-2">품목명</th>
-                                                    <th className="p-2">규격</th>
-                                                    <th className="p-2 text-center">단위</th>
-                                                    <th className="p-2 text-right">최근단가</th>
-                                                    <th className="p-2 text-center">환산계수</th>
+                                                    <th className="p-2">날짜</th>
+                                                    <th className="p-2">명세서 제목</th>
+                                                    <th className="p-2 text-center">드라이브 사진 링크</th>
+                                                    <th className="p-2 text-center">등록 일시</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y text-xs font-bold">
-                                                {!Array.isArray(masterList) || masterList.length === 0 ? (
-                                                    <tr><td colSpan="7" className="p-4 text-center text-slate-400">품목 마스터 데이터가 없습니다.</td></tr>
+                                                {isLoadingInv ? (
+                                                    <tr><td colSpan="4" className="p-4 text-center text-slate-400">데이터 불러오는 중...</td></tr>
+                                                ) : !Array.isArray(receiptList) || receiptList.length === 0 ? (
+                                                    <tr><td colSpan="4" className="p-4 text-center text-slate-400">'거래명세서 내역' 시트에 등록된 데이터가 없습니다.</td></tr>
                                                 ) : (
-                                                    masterList.map((m, idx) => {
-                                                        const mObj = (m && typeof m === 'object') ? m : { id: `M-${idx+1}`, section: "-", name: String(m || ""), spec: "-", unit: "-", price: 0, convert: 1 };
+                                                    receiptList.map((item, idx) => {
+                                                        const itm = (item && typeof item === 'object') ? item : {};
                                                         return (
                                                             <tr key={idx} className="hover:bg-slate-50">
-                                                                <td className="p-2 text-slate-400 text-[10px]">{mObj.id || `M-${idx+1}`}</td>
-                                                                <td className="p-2 text-slate-600">{mObj.section || "-"}</td>
-                                                                <td className="p-2 font-black text-slate-800">{mObj.name || "-"}</td>
-                                                                <td className="p-2 text-slate-500 text-[11px]">{mObj.spec || "-"}</td>
-                                                                <td className="p-2 text-center">{mObj.unit || "-"}</td>
-                                                                <td className="p-2 text-right font-black text-emerald-600">{mObj.price ? Number(mObj.price).toLocaleString() + "원" : "-"}</td>
-                                                                <td className="p-2 text-center font-bold text-blue-600">{mObj.convert || "1"}</td>
+                                                                <td className="p-2 text-slate-500 font-bold text-xs">{itm.date || "-"}</td>
+                                                                <td className="p-2 font-black text-slate-800">{itm.title || "-"}</td>
+                                                                <td className="p-2 text-center">
+                                                                    {itm.photoUrl ? (
+                                                                        <a href={itm.photoUrl} target="_blank" rel="noopener noreferrer" className="bg-indigo-50 text-indigo-600 border border-indigo-200 px-2.5 py-1 rounded-lg font-black text-[11px] no-underline hover:bg-indigo-100 inline-block">
+                                                                            📷 사진 보기
+                                                                        </a>
+                                                                    ) : <span className="text-[10px] text-slate-300">없음</span>}
+                                                                </td>
+                                                                <td className="p-2 text-center text-slate-400 text-[11px]">{itm.createdAt || "-"}</td>
                                                             </tr>
                                                         );
                                                     })
