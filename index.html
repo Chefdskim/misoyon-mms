@@ -129,57 +129,44 @@
             return "기타";
         };
 
-        // 📌 띄어쓰기, 특수문자, 괄호(영문)를 지우는 문자열 정제 함수
-        const cleanName = (str) => {
-            if (!str) return "";
-            return String(str)
-                .replace(/\([^)]*\)/g, "")  
-                .replace(/\[[^\]]*\]/g, "") 
-                .replace(/[^가-힣a-zA-Z0-9]/g, "") 
+        // 📌 괄호() 및 공백/특수문자 정제
+        const cleanStr = (s) => {
+            if (!s) return "";
+            return String(s)
+                .replace(/\([^)]*\)/g, "")  // 괄호 () 및 내용 제거
+                .replace(/\[[^\]]*\]/g, "") // 대괄호 [] 및 내용 제거
+                .replace(/[^가-힣a-zA-Z0-9]/g, "") // 공백 및 특수문자 제거
                 .toLowerCase();
         };
 
-        // 📌 1:1 명확 연결 매칭 함수 (예: 메뉴 '콩나물국밥' <-> 레시피 '전주식 콩나물국밥')
+        // 📌 1:1 오직 완전 일치만 연동하는 함수
         const findMatchedRecipes = (menuText, recipeMap) => {
             if (!menuText || menuText === "일정없음" || !recipeMap) return [];
             const recipes = Object.values(recipeMap);
             if (recipes.length === 0) return [];
 
-            // 메뉴 문자열을 구분자로 분리
             const dishTokens = menuText
                 .split(/[\/\n,\+&\|>:]+/)
-                .map(s => s.replace(/\[.*?\]/g, "").trim())
-                .filter(s => s.length >= 2);
-
-            if (dishTokens.length === 0) return [];
+                .map(s => s.trim())
+                .filter(Boolean);
 
             const matchedRecipes = [];
 
             dishTokens.forEach(dish => {
-                const dishNorm = cleanName(dish);
-                if (!dishNorm || dishNorm.length < 2) return;
+                const dishNorm = cleanStr(dish);
+                if (!dishNorm) return;
 
-                // 1. 메뉴명(Key) 또는 요리명(Name)과 띄어쓰기 제외 1:1 완전 일치
-                let match = recipes.find(recipe => {
+                // 메뉴명/요리명과 1:1 정확히 일치(===) 시에만 연동
+                const exactMatch = recipes.find(recipe => {
                     if (!recipe) return false;
-                    const keyNorm = cleanName(recipe.key);
-                    const nameNorm = cleanName(recipe.name);
+                    const keyNorm = cleanStr(recipe.key);
+                    const nameNorm = cleanStr(recipe.name);
+                    
                     return (keyNorm && dishNorm === keyNorm) || (nameNorm && dishNorm === nameNorm);
                 });
 
-                // 2. 일치가 안 될 경우, 콩나물국밥 <-> 전주식콩나물국밥과 같은 전체 요리명 포함 연동
-                if (!match && dishNorm.length >= 3) {
-                    match = recipes.find(recipe => {
-                        if (!recipe) return false;
-                        const keyNorm = cleanName(recipe.key);
-                        const nameNorm = cleanName(recipe.name);
-                        return (keyNorm && (keyNorm.includes(dishNorm) || dishNorm.includes(keyNorm))) ||
-                               (nameNorm && (nameNorm.includes(dishNorm) || dishNorm.includes(nameNorm)));
-                    });
-                }
-
-                if (match && !matchedRecipes.some(m => m.key === match.key && m.name === match.name)) {
-                    matchedRecipes.push(match);
+                if (exactMatch && !matchedRecipes.some(m => m.key === exactMatch.key)) {
+                    matchedRecipes.push(exactMatch);
                 }
             });
 
