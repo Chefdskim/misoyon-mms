@@ -121,35 +121,34 @@
 
         const autoClassifySection = (name) => {
             if (!name || !name.trim()) return "농산";
-            const cleanName = name.trim().toLowerCase();
-            if (/돼지|소|고기|삼겹|목살|갈비|닭|오리|차돌|양지|등심|안심|돈육|우육|계육|족발|보쌈|베이컨|햄|소시지|한우/.test(cleanName)) return "축산";
-            if (/생선|고등어|갈치|오징어|문어|낙지|새우|굴|조개|전복|명태|동태|대구|멸치|다시마|미역|김|게|꽃게|골뱅이|홍합|가자미|광어|연어|바지락|농어|덕자/.test(cleanName)) return "수산";
-            if (/간장|된장|고추장|식용유|참기름|굴소스|설탕|소금|미원|식초|당면|국수|파스타|통조림|두부|떡|튀김가루|부침가루|케찹|마요네즈|소스|시럽|케첩/.test(cleanName)) return "가공";
-            if (/파|마늘|양파|배추|무|당근|감자|고구마|버섯|상추|깻잎|호박|가지|오이|토마토|고추|콩나물|숙주|사과|배|귤|쌀|부추|시금치|브로콜리|양배추/.test(cleanName)) return "농산";
+            const cleanNameStr = name.trim().toLowerCase();
+            if (/돼지|소|고기|삼겹|목살|갈비|닭|오리|차돌|양지|등심|안심|돈육|우육|계육|족발|보쌈|베이컨|햄|소시지|한우/.test(cleanNameStr)) return "축산";
+            if (/생선|고등어|갈치|오징어|문어|낙지|새우|굴|조개|전복|명태|동태|대구|멸치|다시마|미역|김|게|꽃게|골뱅이|홍합|가자미|광어|연어|바지락|농어|덕자/.test(cleanNameStr)) return "수산";
+            if (/간장|된장|고추장|식용유|참기름|굴소스|설탕|소금|미원|식초|당면|국수|파스타|통조림|두부|떡|튀김가루|부침가루|케찹|마요네즈|소스|시럽|케첩/.test(cleanNameStr)) return "가공";
+            if (/파|마늘|양파|배추|무|당근|감자|고구마|버섯|상추|깻잎|호박|가지|오이|토마토|고추|콩나물|숙주|사과|배|귤|쌀|부추|시금치|브로콜리|양배추/.test(cleanNameStr)) return "농산";
             return "기타";
         };
 
-        // 📌 괄호 및 특수문자를 제거하는 정제 함수
+        // 📌 띄어쓰기, 특수문자, 괄호(영문)를 지우는 문자열 정제 함수
         const cleanName = (str) => {
             if (!str) return "";
             return String(str)
-                .replace(/\([^)]*\)/g, "")  // (영문/원어) 제거
-                .replace(/\[[^\]]*\]/g, "") // [구분] 제거
-                .replace(/\{[^}]*\}/g, "") 
-                .replace(/[^가-힣a-zA-Z0-9]/g, "") // 특수문자, 공백 제거
+                .replace(/\([^)]*\)/g, "")  
+                .replace(/\[[^\]]*\]/g, "") 
+                .replace(/[^가-힣a-zA-Z0-9]/g, "") 
                 .toLowerCase();
         };
 
-        // 📌 엄격 레시피 연동 매칭 함수
+        // 📌 1:1 명확 연결 매칭 함수 (예: 메뉴 '콩나물국밥' <-> 레시피 '전주식 콩나물국밥')
         const findMatchedRecipes = (menuText, recipeMap) => {
             if (!menuText || menuText === "일정없음" || !recipeMap) return [];
             const recipes = Object.values(recipeMap);
             if (recipes.length === 0) return [];
 
-            // 구분 기호(줄바꿈, 쉼표, >>, +, &, /, |)로 메뉴 분리
+            // 메뉴 문자열을 구분자로 분리
             const dishTokens = menuText
                 .split(/[\/\n,\+&\|>:]+/)
-                .map(s => s.replace(/\[.*?\]/g, "").trim()) // [후식] 같은 머리말 정제
+                .map(s => s.replace(/\[.*?\]/g, "").trim())
                 .filter(s => s.length >= 2);
 
             if (dishTokens.length === 0) return [];
@@ -160,26 +159,27 @@
                 const dishNorm = cleanName(dish);
                 if (!dishNorm || dishNorm.length < 2) return;
 
-                // 1:1 완벽 매칭 검증
-                let exactMatch = recipes.find(recipe => {
+                // 1. 메뉴명(Key) 또는 요리명(Name)과 띄어쓰기 제외 1:1 완전 일치
+                let match = recipes.find(recipe => {
                     if (!recipe) return false;
                     const keyNorm = cleanName(recipe.key);
                     const nameNorm = cleanName(recipe.name);
                     return (keyNorm && dishNorm === keyNorm) || (nameNorm && dishNorm === nameNorm);
                 });
 
-                // 1:1 매칭이 없고, 요리명이 전체 완성형 명칭인 경우 (예: 메뉴'콩나물국밥' ➔ 요리명 '전주식콩나물국밥')
-                if (!exactMatch && dishNorm.length >= 4) {
-                    exactMatch = recipes.find(recipe => {
+                // 2. 일치가 안 될 경우, 콩나물국밥 <-> 전주식콩나물국밥과 같은 전체 요리명 포함 연동
+                if (!match && dishNorm.length >= 3) {
+                    match = recipes.find(recipe => {
                         if (!recipe) return false;
                         const keyNorm = cleanName(recipe.key);
                         const nameNorm = cleanName(recipe.name);
-                        return (keyNorm && keyNorm.includes(dishNorm)) || (nameNorm && nameNorm.includes(dishNorm));
+                        return (keyNorm && (keyNorm.includes(dishNorm) || dishNorm.includes(keyNorm))) ||
+                               (nameNorm && (nameNorm.includes(dishNorm) || dishNorm.includes(nameNorm)));
                     });
                 }
 
-                if (exactMatch && !matchedRecipes.some(m => m.key === exactMatch.key)) {
-                    matchedRecipes.push(exactMatch);
+                if (match && !matchedRecipes.some(m => m.key === match.key && m.name === match.name)) {
+                    matchedRecipes.push(match);
                 }
             });
 
@@ -323,6 +323,7 @@
                         const newMap = {};
                         data.recipesFromSheet.forEach(r => {
                             if (r.key) newMap[r.key] = r;
+                            if (r.name && r.name !== r.key) newMap[r.name] = r;
                         });
                         setRecipeMap(prev => ({ ...prev, ...newMap }));
                     }
