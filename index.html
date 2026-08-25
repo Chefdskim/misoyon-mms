@@ -24,7 +24,6 @@
         
         .modal-view { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
-        .zoom-popup { position: fixed; inset: 0; background: rgba(255,255,255,0.95); z-index: 1500; display: flex; flex-direction: column; padding: 20px; animation: zoomIn 0.2s ease-out; }
         .recipe-tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; margin-right: 4px; margin-top: 4px; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; }
         .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
@@ -33,6 +32,7 @@
         .login-box { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); width: 100%; max-width: 320px; text-align: center; }
         .login-input { width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 16px; text-align: center; margin-bottom: 12px; outline: none; transition: all 0.2s; font-weight: 700; }
         .login-btn { width: 100%; background: #3b82f6; color: white; padding: 12px; border-radius: 12px; font-weight: 900; font-size: 14px; margin-top: 4px; }
+        .login-btn:disabled { background: #94a3b8; cursor: not-allowed; }
         .imp-check { width: 18px; height: 18px; accent-color: #f59e0b; cursor: pointer; }
         .spin-anim { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -46,6 +46,11 @@
         const { useState, useEffect, useMemo } = React;
 
         const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbz_7KRW_j6AwOWZOdLhTxfeGSCD1gvuHlb0EKUbwPzstN-kHJDI7KB0Qmy_3h9sqmiZGw/exec";
+
+        // 기본 백업 사용자 목록 (관리자만 탑재)
+        const DEFAULT_USERS = [
+            { name: "관리자", code: "2026" }
+        ];
 
         const getTodayStr = () => {
             const now = new Date();
@@ -61,7 +66,7 @@
             let match = str.match(/(\d{4})[^\d]+(\d{1,2})[^\d]+(\d{1,2})/);
             if (match) return `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`;
             match = str.match(/(\d{1,2})[^\d]+(\d{1,2})/);
-            if (match) return `2026-${String(match[1]).padStart(2, '0')}-${String(match[2]).padStart(2, '0')}`;
+            if (match) return `2026-${String(match[1]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`;
             const digits = str.replace(/[^\d]/g, "");
             if (digits.length === 8) return `${digits.substring(0,4)}-${digits.substring(4,6)}-${digits.substring(6,8)}`;
             return str;
@@ -87,23 +92,6 @@
                 reader.onerror = () => resolve(null);
                 reader.readAsDataURL(file);
             });
-        };
-
-        const getFoodEmoji = (name, category) => {
-            if(!name) return '✨';
-            const n = name.replace(/\s+/g, '');
-            if(n.includes('딸기')) return '🍓';
-            if(n.includes('당근')) return '🥕';
-            if(n.includes('한라봉') || n.includes('귤')) return '🍊';
-            if(n.includes('키위')) return '🥝';
-            if(n.includes('양배추') || n.includes('브로콜리')) return '🥦';
-            if(n.includes('게') || n.includes('꽃게')) return '🦀';
-            if(n.includes('오징어') || n.includes('문어') || n.includes('낙지')) return '🐙';
-            if(n.includes('새우')) return '🦐';
-            if(n.includes('생선') || n.includes('갈치') || n.includes('고등어') || n.includes('가자미')) return '🐟';
-            if(category && category.includes('수산')) return '🐟';
-            if(category && (category.includes('과일') || category.includes('채소'))) return '🥬';
-            return '🍽️';
         };
 
         const formatImageUrl = (url) => {
@@ -231,7 +219,8 @@
             const [inputName, setInputName] = useState("");
             const [inputCode, setInputCode] = useState("");
             const [loginError, setLoginError] = useState("");
-            const [userList, setUserList] = useState([]);
+            const [isLoggingIn, setIsLoggingIn] = useState(false);
+            const [userList, setUserList] = useState(DEFAULT_USERS);
             
             const [menus, setMenus] = useState([]);
             const [selectedDate, setSelectedDate] = useState(null);
@@ -263,8 +252,8 @@
             const [isUploadingReport, setIsUploadingReport] = useState(null);
 
             const [inventoryModal, setInventoryModal] = useState(false);
-            const [activeInvTab, setActiveInvTab] = useState("summary"); // summary | history | recipeReq | receipts
-            const [historyFilter, setHistoryFilter] = useState("all"); // all | today | week | month
+            const [activeInvTab, setActiveInvTab] = useState("summary");
+            const [historyFilter, setHistoryFilter] = useState("all");
             const [showZeroStock, setShowZeroStock] = useState(false);
 
             const [inventoryList, setInventoryList] = useState([]);
@@ -275,6 +264,24 @@
             const [inputItems, setInputItems] = useState([
                 { section: "농산", name: "", inQty: "1", unit: "kg", price: 0 }
             ]);
+
+            // 앱 로드 시 구글 시트 사용자 목록 사전 조회
+            useEffect(() => {
+                Papa.parse(`${USER_URL}&t=${new Date().getTime()}`, {
+                    download: true, header: false,
+                    complete: (res) => {
+                        const users = [];
+                        if (res?.data) {
+                            res.data.forEach(row => { 
+                                if (row.length >= 2 && row[1]) {
+                                    users.push({ name: (row[0]||"").trim(), code: (row[1]||"").trim() });
+                                }
+                            });
+                        }
+                        if (users.length > 0) setUserList(users);
+                    }
+                });
+            }, []);
 
             const saveWebAppUrl = () => {
                 if (!inputUrl.trim()) return alert("URL을 입력해 주세요.");
@@ -315,7 +322,7 @@
                     complete: (res) => {
                         const users = [];
                         if (res?.data) res.data.forEach(row => { if (row.length >= 2 && row[1]) users.push({ name: (row[0]||"").trim(), code: (row[1]||"").trim() }); });
-                        setUserList(users);
+                        if (users.length > 0) setUserList(users);
                     }
                 });
 
@@ -423,10 +430,65 @@
             useEffect(() => { const saved = localStorage.getItem("misoyon_user"); if (saved) { setIsAuthenticated(true); setCurrentUser(saved); } }, []);
 
             const handleLogin = () => {
-                const foundUser = Array.isArray(userList) ? userList.find(u => u.name === inputName.trim() && u.code === inputCode.trim()) : null;
-                if (foundUser) { setIsAuthenticated(true); setCurrentUser(foundUser.name); localStorage.setItem("misoyon_user", foundUser.name); }
-                else if (inputName.trim() === ADMIN_NAME && inputCode.trim() === ADMIN_CODE) { setIsAuthenticated(true); setCurrentUser("관리자"); localStorage.setItem("misoyon_user", "관리자"); }
-                else { setLoginError("이름 또는 코드를 확인하세요."); }
+                const name = inputName.trim();
+                const code = inputCode.trim();
+
+                if (!name || !code) {
+                    setLoginError("이름과 코드를 입력하세요.");
+                    return;
+                }
+
+                // 1차: 로컬 캐시 사용자 목록 및 관리자 백업 체크
+                const foundLocal = userList.find(u => u.name === name && u.code === code);
+                if (foundLocal) {
+                    setIsAuthenticated(true);
+                    setCurrentUser(foundLocal.name);
+                    localStorage.setItem("misoyon_user", foundLocal.name);
+                    setLoginError("");
+                    return;
+                }
+
+                if (name === ADMIN_NAME && code === ADMIN_CODE) {
+                    setIsAuthenticated(true);
+                    setCurrentUser("관리자");
+                    localStorage.setItem("misoyon_user", "관리자");
+                    setLoginError("");
+                    return;
+                }
+
+                // 2차: 로컬에 없으면 구글 시트에서 최신 사용자 목록 실시간 Fetch 후 재검증
+                setIsLoggingIn(true);
+                setLoginError("구글 시트에서 사용자 정보를 확인하는 중...");
+
+                Papa.parse(`${USER_URL}&t=${new Date().getTime()}`, {
+                    download: true, header: false,
+                    complete: (res) => {
+                        setIsLoggingIn(false);
+                        const freshUsers = [];
+                        if (res?.data) {
+                            res.data.forEach(row => {
+                                if (row.length >= 2 && row[1]) {
+                                    freshUsers.push({ name: (row[0]||"").trim(), code: (row[1]||"").trim() });
+                                }
+                            });
+                        }
+                        if (freshUsers.length > 0) setUserList(freshUsers);
+
+                        const foundFresh = freshUsers.find(u => u.name === name && u.code === code);
+                        if (foundFresh) {
+                            setIsAuthenticated(true);
+                            setCurrentUser(foundFresh.name);
+                            localStorage.setItem("misoyon_user", foundFresh.name);
+                            setLoginError("");
+                        } else {
+                            setLoginError("이름 또는 코드를 확인하세요.");
+                        }
+                    },
+                    error: () => {
+                        setIsLoggingIn(false);
+                        setLoginError("사용자 목록을 불러오는 중 오류가 발생했습니다.");
+                    }
+                });
             };
 
             const handleLogout = () => { setIsAuthenticated(false); setCurrentUser(""); localStorage.removeItem("misoyon_user"); window.location.reload(); };
@@ -541,29 +603,6 @@
                         alert("재고 수량이 수정되었습니다.");
                         fetchInventoryData();
                     } else alert("수정 실패");
-                });
-            };
-
-            const handleManualNoteUpdate = (item) => {
-                const currentNote = item.note || "";
-                const newNote = prompt(`[${item.name}] 비고/차감 사유를 입력하세요:`, currentNote);
-                if (newNote === null) return;
-
-                fetch(webAppUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify({
-                        action: 'update_inventory_manual',
-                        rowIdx: item.rowIdx,
-                        note: newNote
-                    })
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        alert("비고가 저장되었습니다.");
-                        fetchInventoryData();
-                    } else alert("저장 실패");
                 });
             };
 
@@ -684,7 +723,6 @@
             const weeklyData = getWeeklyData();
             const todayComments = selectedDate ? comments.filter(c => c.date === selectedDate.date) : [];
             const todayReports = selectedDate ? reports.filter(r => r.date === selectedDate.date) : [];
-            const currentTabReport = todayReports.find(r => r.type === activeReportTab) || { type: activeReportTab, beforeImg: '', afterImg: '', content: '', author: currentUser };
 
             const todayRecipes = useMemo(() => {
                 if (!selectedDate) return [];
@@ -692,7 +730,6 @@
                 return findMatchedRecipes(combinedText, recipeMap);
             }, [selectedDate, recipeMap]);
 
-            // 📌 [핵심] 품목별 현재고 요약 계산 (Name 기준 합산)
             const summaryInventory = useMemo(() => {
                 const map = {};
                 inventoryList.forEach(item => {
@@ -725,7 +762,6 @@
                 return result;
             }, [inventoryList, showZeroStock]);
 
-            // 📌 [핵심] 입고 이력 기간별 필터링
             const filteredHistoryList = useMemo(() => {
                 if (historyFilter === "all") return inventoryList;
                 const todayStr = getTodayStr();
@@ -759,7 +795,9 @@
                             <p className="text-[10px] text-slate-400 font-bold mb-6">Powered by Chef D.S. Kim</p>
                             <input type="text" className="login-input" placeholder="이름 (Name)" value={inputName} onChange={e => setInputName(e.target.value)} />
                             <input type="password" inputMode="numeric" className="login-input" placeholder="비밀번호 (Code)" value={inputCode} onChange={e => setInputCode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
-                            <button onClick={handleLogin} className="login-btn">LOGIN</button>
+                            <button onClick={handleLogin} disabled={isLoggingIn} className="login-btn">
+                                {isLoggingIn ? "검증 중..." : "LOGIN"}
+                            </button>
                             {loginError && <p className="text-red-500 text-xs font-bold mt-3">{loginError}</p>}
                         </div>
                     </div>
@@ -969,7 +1007,6 @@
                             </div>
 
                             <div className="flex-1 bg-white rounded-2xl border overflow-hidden flex flex-col shadow-sm min-h-[300px]">
-                                {/* 상단 뷰 구분 탭 */}
                                 <div className="flex border-b bg-slate-50">
                                     <button onClick={() => setActiveInvTab("summary")} className={`flex-1 py-2.5 text-xs font-black transition-all ${activeInvTab === "summary" ? "bg-white text-emerald-700 border-b-2 border-emerald-600" : "text-slate-400"}`}>
                                         📊 현재고 요약 ({summaryInventory.length}종)
@@ -986,7 +1023,6 @@
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto p-2">
-                                    {/* 1. 현재고 요약 뷰 */}
                                     {activeInvTab === "summary" ? (
                                         <div>
                                             <div className="flex justify-between items-center p-2 bg-slate-50 rounded-xl mb-2 border text-xs font-bold">
@@ -1036,7 +1072,6 @@
                                             </table>
                                         </div>
                                     ) : activeInvTab === "history" ? (
-                                        /* 2. 과거 입고 이력 뷰 (기간별 필터 지원) */
                                         <div>
                                             <div className="flex gap-2 mb-2 p-1 bg-slate-100 rounded-xl">
                                                 <button onClick={() => setHistoryFilter("all")} className={`flex-1 py-1.5 rounded-lg text-xs font-black ${historyFilter === "all" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500"}`}>전체</button>
