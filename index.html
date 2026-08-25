@@ -24,6 +24,7 @@
         
         .modal-view { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; flex-direction: column; padding: 15px; animation: slideUp 0.3s ease-out; }
         .recipe-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+        .zoom-popup { position: fixed; inset: 0; background: rgba(255,255,255,0.98); z-index: 1500; display: flex; flex-direction: column; padding: 20px; animation: zoomIn 0.2s ease-out; }
         .recipe-tag { display: inline-block; background: #eff6ff; color: #2563eb; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 900; margin-right: 4px; margin-top: 4px; border: 1px solid #bfdbfe; cursor: pointer; transition: all 0.2s; }
         .recipe-content { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.7; white-space: pre-wrap; }
         .hl-red { color: #ef4444; text-decoration: underline; font-weight: 900; }
@@ -47,7 +48,6 @@
 
         const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbz_7KRW_j6AwOWZOdLhTxfeGSCD1gvuHlb0EKUbwPzstN-kHJDI7KB0Qmy_3h9sqmiZGw/exec";
 
-        // 기본 백업 사용자 목록 (관리자만 탑재)
         const DEFAULT_USERS = [
             { name: "관리자", code: "2026" }
         ];
@@ -265,7 +265,6 @@
                 { section: "농산", name: "", inQty: "1", unit: "kg", price: 0 }
             ]);
 
-            // 앱 로드 시 구글 시트 사용자 목록 사전 조회
             useEffect(() => {
                 Papa.parse(`${USER_URL}&t=${new Date().getTime()}`, {
                     download: true, header: false,
@@ -438,7 +437,6 @@
                     return;
                 }
 
-                // 1차: 로컬 캐시 사용자 목록 및 관리자 백업 체크
                 const foundLocal = userList.find(u => u.name === name && u.code === code);
                 if (foundLocal) {
                     setIsAuthenticated(true);
@@ -456,7 +454,6 @@
                     return;
                 }
 
-                // 2차: 로컬에 없으면 구글 시트에서 최신 사용자 목록 실시간 Fetch 후 재검증
                 setIsLoggingIn(true);
                 setLoginError("구글 시트에서 사용자 정보를 확인하는 중...");
 
@@ -918,7 +915,22 @@
                         </aside>
                     </main>
 
-                    {/* 식재료 및 재고 관리 모달 */}
+                    {/* ⚙️ URL 설정 모달 */}
+                    {urlSettingModal && (
+                        <div className="recipe-popup" onClick={() => setUrlSettingModal(false)}>
+                            <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                    <h3 className="text-lg font-black text-slate-800">⚙️ 웹앱 URL 설정</h3>
+                                    <button onClick={() => setUrlSettingModal(false)} className="text-2xl font-bold text-slate-400">×</button>
+                                </div>
+                                <p className="text-xs text-slate-500 font-bold mb-3">구글 앱스 스크립트(GAS) Web App URL을 입력하세요.</p>
+                                <input type="text" className="w-full p-3 border-2 border-amber-400 rounded-xl text-xs font-bold mb-4 outline-none" value={inputUrl} onChange={e => setInputUrl(e.target.value)} placeholder="https://script.google.com/macros/s/.../exec" />
+                                <button onClick={saveWebAppUrl} className="w-full bg-amber-500 text-white py-3 rounded-xl font-black text-xs shadow-md hover:bg-amber-600">저장하기</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 📦 식재료 및 재고 관리 모달 */}
                     {inventoryModal && (
                         <div className="modal-view bg-slate-100 overflow-y-auto">
                             <div className="flex justify-between items-center mb-3 bg-white p-4 rounded-2xl border shadow-sm shrink-0">
@@ -1181,7 +1193,120 @@
                         </div>
                     )}
 
-                    {/* 주간 메뉴표 모달 */}
+                    {/* 🌿 제철 식재료 모달 */}
+                    {seasonalModal && (
+                        <div className="modal-view">
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h2 className="text-xl font-black italic text-green-700">🌿 {currentMonth.getMonth()+1}월의 제철 식재료</h2>
+                                <button onClick={() => setSeasonalModal(false)} className="text-3xl">×</button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto space-y-4 pb-10">
+                                {Object.keys(groupedSeasonal).length > 0 ? Object.entries(groupedSeasonal).map(([cat, items]) => (
+                                    <div key={cat} className="bg-slate-50 p-4 rounded-xl border">
+                                        <h3 className="font-black text-green-700 text-sm mb-3 border-b border-green-200 pb-1">[{cat}]</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {items.map((item, idx) => (
+                                                <div key={idx} className="bg-white p-3 rounded-lg border shadow-sm flex gap-3">
+                                                    {item.image && <img src={formatImageUrl(item.image)} alt={item.name} className="w-20 h-20 object-cover rounded-lg border shrink-0 bg-slate-50" />}
+                                                    <div className="flex-1 text-xs space-y-1">
+                                                        <div className="font-black text-slate-800 text-sm">{item.name}</div>
+                                                        {item.desc && <div className="text-slate-600">{item.desc}</div>}
+                                                        {item.pairing && <div className="text-indigo-600 font-bold">🤝 궁합: {item.pairing}</div>}
+                                                        {item.menu && <div className="text-amber-600 font-bold">🍳 추천: {item.menu}</div>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )) : <div className="text-center py-10 text-slate-400 font-bold">등록된 제철 식재료 정보가 없습니다.</div>}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ⭐ 중요 리뷰 모아보기 모달 */}
+                    {importantModal && (
+                        <div className="modal-view">
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h2 className="text-xl font-black italic text-yellow-600">⭐ 중요 리뷰 모아보기</h2>
+                                <button onClick={() => setImportantModal(false)} className="text-3xl">×</button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto space-y-3 pb-10">
+                                {importantComments.length > 0 ? importantComments.map((c, i) => (
+                                    <div key={i} className="p-4 rounded-xl border bg-yellow-50 border-yellow-200 shadow-sm">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-xs font-black text-yellow-800">{c.date} | {c.name}</span>
+                                            <span className="text-[10px] text-slate-400">{c.time}</span>
+                                        </div>
+                                        <div className="text-xs font-bold text-slate-800 whitespace-pre-wrap">{c.content}</div>
+                                    </div>
+                                )) : <div className="text-center py-10 text-slate-400 font-bold">중요 표시된 리뷰가 없습니다.</div>}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 📷 현장 보고서 모달 */}
+                    {reportModal && selectedDate && (
+                        <div className="modal-view">
+                            <div className="flex justify-between items-center mb-3 border-b pb-2">
+                                <h2 className="text-lg font-black italic text-indigo-700">📷 현장 보고서 ({selectedDate.date})</h2>
+                                <button onClick={() => setReportModal(false)} className="text-3xl">×</button>
+                            </div>
+                            
+                            <div className="flex border-b mb-4 bg-slate-50 rounded-xl p-1">
+                                {['아침', '점심', '저녁'].map(t => (
+                                    <button key={t} onClick={() => setActiveReportTab(t)} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${activeReportTab === t ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>
+                                        {t} 현장보고
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto space-y-4 pb-10">
+                                {(() => {
+                                    const currentReport = todayReports.find(r => r.type === activeReportTab);
+                                    return (
+                                        <div className="bg-slate-50 p-4 rounded-2xl border space-y-4">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="bg-white p-3 rounded-xl border text-center">
+                                                    <div className="text-xs font-black text-slate-500 mb-2">배식 전 사진</div>
+                                                    {currentReport?.beforeImg ? (
+                                                        <img src={formatImageUrl(currentReport.beforeImg)} alt="배식 전" className="w-full h-36 object-cover rounded-lg border mb-2" />
+                                                    ) : (
+                                                        <div className="w-full h-36 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400 font-bold mb-2">사진 없음</div>
+                                                    )}
+                                                    <label className="block w-full bg-indigo-50 text-indigo-600 border border-indigo-200 py-2 rounded-lg font-black text-xs cursor-pointer hover:bg-indigo-100">
+                                                        {isUploadingReport === 'before' ? '업로드 중...' : '📸 촬영/등록'}
+                                                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleReportPhotoUpload(activeReportTab, 'before', e)} disabled={!!isUploadingReport} />
+                                                    </label>
+                                                </div>
+
+                                                <div className="bg-white p-3 rounded-xl border text-center">
+                                                    <div className="text-xs font-black text-slate-500 mb-2">배식 후 사진</div>
+                                                    {currentReport?.afterImg ? (
+                                                        <img src={formatImageUrl(currentReport.afterImg)} alt="배식 후" className="w-full h-36 object-cover rounded-lg border mb-2" />
+                                                    ) : (
+                                                        <div className="w-full h-36 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400 font-bold mb-2">사진 없음</div>
+                                                    )}
+                                                    <label className="block w-full bg-indigo-50 text-indigo-600 border border-indigo-200 py-2 rounded-lg font-black text-xs cursor-pointer hover:bg-indigo-100">
+                                                        {isUploadingReport === 'after' ? '업로드 중...' : '📸 촬영/등록'}
+                                                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleReportPhotoUpload(activeReportTab, 'after', e)} disabled={!!isUploadingReport} />
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            {currentReport && (
+                                                <div className="bg-white p-3 rounded-xl border text-xs space-y-1">
+                                                    <div className="font-bold text-slate-500">작성자: {currentReport.author || "미상"}</div>
+                                                    {currentReport.content && <div className="font-bold text-slate-800 leading-relaxed">{currentReport.content}</div>}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 📅 주간 메뉴표 모달 */}
                     {weeklyModal && selectedDate && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -1209,7 +1334,7 @@
                         </div>
                     )}
 
-                    {/* 검색 결과 모달 */}
+                    {/* 🔍 검색 결과 모달 */}
                     {activeModal && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-4 border-b pb-2">
@@ -1231,7 +1356,20 @@
                         </div>
                     )}
 
-                    {/* 레시피 팝업 모달 */}
+                    {/* 🔍 메뉴 텍스트 확대 보기 팝업 */}
+                    {expandedMenu && (
+                        <div className="zoom-popup" onClick={() => setExpandedMenu(null)}>
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h3 className="text-lg font-black text-slate-800 uppercase">🔍 {expandedMenu.type} 상세보기</h3>
+                                <button onClick={() => setExpandedMenu(null)} className="text-3xl font-bold text-slate-400">×</button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto bg-slate-50 p-6 rounded-2xl border flex items-center justify-center text-center">
+                                <div className="text-2xl font-black text-slate-800 leading-relaxed whitespace-pre-wrap">{expandedMenu.text}</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 📖 레시피 팝업 모달 */}
                     {popupRecipes.length > 0 && currentRecipe && (
                         <div className="recipe-popup" onClick={() => setPopupRecipes([])}>
                             <div className="bg-white rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[85vh]" onClick={e => e.stopPropagation()}>
