@@ -1244,7 +1244,7 @@
                         </div>
                     )}
 
-                    {/* 📷 현장 보고서 모달 */}
+                    {/* 📷 현장 보고서 모달 (사진 비율 보존 object-contain 반영) */}
                     {reportModal && selectedDate && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-3 border-b pb-2">
@@ -1269,7 +1269,7 @@
                                                 <div className="bg-white p-3 rounded-xl border text-center">
                                                     <div className="text-xs font-black text-slate-500 mb-2">배식 전 사진</div>
                                                     {currentReport?.beforeImg ? (
-                                                        <img src={formatImageUrl(currentReport.beforeImg)} alt="배식 전" className="w-full h-36 object-cover rounded-lg border mb-2" />
+                                                        <img src={formatImageUrl(currentReport.beforeImg)} alt="배식 전" className="w-full h-48 object-contain bg-slate-900 rounded-lg border mb-2" />
                                                     ) : (
                                                         <div className="w-full h-36 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400 font-bold mb-2">사진 없음</div>
                                                     )}
@@ -1282,7 +1282,7 @@
                                                 <div className="bg-white p-3 rounded-xl border text-center">
                                                     <div className="text-xs font-black text-slate-500 mb-2">배식 후 사진</div>
                                                     {currentReport?.afterImg ? (
-                                                        <img src={formatImageUrl(currentReport.afterImg)} alt="배식 후" className="w-full h-36 object-cover rounded-lg border mb-2" />
+                                                        <img src={formatImageUrl(currentReport.afterImg)} alt="배식 후" className="w-full h-48 object-contain bg-slate-900 rounded-lg border mb-2" />
                                                     ) : (
                                                         <div className="w-full h-36 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400 font-bold mb-2">사진 없음</div>
                                                     )}
