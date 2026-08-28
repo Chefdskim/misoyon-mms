@@ -382,24 +382,27 @@
                     }
                 });
 
+                // 📌 중복 저장된 현장보고서 행 자동 병합 파싱
                 Papa.parse(getUrl(REPORT_URL), {
                     download: true, complete: (res) => {
-                        const data = [];
+                        const reportMap = {};
                         if (res?.data) {
                             res.data.forEach(row => {
-                                if(row.length >= 5 && row[0] !== "날짜") {
-                                    data.push({
-                                        date: normalizeDate(row[0]),
-                                        type: row[1]?.trim() || "아침",
-                                        beforeImg: row[2]?.trim() || "",
-                                        afterImg: row[3]?.trim() || "",
-                                        content: row[4]?.trim() || "",
-                                        author: row[5]?.trim() || ""
-                                    });
+                                if(row.length >= 4 && row[0] !== "날짜") {
+                                    const d = normalizeDate(row[0]);
+                                    const t = row[1]?.trim() || "아침";
+                                    const key = `${d}_${t}`;
+                                    if (!reportMap[key]) {
+                                        reportMap[key] = { date: d, type: t, beforeImg: "", afterImg: "", content: "", author: "" };
+                                    }
+                                    if (row[2]?.trim()) reportMap[key].beforeImg = row[2].trim();
+                                    if (row[3]?.trim()) reportMap[key].afterImg = row[3].trim();
+                                    if (row[4]?.trim()) reportMap[key].content = row[4].trim();
+                                    if (row[5]?.trim()) reportMap[key].author = row[5].trim();
                                 }
                             });
                         }
-                        setReports(data);
+                        setReports(Object.values(reportMap));
                     }
                 });
 
@@ -540,6 +543,7 @@
                 } catch(err) { e.target.value = ""; }
             };
 
+            // 📌 사진 업로드 시 앱 상에 즉시 반영 로직 추가
             const handleReportPhotoUpload = async (mealType, imageType, e) => {
                 const file = e.target.files[0];
                 if (!file || !selectedDate) return;
@@ -565,6 +569,31 @@
                         e.target.value = "";
                         if (data.status === 'success') {
                             alert("현장 사진이 구글 드라이브 및 시트에 저장되었습니다!");
+                            
+                            // 🌟 앱 상의 상태 즉시 업데이트 (게시 지연 방지)
+                            if (data.photoUrl) {
+                                setReports(prev => {
+                                    const next = [...prev];
+                                    const idx = next.findIndex(r => r.date === selectedDate.date && r.type === mealType);
+                                    if (idx >= 0) {
+                                        next[idx] = {
+                                            ...next[idx],
+                                            [imageType === 'before' ? 'beforeImg' : 'afterImg']: data.photoUrl,
+                                            author: currentUser
+                                        };
+                                    } else {
+                                        next.push({
+                                            date: selectedDate.date,
+                                            type: mealType,
+                                            beforeImg: imageType === 'before' ? data.photoUrl : '',
+                                            afterImg: imageType === 'after' ? data.photoUrl : '',
+                                            content: '',
+                                            author: currentUser
+                                        });
+                                    }
+                                    return next;
+                                });
+                            }
                             fetchData(true);
                         } else alert("등록 실패: " + (data.message || "오류"));
                     })
@@ -1244,7 +1273,7 @@
                         </div>
                     )}
 
-                    {/* 📷 현장 보고서 모달 (사진 비율 보존 object-contain 반영) */}
+                    {/* 📷 현장 보고서 모달 */}
                     {reportModal && selectedDate && (
                         <div className="modal-view">
                             <div className="flex justify-between items-center mb-3 border-b pb-2">
