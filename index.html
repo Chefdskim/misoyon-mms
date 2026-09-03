@@ -63,7 +63,6 @@
         const normalizeDate = (dStr) => {
             if (!dStr) return "";
             const str = String(dStr).trim();
-            // 만약 엑셀 날짜 형식이 Serial Number(숫자)로 들어올 경우 처리
             if (!isNaN(str) && Number(str) > 30000) {
                 const jsDate = new Date((Number(str) - (25567 + 2)) * 86400 * 1000);
                 const y = jsDate.getFullYear();
@@ -351,7 +350,6 @@
                         }
                         setMenus(temp);
                         const todayStr = getTodayStr();
-                        // 📌 오늘 날짜를 정확히 찾아오도록 매칭 보완
                         const foundToday = temp.find(m => m.date === todayStr);
                         setSelectedDate(foundToday || temp[0] || { date: todayStr, morning: "", lunch: "", dinner: "", duty: "", packing: "" });
                     }
@@ -604,8 +602,9 @@
                 }
             };
 
+            // 📌 수기 보정 시 품목명(itemName)을 백엔드로 직접 전달
             const handleManualQtyUpdate = (item) => {
-                const newQtyStr = prompt(`[${item.name}] 변경할 재고 수량을 입력하세요 (현재: ${item.invQty}${item.unit}):`, item.invQty);
+                const newQtyStr = prompt(`[${item.name}] 변경할 목표 총 재고 수량을 입력하세요 (현재 총재고: ${item.totalInvQty}${item.unit}):`, item.totalInvQty);
                 if (newQtyStr === null) return;
                 const newQty = parseFloat(newQtyStr);
                 if (isNaN(newQty)) return alert("숫자만 입력 가능합니다.");
@@ -615,14 +614,15 @@
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify({
                         action: 'update_inventory_manual',
-                        rowIdx: item.rowIdx,
+                        itemName: item.name,
+                        rowIdx: item.latestRowIdx,
                         newInvQty: newQty
                     })
                 })
                 .then(res => res.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        alert("재고 수량이 수정되었습니다.");
+                        alert(`[${item.name}] 총 재고가 ${newQty}${item.unit}(으)로 선입선출 보정되었습니다.`);
                         fetchInventoryData();
                     } else alert("수정 실패");
                 });
@@ -746,7 +746,6 @@
             const todayComments = selectedDate ? comments.filter(c => c.date === selectedDate.date) : [];
             const todayReports = selectedDate ? reports.filter(r => r.date === selectedDate.date) : [];
 
-            // 📌 선택된 날짜의 메뉴를 정확히 기준으로 레시피 소요 분석
             const todayRecipes = useMemo(() => {
                 if (!selectedDate) return [];
                 const combinedText = `${selectedDate.morning || ""} ${selectedDate.lunch || ""} ${selectedDate.dinner || ""} ${selectedDate.packing || ""}`;
@@ -832,7 +831,7 @@
                     <header className="flex flex-col px-4 py-3 bg-white border-b gap-3 shrink-0">
                         <div className="flex justify-between items-center">
                             <div>
-                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v3.7</span></h1>
+                                <h1 className="text-xl font-black italic tracking-tighter">Mise-On <span className="text-blue-600 text-xs not-italic">v3.8</span></h1>
                                 <div className="text-[10px] text-slate-400 font-bold">Smart Kitchen System</div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -1099,7 +1098,7 @@
                                                                 <td className="p-2 text-right font-black text-emerald-800">{Number(item.totalInvAmount).toLocaleString()}원</td>
                                                                 <td className="p-2 text-center text-slate-400 text-[11px]">{item.lastDate}</td>
                                                                 <td className="p-2 text-center">
-                                                                    <button onClick={() => handleManualQtyUpdate({ name: item.name, invQty: item.totalInvQty, unit: item.unit, rowIdx: item.latestRowIdx })} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-[10px] font-black hover:bg-slate-300">
+                                                                    <button onClick={() => handleManualQtyUpdate(item)} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-[10px] font-black hover:bg-slate-300">
                                                                         ✏️ 보정
                                                                     </button>
                                                                 </td>
